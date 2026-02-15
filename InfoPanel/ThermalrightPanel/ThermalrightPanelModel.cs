@@ -7,5 +7,7 @@ namespace InfoPanel.ThermalrightPanel
         PeerlessVision360,
         // Wonder Vision 360 - 6.67" (2400x1080) - responds with SSCRM-V3
         WonderVision360,
+        // TL-M10 VISION - 9.16" (1920x462) - responds with SSCRM-V4
+        TLM10Vision,
     }
 }
