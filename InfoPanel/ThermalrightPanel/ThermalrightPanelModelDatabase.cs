@@ -4,8 +4,20 @@ namespace InfoPanel.ThermalrightPanel
 {
     public static class ThermalrightPanelModelDatabase
     {
+        // Primary Thermalright VID/PID (most panels)
         public const int THERMALRIGHT_VENDOR_ID = 0x87AD;
         public const int THERMALRIGHT_PRODUCT_ID = 0x70DB;
+
+        // Trofeo Vision uses different VID/PID
+        public const int TROFEO_VENDOR_ID = 0x0416;
+        public const int TROFEO_PRODUCT_ID = 0x5408;
+
+        // All supported VID/PID pairs for device scanning
+        public static readonly (int Vid, int Pid)[] SupportedDevices =
+        {
+            (THERMALRIGHT_VENDOR_ID, THERMALRIGHT_PRODUCT_ID),
+            (TROFEO_VENDOR_ID, TROFEO_PRODUCT_ID)
+        };
 
         // Device identifiers returned in init response
         public const string IDENTIFIER_V1 = "SSCRM-V1"; // Peerless Vision 360 (480x480)
@@ -49,6 +61,18 @@ namespace InfoPanel.ThermalrightPanel
                 RenderHeight = 462,
                 VendorId = THERMALRIGHT_VENDOR_ID,
                 ProductId = THERMALRIGHT_PRODUCT_ID
+            },
+            [ThermalrightPanelModel.TrofeoVision] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.TrofeoVision,
+                Name = "Trofeo Vision",
+                DeviceIdentifier = "",  // Identified by unique VID/PID
+                Width = 1920,
+                Height = 480,
+                RenderWidth = 1920,
+                RenderHeight = 480,
+                VendorId = TROFEO_VENDOR_ID,
+                ProductId = TROFEO_PRODUCT_ID
             }
         };
 

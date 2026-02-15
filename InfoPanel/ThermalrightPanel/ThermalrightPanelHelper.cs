@@ -19,73 +19,47 @@ namespace InfoPanel.ThermalrightPanel
         public static List<ThermalrightPanelDiscoveryInfo> ScanDevices()
         {
             var devices = new List<ThermalrightPanelDiscoveryInfo>();
-            int vendorId = ThermalrightPanelModelDatabase.THERMALRIGHT_VENDOR_ID;
-            int productId = ThermalrightPanelModelDatabase.THERMALRIGHT_PRODUCT_ID;
 
-            // Try HID discovery first
-            Logger.Information("ThermalrightPanelHelper: Scanning for HID devices VID={VendorId:X4} PID={ProductId:X4}",
-                vendorId, productId);
-
-            try
+            // Scan for all supported VID/PID pairs
+            foreach (var (vendorId, productId) in ThermalrightPanelModelDatabase.SupportedDevices)
             {
-                var hidDevices = DeviceList.Local.GetHidDevices(vendorId, productId).ToList();
-                Logger.Information("ThermalrightPanelHelper: Found {Count} HID devices", hidDevices.Count);
+                Logger.Information("ThermalrightPanelHelper: Scanning for USB devices VID={VendorId:X4} PID={ProductId:X4}",
+                    vendorId, productId);
 
-                foreach (var hidDevice in hidDevices)
+                foreach (UsbRegistry deviceReg in UsbDevice.AllDevices)
                 {
-                    Logger.Information("ThermalrightPanelHelper: HID device path: {Path}", hidDevice.DevicePath);
-                    Logger.Information("ThermalrightPanelHelper: HID MaxInput={MaxIn}, MaxOutput={MaxOut}, MaxFeature={MaxFeat}",
-                        hidDevice.GetMaxInputReportLength(),
-                        hidDevice.GetMaxOutputReportLength(),
-                        hidDevice.GetMaxFeatureReportLength());
-                }
-            }
-            catch (System.Exception ex)
-            {
-                Logger.Warning(ex, "ThermalrightPanelHelper: HID scan failed");
-            }
-
-            // Then try USB discovery
-            Logger.Information("ThermalrightPanelHelper: Scanning for USB devices VID={VendorId:X4} PID={ProductId:X4}",
-                vendorId, productId);
-
-            foreach (UsbRegistry deviceReg in UsbDevice.AllDevices)
-            {
-                if (deviceReg.Vid == vendorId && deviceReg.Pid == productId)
-                {
-                    var deviceId = deviceReg.DeviceProperties["DeviceID"] as string;
-                    var deviceLocation = deviceReg.DeviceProperties["LocationInformation"] as string;
-
-                    Logger.Information("ThermalrightPanelHelper: USB device found - Path: {Path}", deviceReg.DevicePath);
-
-                    if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(deviceLocation))
+                    if (deviceReg.Vid == vendorId && deviceReg.Pid == productId)
                     {
-                        Logger.Warning("ThermalrightPanelHelper: Found device but missing DeviceID or LocationInformation");
-                        continue;
+                        var deviceId = deviceReg.DeviceProperties["DeviceID"] as string;
+                        var deviceLocation = deviceReg.DeviceProperties["LocationInformation"] as string;
+
+                        Logger.Information("ThermalrightPanelHelper: USB device found - Path: {Path}", deviceReg.DevicePath);
+
+                        if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(deviceLocation))
+                        {
+                            Logger.Warning("ThermalrightPanelHelper: Found device but missing DeviceID or LocationInformation");
+                            continue;
+                        }
+
+                        // Get model info based on VID/PID (works for unique VID/PID like Trofeo)
+                        var modelInfo = ThermalrightPanelModelDatabase.GetModelByVidPid(vendorId, productId);
+
+                        var discoveryInfo = new ThermalrightPanelDiscoveryInfo
+                        {
+                            DeviceId = deviceId,
+                            DeviceLocation = deviceLocation,
+                            DevicePath = deviceReg.DevicePath,
+                            VendorId = vendorId,
+                            ProductId = productId,
+                            Model = modelInfo?.Model ?? ThermalrightPanelModel.Unknown,
+                            ModelInfo = modelInfo
+                        };
+
+                        Logger.Information("ThermalrightPanelHelper: Found {Model} at {Location}",
+                            modelInfo?.Name ?? "Unknown", deviceLocation);
+
+                        devices.Add(discoveryInfo);
                     }
-
-                    // Get model info based on VID/PID
-                    var modelInfo = ThermalrightPanelModelDatabase.GetModelByVidPid(vendorId, productId);
-
-                    if (modelInfo == null)
-                    {
-                        Logger.Warning("ThermalrightPanelHelper: Unknown model for VID:{Vid:X4} PID:{Pid:X4}", vendorId, productId);
-                        continue;
-                    }
-
-                    var discoveryInfo = new ThermalrightPanelDiscoveryInfo
-                    {
-                        DeviceId = deviceId,
-                        DeviceLocation = deviceLocation,
-                        DevicePath = deviceReg.DevicePath,
-                        Model = modelInfo.Model,
-                        ModelInfo = modelInfo
-                    };
-
-                    Logger.Information("ThermalrightPanelHelper: Found {Model} at {Location}",
-                        modelInfo.Name, deviceLocation);
-
-                    devices.Add(discoveryInfo);
                 }
             }
 
@@ -99,6 +73,8 @@ namespace InfoPanel.ThermalrightPanel
         public string DeviceId { get; init; } = string.Empty;
         public string DeviceLocation { get; init; } = string.Empty;
         public string DevicePath { get; init; } = string.Empty;
+        public int VendorId { get; init; }
+        public int ProductId { get; init; }
         public ThermalrightPanelModel Model { get; init; }
         public ThermalrightPanelModelInfo? ModelInfo { get; init; }
     }

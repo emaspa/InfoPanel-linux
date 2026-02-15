@@ -36,6 +36,14 @@ namespace InfoPanel.Services
         public ThermalrightPanelDeviceTask(ThermalrightPanelDevice device)
         {
             _device = device ?? throw new ArgumentNullException(nameof(device));
+
+            // Initialize from device's ModelInfo if available (handles unique VID/PID devices like Trofeo Vision)
+            if (_device.ModelInfo != null)
+            {
+                _panelWidth = _device.ModelInfo.RenderWidth;
+                _panelHeight = _device.ModelInfo.RenderHeight;
+                _detectedModel = _device.ModelInfo;
+            }
         }
 
         /// <summary>
@@ -122,11 +130,12 @@ namespace InfoPanel.Services
             try
             {
                 // Use direct WinUSB API to open device (bypasses LibUsbDotNet issues)
-                Logger.Information("ThermalrightPanelDevice {Device}: Opening device via WinUSB API...", _device);
+                var vendorId = _device.ModelInfo?.VendorId ?? ThermalrightPanelModelDatabase.THERMALRIGHT_VENDOR_ID;
+                var productId = _device.ModelInfo?.ProductId ?? ThermalrightPanelModelDatabase.THERMALRIGHT_PRODUCT_ID;
+                Logger.Information("ThermalrightPanelDevice {Device}: Opening device via WinUSB API (VID={Vid:X4} PID={Pid:X4})...",
+                    _device, vendorId, productId);
 
-                using var usbDevice = WinUsbDevice.Open(
-                    ThermalrightPanelModelDatabase.THERMALRIGHT_VENDOR_ID,
-                    ThermalrightPanelModelDatabase.THERMALRIGHT_PRODUCT_ID);
+                using var usbDevice = WinUsbDevice.Open(vendorId, productId);
 
                 if (usbDevice == null)
                 {

@@ -9,5 +9,7 @@ namespace InfoPanel.ThermalrightPanel
         WonderVision360,
         // TL-M10 VISION - 9.16" (1920x462) - responds with SSCRM-V4
         TLM10Vision,
+        // Trofeo Vision - 9.16" (1920x480) - VID 0x0416 / PID 0x5408
+        TrofeoVision,
     }
 }
