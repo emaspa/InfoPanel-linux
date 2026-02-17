@@ -2,6 +2,8 @@ using InfoPanel.Extensions;
 using InfoPanel.Models;
 using InfoPanel.ThermalrightPanel;
 using InfoPanel.Utils;
+using LibUsbDotNet;
+using LibUsbDotNet.Main;
 using Serilog;
 using SkiaSharp;
 using System;
@@ -136,49 +138,89 @@ namespace InfoPanel.Services
                 await DoWorkWinUsbAsync(token);
         }
 
+        /// <summary>
+        /// Finds the matching UsbRegistry for this device by scanning all connected USB devices.
+        /// </summary>
+        private UsbRegistry? FindUsbRegistry(int vendorId, int productId)
+        {
+            foreach (UsbRegistry deviceReg in UsbDevice.AllDevices)
+            {
+                if (deviceReg.Vid == vendorId && deviceReg.Pid == productId)
+                {
+                    var deviceId = deviceReg.DeviceProperties["DeviceID"] as string;
+
+                    // Match by DeviceId if we have one, otherwise take first match
+                    if (string.IsNullOrEmpty(_device.DeviceId) ||
+                        (deviceId != null && deviceId.Equals(_device.DeviceId, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        return deviceReg;
+                    }
+                }
+            }
+            return null;
+        }
+
         private async Task DoWorkWinUsbAsync(CancellationToken token)
         {
             try
             {
-                // Use direct WinUSB API to open device (bypasses LibUsbDotNet issues)
                 var vendorId = _device.ModelInfo?.VendorId ?? ThermalrightPanelModelDatabase.THERMALRIGHT_VENDOR_ID;
                 var productId = _device.ModelInfo?.ProductId ?? ThermalrightPanelModelDatabase.THERMALRIGHT_PRODUCT_ID;
-                Logger.Information("ThermalrightPanelDevice {Device}: Opening device via WinUSB API (VID={Vid:X4} PID={Pid:X4})...",
+                Logger.Information("ThermalrightPanelDevice {Device}: Opening device via LibUsbDotNet (VID={Vid:X4} PID={Pid:X4})...",
                     _device, vendorId, productId);
 
-                using var usbDevice = WinUsbDevice.Open(vendorId, productId);
+                // Find the matching UsbRegistry
+                var usbRegistry = FindUsbRegistry(vendorId, productId);
+                if (usbRegistry == null)
+                {
+                    Logger.Warning("ThermalrightPanelDevice {Device}: USB device not found", _device);
+                    _device.UpdateRuntimeProperties(errorMessage:
+                        "USB device not found. Make sure:\n" +
+                        "1. WinUSB driver is installed (use Zadig)\n" +
+                        "2. The device is connected");
+                    return;
+                }
 
+                using var usbDevice = usbRegistry.Device;
                 if (usbDevice == null)
                 {
-                    Logger.Warning("ThermalrightPanelDevice {Device}: Failed to open device via WinUSB", _device);
+                    Logger.Warning("ThermalrightPanelDevice {Device}: Failed to open USB device", _device);
                     _device.UpdateRuntimeProperties(errorMessage:
                         "Failed to open USB device. Make sure:\n" +
-                        "1. WinUSB driver is installed (use Zadig)\n" +
-                        "2. No other application is using the device\n" +
-                        "3. Try running as Administrator");
+                        "1. No other application is using the device\n" +
+                        "2. Try running as Administrator");
                     return;
+                }
+
+                // Claim the interface (required for WinUSB devices)
+                if (usbDevice is IUsbDevice wholeUsbDevice)
+                {
+                    wholeUsbDevice.SetConfiguration(1);
+                    wholeUsbDevice.ClaimInterface(0);
                 }
 
                 Logger.Information("ThermalrightPanelDevice {Device}: Device opened successfully!", _device);
 
+                using var writer = usbDevice.OpenEndpointWriter(WriteEndpointID.Ep01);
+                using var reader = usbDevice.OpenEndpointReader(ReadEndpointID.Ep01);
+
                 // Send initialization command (magic + zeros + 0x01 at offset 56)
                 var initCommand = BuildInitCommand();
                 Logger.Information("ThermalrightPanelDevice {Device}: Sending init command (64 bytes)", _device);
-                Logger.Debug("ThermalrightPanelDevice {Device}: Init bytes: {Hex}", _device,
-                    BitConverter.ToString(initCommand).Replace("-", ""));
 
-                if (!usbDevice.Write(initCommand, out int initWritten))
+                var ec = writer.Write(initCommand, 5000, out int initWritten);
+                if (ec != ErrorCode.None)
                 {
-                    Logger.Error("ThermalrightPanelDevice {Device}: Init command failed", _device);
-                    _device.UpdateRuntimeProperties(errorMessage: "Init command failed");
+                    Logger.Error("ThermalrightPanelDevice {Device}: Init command failed: {Error}", _device, ec);
+                    _device.UpdateRuntimeProperties(errorMessage: $"Init command failed: {ec}");
                     return;
                 }
                 Logger.Information("ThermalrightPanelDevice {Device}: Init command sent ({Bytes} bytes)", _device, initWritten);
 
                 // Read device response to identify panel type (SSCRM-V1, SSCRM-V3, etc.)
                 var responseBuffer = new byte[64];
-                string? deviceIdentifier = null;
-                if (usbDevice.Read(responseBuffer, out int bytesRead) && bytesRead > 0)
+                ec = reader.Read(responseBuffer, 5000, out int bytesRead);
+                if (ec == ErrorCode.None && bytesRead > 0)
                 {
                     var responseHex = BitConverter.ToString(responseBuffer, 0, Math.Min(bytesRead, 32)).Replace("-", "");
                     Logger.Information("ThermalrightPanelDevice {Device}: Device response ({Bytes} bytes): {Hex}",
@@ -187,7 +229,7 @@ namespace InfoPanel.Services
                     // Extract device identifier (e.g., "SSCRM-V1", "SSCRM-V3" at offset 4)
                     if (bytesRead >= 12)
                     {
-                        deviceIdentifier = System.Text.Encoding.ASCII.GetString(responseBuffer, 4, 8).TrimEnd('\0');
+                        var deviceIdentifier = System.Text.Encoding.ASCII.GetString(responseBuffer, 4, 8).TrimEnd('\0');
                         Logger.Information("ThermalrightPanelDevice {Device}: Device identifier: {Id}", _device, deviceIdentifier);
 
                         // Detect panel model based on identifier
@@ -212,8 +254,8 @@ namespace InfoPanel.Services
                 }
                 else
                 {
-                    Logger.Warning("ThermalrightPanelDevice {Device}: No response from device, using default {Width}x{Height}",
-                        _device, _panelWidth, _panelHeight);
+                    Logger.Warning("ThermalrightPanelDevice {Device}: No response from device (ec={Error}), using default {Width}x{Height}",
+                        _device, ec, _panelWidth, _panelHeight);
                 }
 
                 // Update device display name with detected model (show native resolution)
@@ -221,7 +263,7 @@ namespace InfoPanel.Services
 
                 await Task.Delay(100, token); // Small delay after init
 
-                // Run the render+send loop using WinUSB bulk transfers
+                // Run the render+send loop using LibUsbDotNet bulk transfers
                 await RunRenderSendLoop(jpegData =>
                 {
                     // Build display header with JPEG size
@@ -232,10 +274,11 @@ namespace InfoPanel.Services
                     Array.Copy(header, 0, packet, 0, HEADER_SIZE);
                     Array.Copy(jpegData, 0, packet, HEADER_SIZE, jpegData.Length);
 
-                    // Send as single bulk transfer
-                    if (!usbDevice.Write(packet, out int bytesWritten))
+                    // Send as single bulk write
+                    var writeEc = writer.Write(packet, 5000, out int bytesWritten);
+                    if (writeEc != ErrorCode.None)
                     {
-                        throw new Exception("USB write failed");
+                        throw new Exception($"USB write failed: {writeEc}");
                     }
                 }, token);
             }
