@@ -95,6 +95,10 @@ namespace InfoPanel.Services
                     Logger.Debug("ThermalrightPanel: Multi-device mode is disabled. No devices will be started.");
                 }
             }
+            catch (TaskCanceledException)
+            {
+                Logger.Debug("ThermalrightPanel: Task cancelled");
+            }
             catch (Exception e)
             {
                 Logger.Error(e, "ThermalrightPanel: Error in DoWorkAsync");
@@ -141,6 +145,10 @@ namespace InfoPanel.Services
                     }
 
                     await Task.Delay(1000, token);
+                }
+                catch (TaskCanceledException)
+                {
+                    break;
                 }
                 catch (Exception ex)
                 {

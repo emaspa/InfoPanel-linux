@@ -28,6 +28,9 @@ namespace InfoPanel.Services
         private const int DEFAULT_WIDTH = 480;
         private const int DEFAULT_HEIGHT = 480;
 
+        // Delay before returning after a device open failure (prevents rapid retry storm)
+        private const int OPEN_FAILURE_BACKOFF_MS = 10000;
+
         private readonly ThermalrightPanelDevice _device;
         private int _panelWidth = DEFAULT_WIDTH;
         private int _panelHeight = DEFAULT_HEIGHT;
@@ -178,6 +181,7 @@ namespace InfoPanel.Services
                         "USB device not found. Make sure:\n" +
                         "1. WinUSB driver is installed (use Zadig)\n" +
                         "2. The device is connected");
+                    await Task.Delay(OPEN_FAILURE_BACKOFF_MS, token);
                     return;
                 }
 
@@ -189,6 +193,7 @@ namespace InfoPanel.Services
                         "Failed to open USB device. Make sure:\n" +
                         "1. No other application is using the device\n" +
                         "2. Try running as Administrator");
+                    await Task.Delay(OPEN_FAILURE_BACKOFF_MS, token);
                     return;
                 }
 
@@ -315,6 +320,7 @@ namespace InfoPanel.Services
                         "Failed to open HID device. Make sure:\n" +
                         "1. The device is connected\n" +
                         "2. No other application is using the device");
+                    await Task.Delay(OPEN_FAILURE_BACKOFF_MS, token);
                     return;
                 }
 
