@@ -127,6 +127,17 @@ namespace InfoPanel.Services
         {
             await Task.Delay(300, token);
 
+            var transportType = _device.ModelInfo?.TransportType ?? ThermalrightTransportType.WinUsb;
+            Logger.Information("ThermalrightPanelDevice {Device}: Using {Transport} transport", _device, transportType);
+
+            if (transportType == ThermalrightTransportType.Hid)
+                await DoWorkHidAsync(token);
+            else
+                await DoWorkWinUsbAsync(token);
+        }
+
+        private async Task DoWorkWinUsbAsync(CancellationToken token)
+        {
             try
             {
                 // Use direct WinUSB API to open device (bypasses LibUsbDotNet issues)
@@ -206,107 +217,27 @@ namespace InfoPanel.Services
                 }
 
                 // Update device display name with detected model (show native resolution)
-                var modelName = _detectedModel?.Name ?? "Panel";
-                var nativeWidth = _detectedModel?.Width ?? _panelWidth;
-                var nativeHeight = _detectedModel?.Height ?? _panelHeight;
-                _device.RuntimeProperties.Name = $"Thermalright {modelName} ({nativeWidth}x{nativeHeight})";
-                Logger.Information("ThermalrightPanelDevice {Device}: Connected to {Name} (native {NativeW}x{NativeH}, rendering at {RenderW}x{RenderH})",
-                    _device, modelName, nativeWidth, nativeHeight, _panelWidth, _panelHeight);
+                UpdateDeviceDisplayName();
 
                 await Task.Delay(100, token); // Small delay after init
 
-                // Main rendering loop
-                FpsCounter fpsCounter = new(60);
-                byte[]? _latestFrame = null;
-                AutoResetEvent _frameAvailable = new(false);
-
-                var renderCts = CancellationTokenSource.CreateLinkedTokenSource(token);
-                var renderToken = renderCts.Token;
-
-                _device.UpdateRuntimeProperties(isRunning: true);
-
-                var renderTask = Task.Run(async () =>
+                // Run the render+send loop using WinUSB bulk transfers
+                await RunRenderSendLoop(jpegData =>
                 {
-                    Thread.CurrentThread.Name ??= $"Thermalright-Render-{_device.DeviceLocation}";
-                    var stopwatch = new Stopwatch();
+                    // Build display header with JPEG size
+                    var header = BuildDisplayHeader(jpegData.Length);
 
-                    while (!renderToken.IsCancellationRequested)
+                    // Combine header + JPEG into single buffer
+                    var packet = new byte[HEADER_SIZE + jpegData.Length];
+                    Array.Copy(header, 0, packet, 0, HEADER_SIZE);
+                    Array.Copy(jpegData, 0, packet, HEADER_SIZE, jpegData.Length);
+
+                    // Send as single bulk transfer
+                    if (!usbDevice.Write(packet, out int bytesWritten))
                     {
-                        stopwatch.Restart();
-                        var frame = GenerateJpegBuffer();
-
-                        if (frame != null)
-                        {
-                            Interlocked.Exchange(ref _latestFrame, frame);
-                            _frameAvailable.Set();
-                        }
-
-                        var targetFrameTime = 1000 / ConfigModel.Instance.Settings.TargetFrameRate;
-                        var desiredFrameTime = Math.Max((int)(fpsCounter.FrameTime * 0.9), targetFrameTime);
-                        var adaptiveFrameTime = 0;
-
-                        var elapsedMs = (int)stopwatch.ElapsedMilliseconds;
-
-                        if (elapsedMs < desiredFrameTime)
-                        {
-                            adaptiveFrameTime = desiredFrameTime - elapsedMs;
-                        }
-
-                        if (adaptiveFrameTime > 0)
-                        {
-                            await Task.Delay(adaptiveFrameTime, token);
-                        }
-                    }
-                }, renderToken);
-
-                var sendTask = Task.Run(() =>
-                {
-                    Thread.CurrentThread.Name ??= $"Thermalright-Send-{_device.DeviceLocation}";
-                    try
-                    {
-                        var stopwatch = new Stopwatch();
-
-                        while (!token.IsCancellationRequested)
-                        {
-                            if (_frameAvailable.WaitOne(100))
-                            {
-                                var jpegData = Interlocked.Exchange(ref _latestFrame, null);
-                                if (jpegData != null)
-                                {
-                                    stopwatch.Restart();
-
-                                    // Build display header with JPEG size
-                                    var header = BuildDisplayHeader(jpegData.Length);
-
-                                    // Combine header + JPEG into single buffer
-                                    var packet = new byte[HEADER_SIZE + jpegData.Length];
-                                    Array.Copy(header, 0, packet, 0, HEADER_SIZE);
-                                    Array.Copy(jpegData, 0, packet, HEADER_SIZE, jpegData.Length);
-
-                                    // Send as single bulk transfer
-                                    if (!usbDevice.Write(packet, out int bytesWritten))
-                                    {
-                                        throw new Exception("USB write failed");
-                                    }
-
-                                    fpsCounter.Update(stopwatch.ElapsedMilliseconds);
-                                    _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        Logger.Error(e, "ThermalrightPanelDevice {Device}: Error in send task", _device);
-                        _device.UpdateRuntimeProperties(errorMessage: e.Message);
-                    }
-                    finally
-                    {
-                        renderCts.Cancel();
+                        throw new Exception("USB write failed");
                     }
                 }, token);
-
-                await Task.WhenAll(renderTask, sendTask);
             }
             catch (TaskCanceledException)
             {
@@ -321,6 +252,176 @@ namespace InfoPanel.Services
             {
                 _device.UpdateRuntimeProperties(isRunning: false);
             }
+        }
+
+        private async Task DoWorkHidAsync(CancellationToken token)
+        {
+            try
+            {
+                var vendorId = _device.ModelInfo?.VendorId ?? 0;
+                var productId = _device.ModelInfo?.ProductId ?? 0;
+                Logger.Information("ThermalrightPanelDevice {Device}: Opening device via HID (VID={Vid:X4} PID={Pid:X4})...",
+                    _device, vendorId, productId);
+
+                using var hidDevice = HidPanelDevice.Open(vendorId, productId);
+
+                if (hidDevice == null)
+                {
+                    Logger.Warning("ThermalrightPanelDevice {Device}: Failed to open HID device", _device);
+                    _device.UpdateRuntimeProperties(errorMessage:
+                        "Failed to open HID device. Make sure:\n" +
+                        "1. The device is connected\n" +
+                        "2. No other application is using the device");
+                    return;
+                }
+
+                Logger.Information("ThermalrightPanelDevice {Device}: HID device opened successfully!", _device);
+
+                // Send HID init command
+                if (!hidDevice.SendInit())
+                {
+                    Logger.Error("ThermalrightPanelDevice {Device}: HID init failed", _device);
+                    _device.UpdateRuntimeProperties(errorMessage: "HID init command failed");
+                    return;
+                }
+
+                // Read init response (optional - for logging)
+                var response = hidDevice.ReadInitResponse();
+                if (response != null && response.Length >= 20)
+                {
+                    // Log the identifier portion (bytes 20+ are typically an ASCII identifier like "BP13288")
+                    var identifierBytes = new byte[Math.Min(8, response.Length - 20)];
+                    Array.Copy(response, 20, identifierBytes, 0, identifierBytes.Length);
+                    var identifier = System.Text.Encoding.ASCII.GetString(identifierBytes).TrimEnd('\0');
+                    Logger.Information("ThermalrightPanelDevice {Device}: HID device identifier: {Id}", _device, identifier);
+                }
+
+                // Model is already known from VID/PID (no identifier-based detection needed)
+                UpdateDeviceDisplayName();
+
+                await Task.Delay(100, token); // Small delay after init
+
+                // Run the render+send loop using HID reports
+                var width = _panelWidth;
+                var height = _panelHeight;
+                await RunRenderSendLoop(jpegData =>
+                {
+                    if (!hidDevice.SendJpegFrame(jpegData, width, height))
+                    {
+                        throw new Exception("HID frame send failed");
+                    }
+                }, token);
+            }
+            catch (TaskCanceledException)
+            {
+                Logger.Debug("ThermalrightPanelDevice {Device}: Task cancelled", _device);
+            }
+            catch (Exception e)
+            {
+                Logger.Error(e, "ThermalrightPanelDevice {Device}: Error", _device);
+                _device.UpdateRuntimeProperties(errorMessage: e.Message);
+            }
+            finally
+            {
+                _device.UpdateRuntimeProperties(isRunning: false);
+            }
+        }
+
+        private void UpdateDeviceDisplayName()
+        {
+            var modelName = _detectedModel?.Name ?? "Panel";
+            var nativeWidth = _detectedModel?.Width ?? _panelWidth;
+            var nativeHeight = _detectedModel?.Height ?? _panelHeight;
+            _device.RuntimeProperties.Name = $"Thermalright {modelName} ({nativeWidth}x{nativeHeight})";
+            Logger.Information("ThermalrightPanelDevice {Device}: Connected to {Name} (native {NativeW}x{NativeH}, rendering at {RenderW}x{RenderH})",
+                _device, modelName, nativeWidth, nativeHeight, _panelWidth, _panelHeight);
+        }
+
+        /// <summary>
+        /// Shared render+send loop used by both WinUSB and HID protocols.
+        /// The sendFrame action receives JPEG data and handles protocol-specific sending.
+        /// </summary>
+        private async Task RunRenderSendLoop(Action<byte[]> sendFrame, CancellationToken token)
+        {
+            FpsCounter fpsCounter = new(60);
+            byte[]? _latestFrame = null;
+            AutoResetEvent _frameAvailable = new(false);
+
+            var renderCts = CancellationTokenSource.CreateLinkedTokenSource(token);
+            var renderToken = renderCts.Token;
+
+            _device.UpdateRuntimeProperties(isRunning: true);
+
+            var renderTask = Task.Run(async () =>
+            {
+                Thread.CurrentThread.Name ??= $"Thermalright-Render-{_device.DeviceLocation}";
+                var stopwatch = new Stopwatch();
+
+                while (!renderToken.IsCancellationRequested)
+                {
+                    stopwatch.Restart();
+                    var frame = GenerateJpegBuffer();
+
+                    if (frame != null)
+                    {
+                        Interlocked.Exchange(ref _latestFrame, frame);
+                        _frameAvailable.Set();
+                    }
+
+                    var targetFrameTime = 1000 / ConfigModel.Instance.Settings.TargetFrameRate;
+                    var desiredFrameTime = Math.Max((int)(fpsCounter.FrameTime * 0.9), targetFrameTime);
+                    var adaptiveFrameTime = 0;
+
+                    var elapsedMs = (int)stopwatch.ElapsedMilliseconds;
+
+                    if (elapsedMs < desiredFrameTime)
+                    {
+                        adaptiveFrameTime = desiredFrameTime - elapsedMs;
+                    }
+
+                    if (adaptiveFrameTime > 0)
+                    {
+                        await Task.Delay(adaptiveFrameTime, token);
+                    }
+                }
+            }, renderToken);
+
+            var sendTask = Task.Run(() =>
+            {
+                Thread.CurrentThread.Name ??= $"Thermalright-Send-{_device.DeviceLocation}";
+                try
+                {
+                    var stopwatch = new Stopwatch();
+
+                    while (!token.IsCancellationRequested)
+                    {
+                        if (_frameAvailable.WaitOne(100))
+                        {
+                            var jpegData = Interlocked.Exchange(ref _latestFrame, null);
+                            if (jpegData != null)
+                            {
+                                stopwatch.Restart();
+
+                                sendFrame(jpegData);
+
+                                fpsCounter.Update(stopwatch.ElapsedMilliseconds);
+                                _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
+                            }
+                        }
+                    }
+                }
+                catch (Exception e)
+                {
+                    Logger.Error(e, "ThermalrightPanelDevice {Device}: Error in send task", _device);
+                    _device.UpdateRuntimeProperties(errorMessage: e.Message);
+                }
+                finally
+                {
+                    renderCts.Cancel();
+                }
+            }, token);
+
+            await Task.WhenAll(renderTask, sendTask);
         }
     }
 }

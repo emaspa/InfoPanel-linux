@@ -1,5 +1,11 @@
 namespace InfoPanel.ThermalrightPanel
 {
+    public enum ThermalrightTransportType
+    {
+        WinUsb,
+        Hid
+    }
+
     public class ThermalrightPanelModelInfo
     {
         public ThermalrightPanelModel Model { get; init; }
@@ -11,6 +17,7 @@ namespace InfoPanel.ThermalrightPanel
         public int RenderHeight { get; init; }
         public int VendorId { get; init; }
         public int ProductId { get; init; }
+        public ThermalrightTransportType TransportType { get; init; } = ThermalrightTransportType.WinUsb;
 
         public override string ToString() => $"{Name} ({RenderWidth}x{RenderHeight}) - {DeviceIdentifier}";
     }

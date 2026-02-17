@@ -74,7 +74,8 @@ namespace InfoPanel.ThermalrightPanel
                 RenderWidth = 1920,
                 RenderHeight = 480,
                 VendorId = TROFEO_VENDOR_ID,
-                ProductId = TROFEO_PRODUCT_ID_916
+                ProductId = TROFEO_PRODUCT_ID_916,
+                TransportType = ThermalrightTransportType.Hid
             },
             [ThermalrightPanelModel.TrofeoVision686] = new ThermalrightPanelModelInfo
             {
@@ -86,7 +87,8 @@ namespace InfoPanel.ThermalrightPanel
                 RenderWidth = 1280,
                 RenderHeight = 480,
                 VendorId = TROFEO_VENDOR_ID,
-                ProductId = TROFEO_PRODUCT_ID_686
+                ProductId = TROFEO_PRODUCT_ID_686,
+                TransportType = ThermalrightTransportType.Hid
             }
         };
 

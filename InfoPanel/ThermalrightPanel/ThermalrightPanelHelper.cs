@@ -13,17 +13,30 @@ namespace InfoPanel.ThermalrightPanel
 
         /// <summary>
         /// Scans for all connected Thermalright panel devices.
-        /// Tries both USB (LibUsbDotNet) and HID (HidSharp) discovery.
+        /// WinUSB models are discovered via LibUsbDotNet, HID models via HidSharp.
         /// </summary>
         /// <returns>List of discovered Thermalright panel device info</returns>
         public static List<ThermalrightPanelDiscoveryInfo> ScanDevices()
         {
             var devices = new List<ThermalrightPanelDiscoveryInfo>();
 
-            // Scan for all supported VID/PID pairs
-            foreach (var (vendorId, productId) in ThermalrightPanelModelDatabase.SupportedDevices)
+            // Partition supported devices by transport type
+            var winUsbDevices = new List<(int Vid, int Pid)>();
+            var hidDevices = new List<(int Vid, int Pid)>();
+
+            foreach (var (vid, pid) in ThermalrightPanelModelDatabase.SupportedDevices)
             {
-                Logger.Information("ThermalrightPanelHelper: Scanning for USB devices VID={VendorId:X4} PID={ProductId:X4}",
+                var modelInfo = ThermalrightPanelModelDatabase.GetModelByVidPid(vid, pid);
+                if (modelInfo?.TransportType == ThermalrightTransportType.Hid)
+                    hidDevices.Add((vid, pid));
+                else
+                    winUsbDevices.Add((vid, pid));
+            }
+
+            // Scan WinUSB devices via LibUsbDotNet
+            foreach (var (vendorId, productId) in winUsbDevices)
+            {
+                Logger.Information("ThermalrightPanelHelper: Scanning for WinUSB devices VID={VendorId:X4} PID={ProductId:X4}",
                     vendorId, productId);
 
                 foreach (UsbRegistry deviceReg in UsbDevice.AllDevices)
@@ -33,7 +46,7 @@ namespace InfoPanel.ThermalrightPanel
                         var deviceId = deviceReg.DeviceProperties["DeviceID"] as string;
                         var deviceLocation = deviceReg.DeviceProperties["LocationInformation"] as string;
 
-                        Logger.Information("ThermalrightPanelHelper: USB device found - Path: {Path}", deviceReg.DevicePath);
+                        Logger.Information("ThermalrightPanelHelper: WinUSB device found - Path: {Path}", deviceReg.DevicePath);
 
                         if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(deviceLocation))
                         {
@@ -41,7 +54,6 @@ namespace InfoPanel.ThermalrightPanel
                             continue;
                         }
 
-                        // Get model info based on VID/PID (works for unique VID/PID like Trofeo)
                         var modelInfo = ThermalrightPanelModelDatabase.GetModelByVidPid(vendorId, productId);
 
                         var discoveryInfo = new ThermalrightPanelDiscoveryInfo
@@ -63,7 +75,40 @@ namespace InfoPanel.ThermalrightPanel
                 }
             }
 
-            Logger.Information("ThermalrightPanelHelper: Scan complete, found {Count} devices", devices.Count);
+            // Scan HID devices via HidSharp
+            foreach (var (vendorId, productId) in hidDevices)
+            {
+                Logger.Information("ThermalrightPanelHelper: Scanning for HID devices VID={VendorId:X4} PID={ProductId:X4}",
+                    vendorId, productId);
+
+                var hidDeviceList = DeviceList.Local.GetHidDevices(vendorId, productId).ToList();
+                foreach (var hidDevice in hidDeviceList)
+                {
+                    var modelInfo = ThermalrightPanelModelDatabase.GetModelByVidPid(vendorId, productId);
+
+                    // Synthesize a stable device ID and location for HID devices
+                    var deviceId = $"HID\\VID_{vendorId:X4}&PID_{productId:X4}";
+                    var deviceLocation = hidDevice.DevicePath;
+
+                    var discoveryInfo = new ThermalrightPanelDiscoveryInfo
+                    {
+                        DeviceId = deviceId,
+                        DeviceLocation = deviceLocation,
+                        DevicePath = hidDevice.DevicePath,
+                        VendorId = vendorId,
+                        ProductId = productId,
+                        Model = modelInfo?.Model ?? ThermalrightPanelModel.Unknown,
+                        ModelInfo = modelInfo
+                    };
+
+                    Logger.Information("ThermalrightPanelHelper: Found HID {Model} at {Path}",
+                        modelInfo?.Name ?? "Unknown", hidDevice.DevicePath);
+
+                    devices.Add(discoveryInfo);
+                }
+            }
+
+            Logger.Information("ThermalrightPanelHelper: Scan complete, found {Count} device(s)", devices.Count);
             return devices;
         }
     }
