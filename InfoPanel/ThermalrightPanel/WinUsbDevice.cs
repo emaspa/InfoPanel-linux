@@ -32,6 +32,10 @@ namespace InfoPanel.ThermalrightPanel
         private IntPtr _winUsbHandle;
         private bool _disposed;
 
+        // Discovered endpoints (0 = not found)
+        private byte _bulkOutEndpoint;
+        private byte _bulkInEndpoint;
+
         public bool IsOpen => _deviceHandle != null && !_deviceHandle.IsInvalid && !_deviceHandle.IsClosed && _winUsbHandle != IntPtr.Zero;
 
         #region P/Invoke Declarations
@@ -79,6 +83,44 @@ namespace InfoPanel.ThermalrightPanel
             uint PolicyType,
             uint ValueLength,
             ref uint Value);
+
+        [DllImport("winusb.dll", SetLastError = true)]
+        private static extern bool WinUsb_QueryInterfaceSettings(
+            IntPtr InterfaceHandle,
+            byte AlternateInterfaceNumber,
+            out USB_INTERFACE_DESCRIPTOR UsbAltInterfaceDescriptor);
+
+        [DllImport("winusb.dll", SetLastError = true)]
+        private static extern bool WinUsb_QueryPipe(
+            IntPtr InterfaceHandle,
+            byte AlternateInterfaceNumber,
+            byte PipeIndex,
+            out WINUSB_PIPE_INFORMATION PipeInformation);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct USB_INTERFACE_DESCRIPTOR
+        {
+            public byte bLength;
+            public byte bDescriptorType;
+            public byte bInterfaceNumber;
+            public byte bAlternateSetting;
+            public byte bNumEndpoints;
+            public byte bInterfaceClass;
+            public byte bInterfaceSubClass;
+            public byte bInterfaceProtocol;
+            public byte iInterface;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct WINUSB_PIPE_INFORMATION
+        {
+            public byte PipeType;  // 0=Control, 1=Isochronous, 2=Bulk, 3=Interrupt
+            public byte PipeId;
+            public ushort MaximumPacketSize;
+            public byte Interval;
+        }
+
+        private const byte USB_ENDPOINT_DIRECTION_IN = 0x80;
 
         [DllImport("setupapi.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern IntPtr SetupDiGetClassDevs(
@@ -321,16 +363,96 @@ namespace InfoPanel.ThermalrightPanel
 
             Logger.Information("WinUsbDevice: Device opened successfully");
 
+            // Discover endpoints
+            if (!DiscoverEndpoints())
+            {
+                Logger.Error("WinUsbDevice: Failed to discover endpoints");
+                WinUsb_Free(_winUsbHandle);
+                _winUsbHandle = IntPtr.Zero;
+                _deviceHandle.Close();
+                _deviceHandle = null;
+                return false;
+            }
+
             // Set pipe timeout (5 seconds)
             uint timeout = 5000;
-            WinUsb_SetPipePolicy(_winUsbHandle, 0x01, PIPE_TRANSFER_TIMEOUT, sizeof(uint), ref timeout);
-            WinUsb_SetPipePolicy(_winUsbHandle, 0x81, PIPE_TRANSFER_TIMEOUT, sizeof(uint), ref timeout);
+            if (_bulkOutEndpoint != 0)
+                WinUsb_SetPipePolicy(_winUsbHandle, _bulkOutEndpoint, PIPE_TRANSFER_TIMEOUT, sizeof(uint), ref timeout);
+            if (_bulkInEndpoint != 0)
+                WinUsb_SetPipePolicy(_winUsbHandle, _bulkInEndpoint, PIPE_TRANSFER_TIMEOUT, sizeof(uint), ref timeout);
 
             return true;
         }
 
         /// <summary>
-        /// Write data to the OUT endpoint (0x01).
+        /// Discovers bulk endpoints by querying the interface descriptor.
+        /// </summary>
+        private bool DiscoverEndpoints()
+        {
+            // Query interface settings to get number of endpoints
+            if (!WinUsb_QueryInterfaceSettings(_winUsbHandle, 0, out USB_INTERFACE_DESCRIPTOR interfaceDesc))
+            {
+                var error = Marshal.GetLastWin32Error();
+                Logger.Error("WinUsbDevice: WinUsb_QueryInterfaceSettings failed with error {Error}", error);
+                return false;
+            }
+
+            Logger.Information("WinUsbDevice: Interface has {NumEndpoints} endpoints", interfaceDesc.bNumEndpoints);
+
+            // Query each endpoint to find bulk IN and OUT
+            for (byte i = 0; i < interfaceDesc.bNumEndpoints; i++)
+            {
+                if (!WinUsb_QueryPipe(_winUsbHandle, 0, i, out WINUSB_PIPE_INFORMATION pipeInfo))
+                {
+                    var error = Marshal.GetLastWin32Error();
+                    Logger.Warning("WinUsbDevice: WinUsb_QueryPipe failed for pipe {Index} with error {Error}", i, error);
+                    continue;
+                }
+
+                var direction = (pipeInfo.PipeId & USB_ENDPOINT_DIRECTION_IN) != 0 ? "IN" : "OUT";
+                var pipeTypeName = pipeInfo.PipeType switch
+                {
+                    0 => "Control",
+                    1 => "Isochronous",
+                    2 => "Bulk",
+                    3 => "Interrupt",
+                    _ => "Unknown"
+                };
+
+                Logger.Information("WinUsbDevice: Endpoint {Index}: PipeId=0x{PipeId:X2}, Type={Type}, Direction={Dir}, MaxPacket={MaxPacket}",
+                    i, pipeInfo.PipeId, pipeTypeName, direction, pipeInfo.MaximumPacketSize);
+
+                // We're looking for bulk endpoints (type 2)
+                if (pipeInfo.PipeType == 2)
+                {
+                    if ((pipeInfo.PipeId & USB_ENDPOINT_DIRECTION_IN) != 0)
+                    {
+                        _bulkInEndpoint = pipeInfo.PipeId;
+                        Logger.Information("WinUsbDevice: Found Bulk IN endpoint: 0x{Endpoint:X2}", _bulkInEndpoint);
+                    }
+                    else
+                    {
+                        _bulkOutEndpoint = pipeInfo.PipeId;
+                        Logger.Information("WinUsbDevice: Found Bulk OUT endpoint: 0x{Endpoint:X2}", _bulkOutEndpoint);
+                    }
+                }
+            }
+
+            // We need at least a bulk OUT endpoint to send frames
+            if (_bulkOutEndpoint == 0)
+            {
+                Logger.Error("WinUsbDevice: No Bulk OUT endpoint found!");
+                return false;
+            }
+
+            Logger.Information("WinUsbDevice: Using endpoints - OUT: 0x{Out:X2}, IN: 0x{In:X2}",
+                _bulkOutEndpoint, _bulkInEndpoint != 0 ? _bulkInEndpoint : 0);
+
+            return true;
+        }
+
+        /// <summary>
+        /// Write data to the discovered Bulk OUT endpoint.
         /// </summary>
         public bool Write(byte[] data, out int bytesWritten)
         {
@@ -342,7 +464,13 @@ namespace InfoPanel.ThermalrightPanel
                 return false;
             }
 
-            if (!WinUsb_WritePipe(_winUsbHandle, 0x01, data, (uint)data.Length, out uint transferred, IntPtr.Zero))
+            if (_bulkOutEndpoint == 0)
+            {
+                Logger.Error("WinUsbDevice: No Bulk OUT endpoint available");
+                return false;
+            }
+
+            if (!WinUsb_WritePipe(_winUsbHandle, _bulkOutEndpoint, data, (uint)data.Length, out uint transferred, IntPtr.Zero))
             {
                 var error = Marshal.GetLastWin32Error();
                 Logger.Error("WinUsbDevice: Write failed with error {Error}", error);
@@ -354,7 +482,7 @@ namespace InfoPanel.ThermalrightPanel
         }
 
         /// <summary>
-        /// Read data from the IN endpoint (0x81).
+        /// Read data from the discovered Bulk IN endpoint.
         /// </summary>
         public bool Read(byte[] buffer, out int bytesRead)
         {
@@ -366,7 +494,13 @@ namespace InfoPanel.ThermalrightPanel
                 return false;
             }
 
-            if (!WinUsb_ReadPipe(_winUsbHandle, 0x81, buffer, (uint)buffer.Length, out uint transferred, IntPtr.Zero))
+            if (_bulkInEndpoint == 0)
+            {
+                Logger.Warning("WinUsbDevice: No Bulk IN endpoint available, skipping read");
+                return false;
+            }
+
+            if (!WinUsb_ReadPipe(_winUsbHandle, _bulkInEndpoint, buffer, (uint)buffer.Length, out uint transferred, IntPtr.Zero))
             {
                 var error = Marshal.GetLastWin32Error();
                 Logger.Error("WinUsbDevice: Read failed with error {Error}", error);
