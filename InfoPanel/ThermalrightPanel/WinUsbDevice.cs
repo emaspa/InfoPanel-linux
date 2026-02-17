@@ -114,7 +114,7 @@ namespace InfoPanel.ThermalrightPanel
         [StructLayout(LayoutKind.Sequential)]
         private struct WINUSB_PIPE_INFORMATION
         {
-            public byte PipeType;  // 0=Control, 1=Isochronous, 2=Bulk, 3=Interrupt
+            public int PipeType;  // USBD_PIPE_TYPE enum (4 bytes): 0=Control, 1=Isochronous, 2=Bulk, 3=Interrupt
             public byte PipeId;
             public ushort MaximumPacketSize;
             public byte Interval;
