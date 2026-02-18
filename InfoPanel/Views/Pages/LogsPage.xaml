@@ -36,9 +36,8 @@
             FontSize="12"
             IsReadOnly="True"
             Text="{Binding ViewModel.LogText, Mode=OneWay}"
-            TextWrapping="NoWrap"
+            TextWrapping="Wrap"
             VerticalScrollBarVisibility="Auto"
-            HorizontalScrollBarVisibility="Auto"
             AcceptsReturn="True" />
     </Grid>
 </Page>
