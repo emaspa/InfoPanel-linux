@@ -337,20 +337,46 @@ namespace InfoPanel.Services
         {
             // Send initialization command (magic + zeros + 0x01 at offset 56)
             var initCommand = BuildInitCommand();
-            Logger.Information("ThermalrightPanelDevice {Device}: Sending ChiZhu init command (64 bytes)", _device);
 
-            var ec = writer.Write(initCommand, 5000, out int initWritten);
-            if (ec != ErrorCode.None)
-            {
-                Logger.Error("ThermalrightPanelDevice {Device}: Init command failed: {Error}", _device, ec);
-                _device.UpdateRuntimeProperties(errorMessage: $"Init command failed: {ec}");
-                return;
-            }
-            Logger.Information("ThermalrightPanelDevice {Device}: Init command sent ({Bytes} bytes)", _device, initWritten);
-
-            // Read device response to identify panel type (SSCRM-V1, SSCRM-V3, etc.)
+            // Boot detection: device responds A1A2A3A4 while still booting — retry up to 5 times (TRCC Linux)
+            ErrorCode ec = ErrorCode.None;
+            int bytesRead = 0;
             var responseBuffer = new byte[64];
-            ec = reader.Read(responseBuffer, 5000, out int bytesRead);
+            const int MAX_BOOT_RETRIES = 5;
+
+            for (int bootAttempt = 0; bootAttempt < MAX_BOOT_RETRIES; bootAttempt++)
+            {
+                if (bootAttempt > 0)
+                {
+                    Logger.Warning("ThermalrightPanelDevice {Device}: Device booting (A1A2A3A4), waiting 3s (attempt {N}/{Max})",
+                        _device, bootAttempt + 1, MAX_BOOT_RETRIES);
+                    await Task.Delay(3000, token);
+                }
+
+                Logger.Information("ThermalrightPanelDevice {Device}: Sending ChiZhu init command (64 bytes)", _device);
+                ec = writer.Write(initCommand, 5000, out int initWritten);
+                if (ec != ErrorCode.None)
+                {
+                    Logger.Error("ThermalrightPanelDevice {Device}: Init command failed: {Error}", _device, ec);
+                    _device.UpdateRuntimeProperties(errorMessage: $"Init command failed: {ec}");
+                    return;
+                }
+                Logger.Information("ThermalrightPanelDevice {Device}: Init command sent ({Bytes} bytes)", _device, initWritten);
+
+                ec = reader.Read(responseBuffer, 5000, out bytesRead);
+
+                // Check for boot indicator: bytes 4-7 == A1 A2 A3 A4
+                if (ec == ErrorCode.None && bytesRead >= 8 &&
+                    responseBuffer[4] == 0xA1 && responseBuffer[5] == 0xA2 &&
+                    responseBuffer[6] == 0xA3 && responseBuffer[7] == 0xA4)
+                {
+                    Logger.Warning("ThermalrightPanelDevice {Device}: Device is still booting (A1A2A3A4)", _device);
+                    continue;
+                }
+
+                break; // Not booting — proceed
+            }
+
             if (ec == ErrorCode.None && bytesRead > 0)
             {
                 var responseHex = BitConverter.ToString(responseBuffer, 0, Math.Min(bytesRead, 32)).Replace("-", "");
@@ -396,9 +422,14 @@ namespace InfoPanel.Services
 
                 var writeEc = writer.Write(packet, 5000, out int bytesWritten);
                 if (writeEc != ErrorCode.None)
-                {
                     throw new Exception($"USB write failed: {writeEc}");
-                }
+
+                // ZLP: USB bulk requires a zero-length packet when total size is a multiple of max packet size (512)
+                if (packet.Length % 512 == 0)
+                    writer.Write(Array.Empty<byte>(), 1000, out _);
+
+                // TRCC Linux: 15ms inter-frame delay for ChiZhu bulk
+                Thread.Sleep(15);
             }, token);
         }
 
@@ -523,22 +554,44 @@ namespace InfoPanel.Services
 
                 Logger.Information("ThermalrightPanelDevice {Device}: HID device opened successfully!", _device);
 
-                // Pre-init delay (TRCC Linux: 50ms before sending init)
-                await Task.Delay(50, token);
-
-                // Send HID init command
-                if (!hidDevice.SendInit())
+                // HID init with retry (TRCC Linux: up to 3 attempts, 500ms between)
+                byte[]? response = null;
+                bool initOk = false;
+                for (int attempt = 1; attempt <= 3 && !initOk; attempt++)
                 {
-                    Logger.Error("ThermalrightPanelDevice {Device}: HID init failed", _device);
-                    _device.UpdateRuntimeProperties(errorMessage: "HID init command failed");
+                    if (attempt > 1)
+                    {
+                        Logger.Warning("ThermalrightPanelDevice {Device}: HID init retry {Attempt}/3", _device, attempt);
+                        await Task.Delay(500, token);
+                    }
+
+                    // Pre-init delay (TRCC Linux: 50ms before sending init)
+                    await Task.Delay(50, token);
+
+                    if (!hidDevice.SendInit())
+                    {
+                        Logger.Warning("ThermalrightPanelDevice {Device}: HID init send failed (attempt {Attempt}/3)", _device, attempt);
+                        continue;
+                    }
+
+                    // Post-init delay (TRCC Linux: 200ms after sending init, before reading response)
+                    await Task.Delay(200, token);
+
+                    response = hidDevice.ReadInitResponse();
+                    if (response != null)
+                        initOk = true;
+                    else
+                        Logger.Warning("ThermalrightPanelDevice {Device}: No HID init response (attempt {Attempt}/3)", _device, attempt);
+                }
+
+                if (!initOk)
+                {
+                    Logger.Error("ThermalrightPanelDevice {Device}: HID init failed after 3 attempts", _device);
+                    _device.UpdateRuntimeProperties(errorMessage: "HID init failed after 3 attempts");
                     return;
                 }
 
-                // Post-init delay (TRCC Linux: 200ms after sending init, before reading response)
-                await Task.Delay(200, token);
-
                 // Read init response to determine panel model from PM byte and identifier
-                var response = hidDevice.ReadInitResponse();
                 if (response != null && response.Length >= 6)
                 {
                     // Byte[5] = PM (Product Mode) - primary discriminator for Trofeo HID panels
@@ -614,6 +667,7 @@ namespace InfoPanel.Services
                         ? hidDevice.SendRgb565Frame(frameData, width, height)
                         : hidDevice.SendJpegFrame(frameData, width, height);
                     if (!ok) throw new Exception("HID frame send failed");
+                    Thread.Sleep(1); // TRCC Linux: 1ms inter-frame delay for HID Type 2
                 }, token);
             }
             catch (TaskCanceledException)
@@ -652,7 +706,7 @@ namespace InfoPanel.Services
             var renderCts = CancellationTokenSource.CreateLinkedTokenSource(token);
             var renderToken = renderCts.Token;
 
-            _device.UpdateRuntimeProperties(isRunning: true);
+            _device.UpdateRuntimeProperties(isRunning: true, errorMessage: string.Empty);
 
             var renderTask = Task.Run(async () =>
             {
