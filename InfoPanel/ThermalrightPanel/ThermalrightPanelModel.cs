@@ -9,10 +9,10 @@ namespace InfoPanel.ThermalrightPanel
         WonderVision360,
         // TL-M10 VISION - 9.16" (1920x462) - responds with SSCRM-V4
         TLM10Vision,
-        // Trofeo Vision - HID panels (VID 0x0416 / PID 0x5302)
-        // Resolution determined from init response PM byte:
-        //   PM 128 (0x80) = 6.86" 1280x480
-        //   PM 65  (0x41) = 9.16" 1920x462
+        // Trofeo Vision 6.86" - HID (VID 0x0416 / PID 0x5302)
+        // Resolution determined from init response PM byte
         TrofeoVision,
+        // Trofeo Vision 9.16" - USB bulk (VID 0x0416 / PID 0x5408)
+        TrofeoVision916,
     }
 }

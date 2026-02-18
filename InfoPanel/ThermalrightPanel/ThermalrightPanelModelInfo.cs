@@ -6,6 +6,12 @@ namespace InfoPanel.ThermalrightPanel
         Hid
     }
 
+    public enum ThermalrightProtocolType
+    {
+        ChiZhu,   // 12 34 56 78 magic, 64-byte header + JPEG (Peerless/Wonder/TL-M10)
+        Trofeo    // DA DB DC DD magic, 512-byte chunked packets (Trofeo Vision)
+    }
+
     public class ThermalrightPanelModelInfo
     {
         public ThermalrightPanelModel Model { get; init; }
@@ -18,6 +24,7 @@ namespace InfoPanel.ThermalrightPanel
         public int VendorId { get; init; }
         public int ProductId { get; init; }
         public ThermalrightTransportType TransportType { get; init; } = ThermalrightTransportType.WinUsb;
+        public ThermalrightProtocolType ProtocolType { get; init; } = ThermalrightProtocolType.ChiZhu;
 
         public override string ToString() => $"{Name} ({RenderWidth}x{RenderHeight}) - {DeviceIdentifier}";
     }

@@ -8,16 +8,17 @@ namespace InfoPanel.ThermalrightPanel
         public const int THERMALRIGHT_VENDOR_ID = 0x87AD;
         public const int THERMALRIGHT_PRODUCT_ID = 0x70DB;
 
-        // Trofeo Vision HID panels (all sizes share the same VID/PID)
-        // Model/resolution is determined from init response PM byte
+        // Trofeo Vision panels
         public const int TROFEO_VENDOR_ID = 0x0416;
-        public const int TROFEO_PRODUCT_ID = 0x5302;
+        public const int TROFEO_PRODUCT_ID_686 = 0x5302;  // 6.86" - HID transport
+        public const int TROFEO_PRODUCT_ID_916 = 0x5408;  // 9.16" - USB bulk transport (needs WinUSB driver via Zadig)
 
         // All supported VID/PID pairs for device scanning
         public static readonly (int Vid, int Pid)[] SupportedDevices =
         {
             (THERMALRIGHT_VENDOR_ID, THERMALRIGHT_PRODUCT_ID),
-            (TROFEO_VENDOR_ID, TROFEO_PRODUCT_ID)
+            (TROFEO_VENDOR_ID, TROFEO_PRODUCT_ID_686),
+            (TROFEO_VENDOR_ID, TROFEO_PRODUCT_ID_916)
         };
 
         // Device identifiers returned in init response
@@ -66,15 +67,29 @@ namespace InfoPanel.ThermalrightPanel
             [ThermalrightPanelModel.TrofeoVision] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.TrofeoVision,
-                Name = "Trofeo Vision",
+                Name = "Trofeo Vision 6.86\"",
                 DeviceIdentifier = "",  // Resolution determined from init response PM byte
                 Width = 1280,
                 Height = 480,
                 RenderWidth = 1280,
                 RenderHeight = 480,
                 VendorId = TROFEO_VENDOR_ID,
-                ProductId = TROFEO_PRODUCT_ID,
-                TransportType = ThermalrightTransportType.Hid
+                ProductId = TROFEO_PRODUCT_ID_686,
+                TransportType = ThermalrightTransportType.Hid,
+                ProtocolType = ThermalrightProtocolType.Trofeo
+            },
+            [ThermalrightPanelModel.TrofeoVision916] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.TrofeoVision916,
+                Name = "Trofeo Vision 9.16\"",
+                DeviceIdentifier = "",  // Identified by unique VID/PID, needs WinUSB driver via Zadig
+                Width = 1920,
+                Height = 462,
+                RenderWidth = 1920,
+                RenderHeight = 462,
+                VendorId = TROFEO_VENDOR_ID,
+                ProductId = TROFEO_PRODUCT_ID_916,
+                ProtocolType = ThermalrightProtocolType.Trofeo
             }
         };
 

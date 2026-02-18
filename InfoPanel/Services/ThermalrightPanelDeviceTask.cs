@@ -24,6 +24,11 @@ namespace InfoPanel.Services
         private const int COMMAND_DISPLAY = 0x02;
         private const int JPEG_QUALITY = 85;
 
+        // Trofeo protocol constants (DA DB DC DD magic, 512-byte packets)
+        private static readonly byte[] TROFEO_MAGIC_BYTES = { 0xDA, 0xDB, 0xDC, 0xDD };
+        private const int TROFEO_PACKET_SIZE = 512;
+        private const int TROFEO_HEADER_JPEG_OFFSET = 20;
+
         // Default resolution (updated after device identification)
         private const int DEFAULT_WIDTH = 480;
         private const int DEFAULT_HEIGHT = 480;
@@ -133,7 +138,8 @@ namespace InfoPanel.Services
             await Task.Delay(300, token);
 
             var transportType = _device.ModelInfo?.TransportType ?? ThermalrightTransportType.WinUsb;
-            Logger.Information("ThermalrightPanelDevice {Device}: Using {Transport} transport", _device, transportType);
+            var protocolType = _device.ModelInfo?.ProtocolType ?? ThermalrightProtocolType.ChiZhu;
+            Logger.Information("ThermalrightPanelDevice {Device}: Using {Transport} transport, {Protocol} protocol", _device, transportType, protocolType);
 
             if (transportType == ThermalrightTransportType.Hid)
                 await DoWorkHidAsync(token);
@@ -209,83 +215,16 @@ namespace InfoPanel.Services
                 using var writer = usbDevice.OpenEndpointWriter(WriteEndpointID.Ep01);
                 using var reader = usbDevice.OpenEndpointReader(ReadEndpointID.Ep01);
 
-                // Send initialization command (magic + zeros + 0x01 at offset 56)
-                var initCommand = BuildInitCommand();
-                Logger.Information("ThermalrightPanelDevice {Device}: Sending init command (64 bytes)", _device);
+                var protocolType = _device.ModelInfo?.ProtocolType ?? ThermalrightProtocolType.ChiZhu;
 
-                var ec = writer.Write(initCommand, 5000, out int initWritten);
-                if (ec != ErrorCode.None)
+                if (protocolType == ThermalrightProtocolType.Trofeo)
                 {
-                    Logger.Error("ThermalrightPanelDevice {Device}: Init command failed: {Error}", _device, ec);
-                    _device.UpdateRuntimeProperties(errorMessage: $"Init command failed: {ec}");
-                    return;
-                }
-                Logger.Information("ThermalrightPanelDevice {Device}: Init command sent ({Bytes} bytes)", _device, initWritten);
-
-                // Read device response to identify panel type (SSCRM-V1, SSCRM-V3, etc.)
-                var responseBuffer = new byte[64];
-                ec = reader.Read(responseBuffer, 5000, out int bytesRead);
-                if (ec == ErrorCode.None && bytesRead > 0)
-                {
-                    var responseHex = BitConverter.ToString(responseBuffer, 0, Math.Min(bytesRead, 32)).Replace("-", "");
-                    Logger.Information("ThermalrightPanelDevice {Device}: Device response ({Bytes} bytes): {Hex}",
-                        _device, bytesRead, responseHex);
-
-                    // Extract device identifier (e.g., "SSCRM-V1", "SSCRM-V3" at offset 4)
-                    if (bytesRead >= 12)
-                    {
-                        var deviceIdentifier = System.Text.Encoding.ASCII.GetString(responseBuffer, 4, 8).TrimEnd('\0');
-                        Logger.Information("ThermalrightPanelDevice {Device}: Device identifier: {Id}", _device, deviceIdentifier);
-
-                        // Detect panel model based on identifier
-                        _detectedModel = ThermalrightPanelModelDatabase.GetModelByIdentifier(deviceIdentifier);
-                        if (_detectedModel != null)
-                        {
-                            _panelWidth = _detectedModel.RenderWidth;
-                            _panelHeight = _detectedModel.RenderHeight;
-
-                            // Update device model so UI shows correct dimensions
-                            _device.Model = _detectedModel.Model;
-
-                            Logger.Information("ThermalrightPanelDevice {Device}: Detected {Model} - using {Width}x{Height}",
-                                _device, _detectedModel.Name, _panelWidth, _panelHeight);
-                        }
-                        else
-                        {
-                            Logger.Warning("ThermalrightPanelDevice {Device}: Unknown identifier '{Id}', using default {Width}x{Height}",
-                                _device, deviceIdentifier, _panelWidth, _panelHeight);
-                        }
-                    }
+                    await DoWinUsbTrofeoProtocol(writer, reader, token);
                 }
                 else
                 {
-                    Logger.Warning("ThermalrightPanelDevice {Device}: No response from device (ec={Error}), using default {Width}x{Height}",
-                        _device, ec, _panelWidth, _panelHeight);
+                    await DoWinUsbChiZhuProtocol(writer, reader, token);
                 }
-
-                // Update device display name with detected model (show native resolution)
-                UpdateDeviceDisplayName();
-
-                await Task.Delay(100, token); // Small delay after init
-
-                // Run the render+send loop using LibUsbDotNet bulk transfers
-                await RunRenderSendLoop(jpegData =>
-                {
-                    // Build display header with JPEG size
-                    var header = BuildDisplayHeader(jpegData.Length);
-
-                    // Combine header + JPEG into single buffer
-                    var packet = new byte[HEADER_SIZE + jpegData.Length];
-                    Array.Copy(header, 0, packet, 0, HEADER_SIZE);
-                    Array.Copy(jpegData, 0, packet, HEADER_SIZE, jpegData.Length);
-
-                    // Send as single bulk write
-                    var writeEc = writer.Write(packet, 5000, out int bytesWritten);
-                    if (writeEc != ErrorCode.None)
-                    {
-                        throw new Exception($"USB write failed: {writeEc}");
-                    }
-                }, token);
             }
             catch (TaskCanceledException)
             {
@@ -300,6 +239,170 @@ namespace InfoPanel.Services
             {
                 _device.UpdateRuntimeProperties(isRunning: false);
             }
+        }
+
+        /// <summary>
+        /// ChiZhu Tech protocol over WinUSB bulk: 12 34 56 78 magic, 64-byte headers, SSCRM identifier.
+        /// </summary>
+        private async Task DoWinUsbChiZhuProtocol(UsbEndpointWriter writer, UsbEndpointReader reader, CancellationToken token)
+        {
+            // Send initialization command (magic + zeros + 0x01 at offset 56)
+            var initCommand = BuildInitCommand();
+            Logger.Information("ThermalrightPanelDevice {Device}: Sending ChiZhu init command (64 bytes)", _device);
+
+            var ec = writer.Write(initCommand, 5000, out int initWritten);
+            if (ec != ErrorCode.None)
+            {
+                Logger.Error("ThermalrightPanelDevice {Device}: Init command failed: {Error}", _device, ec);
+                _device.UpdateRuntimeProperties(errorMessage: $"Init command failed: {ec}");
+                return;
+            }
+            Logger.Information("ThermalrightPanelDevice {Device}: Init command sent ({Bytes} bytes)", _device, initWritten);
+
+            // Read device response to identify panel type (SSCRM-V1, SSCRM-V3, etc.)
+            var responseBuffer = new byte[64];
+            ec = reader.Read(responseBuffer, 5000, out int bytesRead);
+            if (ec == ErrorCode.None && bytesRead > 0)
+            {
+                var responseHex = BitConverter.ToString(responseBuffer, 0, Math.Min(bytesRead, 32)).Replace("-", "");
+                Logger.Information("ThermalrightPanelDevice {Device}: Device response ({Bytes} bytes): {Hex}",
+                    _device, bytesRead, responseHex);
+
+                if (bytesRead >= 12)
+                {
+                    var deviceIdentifier = System.Text.Encoding.ASCII.GetString(responseBuffer, 4, 8).TrimEnd('\0');
+                    Logger.Information("ThermalrightPanelDevice {Device}: Device identifier: {Id}", _device, deviceIdentifier);
+
+                    _detectedModel = ThermalrightPanelModelDatabase.GetModelByIdentifier(deviceIdentifier);
+                    if (_detectedModel != null)
+                    {
+                        _panelWidth = _detectedModel.RenderWidth;
+                        _panelHeight = _detectedModel.RenderHeight;
+                        _device.Model = _detectedModel.Model;
+                        Logger.Information("ThermalrightPanelDevice {Device}: Detected {Model} - using {Width}x{Height}",
+                            _device, _detectedModel.Name, _panelWidth, _panelHeight);
+                    }
+                    else
+                    {
+                        Logger.Warning("ThermalrightPanelDevice {Device}: Unknown identifier '{Id}', using default {Width}x{Height}",
+                            _device, deviceIdentifier, _panelWidth, _panelHeight);
+                    }
+                }
+            }
+            else
+            {
+                Logger.Warning("ThermalrightPanelDevice {Device}: No response from device (ec={Error}), using default {Width}x{Height}",
+                    _device, ec, _panelWidth, _panelHeight);
+            }
+
+            UpdateDeviceDisplayName();
+            await Task.Delay(100, token);
+
+            await RunRenderSendLoop(jpegData =>
+            {
+                var header = BuildDisplayHeader(jpegData.Length);
+                var packet = new byte[HEADER_SIZE + jpegData.Length];
+                Array.Copy(header, 0, packet, 0, HEADER_SIZE);
+                Array.Copy(jpegData, 0, packet, HEADER_SIZE, jpegData.Length);
+
+                var writeEc = writer.Write(packet, 5000, out int bytesWritten);
+                if (writeEc != ErrorCode.None)
+                {
+                    throw new Exception($"USB write failed: {writeEc}");
+                }
+            }, token);
+        }
+
+        /// <summary>
+        /// Trofeo protocol over WinUSB bulk: DA DB DC DD magic, 512-byte chunked packets (no HID report ID prefix).
+        /// Used by Trofeo Vision 9.16" which presents as USB bulk device rather than HID.
+        /// </summary>
+        private async Task DoWinUsbTrofeoProtocol(UsbEndpointWriter writer, UsbEndpointReader reader, CancellationToken token)
+        {
+            // Send Trofeo init command (512 bytes: DA DB DC DD magic, 0x01 at byte 12)
+            var initPacket = new byte[TROFEO_PACKET_SIZE];
+            Array.Copy(TROFEO_MAGIC_BYTES, 0, initPacket, 0, 4);
+            initPacket[12] = 0x01;
+
+            Logger.Information("ThermalrightPanelDevice {Device}: Sending Trofeo init command (512 bytes)", _device);
+            var ec = writer.Write(initPacket, 5000, out int initWritten);
+            if (ec != ErrorCode.None)
+            {
+                Logger.Error("ThermalrightPanelDevice {Device}: Trofeo init command failed: {Error}", _device, ec);
+                _device.UpdateRuntimeProperties(errorMessage: $"Init command failed: {ec}");
+                return;
+            }
+            Logger.Information("ThermalrightPanelDevice {Device}: Trofeo init sent ({Bytes} bytes)", _device, initWritten);
+
+            // Read init response
+            var responseBuffer = new byte[TROFEO_PACKET_SIZE];
+            ec = reader.Read(responseBuffer, 5000, out int bytesRead);
+            if (ec == ErrorCode.None && bytesRead > 0)
+            {
+                Logger.Information("ThermalrightPanelDevice {Device}: Trofeo response ({Bytes} bytes): {Hex}",
+                    _device, bytesRead, BitConverter.ToString(responseBuffer, 0, Math.Min(bytesRead, 36)).Replace("-", " "));
+
+                // Parse PM byte for resolution detection
+                if (bytesRead >= 6)
+                {
+                    var pm = responseBuffer[5];
+                    Logger.Information("ThermalrightPanelDevice {Device}: Trofeo PM byte: 0x{PM:X2} ({PMDec})", _device, pm, pm);
+
+                    var resolution = ThermalrightPanelModelDatabase.GetResolutionFromPM(pm);
+                    if (resolution != null)
+                    {
+                        _panelWidth = resolution.Value.Width;
+                        _panelHeight = resolution.Value.Height;
+                        Logger.Information("ThermalrightPanelDevice {Device}: PM {PM} -> {Width}x{Height} ({Size})",
+                            _device, pm, _panelWidth, _panelHeight, resolution.Value.SizeName);
+                    }
+                }
+            }
+            else
+            {
+                Logger.Warning("ThermalrightPanelDevice {Device}: No Trofeo init response (ec={Error}), using default {Width}x{Height}",
+                    _device, ec, _panelWidth, _panelHeight);
+            }
+
+            UpdateDeviceDisplayName();
+            await Task.Delay(100, token);
+
+            // Run render+send loop with Trofeo frame format over bulk USB (no HID report ID prefix)
+            var width = _panelWidth;
+            var height = _panelHeight;
+            await RunRenderSendLoop(jpegData =>
+            {
+                // Build 512-byte header: magic, cmd=0x02, width/height, type=0x02, jpeg size, first JPEG chunk
+                var header = new byte[TROFEO_PACKET_SIZE];
+                Array.Copy(TROFEO_MAGIC_BYTES, 0, header, 0, 4);
+                header[4] = 0x02; // Frame command
+                BitConverter.GetBytes((ushort)width).CopyTo(header, 8);
+                BitConverter.GetBytes((ushort)height).CopyTo(header, 10);
+                header[12] = 0x02; // Frame type
+                BitConverter.GetBytes(jpegData.Length).CopyTo(header, 16);
+
+                int firstChunkSize = Math.Min(jpegData.Length, TROFEO_PACKET_SIZE - TROFEO_HEADER_JPEG_OFFSET);
+                Array.Copy(jpegData, 0, header, TROFEO_HEADER_JPEG_OFFSET, firstChunkSize);
+
+                var writeEc = writer.Write(header, 5000, out _);
+                if (writeEc != ErrorCode.None)
+                    throw new Exception($"USB write failed: {writeEc}");
+
+                // Send remaining JPEG data in 512-byte chunks
+                int offset = firstChunkSize;
+                while (offset < jpegData.Length)
+                {
+                    var chunk = new byte[TROFEO_PACKET_SIZE];
+                    int chunkSize = Math.Min(jpegData.Length - offset, TROFEO_PACKET_SIZE);
+                    Array.Copy(jpegData, offset, chunk, 0, chunkSize);
+
+                    writeEc = writer.Write(chunk, 5000, out _);
+                    if (writeEc != ErrorCode.None)
+                        throw new Exception($"USB write failed: {writeEc}");
+
+                    offset += chunkSize;
+                }
+            }, token);
         }
 
         private async Task DoWorkHidAsync(CancellationToken token)
