@@ -87,10 +87,10 @@ namespace InfoPanel.ThermalrightPanel
                 ProtocolType = ThermalrightProtocolType.Trofeo,
                 PmByte = TROFEO_686_PM_BYTE
             },
-            [ThermalrightPanelModel.TrofeoVision240] = new ThermalrightPanelModelInfo
+            [ThermalrightPanelModel.FrozenWarframe] = new ThermalrightPanelModelInfo
             {
-                Model = ThermalrightPanelModel.TrofeoVision240,
-                Name = "Trofeo Vision 2.4\"",
+                Model = ThermalrightPanelModel.FrozenWarframe,
+                Name = "Frozen Warframe 240/360",
                 DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,  // "BP21940" - shared with 6.86", PM byte distinguishes
                 Width = 320,
                 Height = 240,
