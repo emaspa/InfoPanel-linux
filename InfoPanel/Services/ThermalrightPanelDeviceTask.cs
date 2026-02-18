@@ -80,16 +80,21 @@ namespace InfoPanel.Services
 
         /// <summary>
         /// Builds a 64-byte display header for the ChiZhu Tech USB Display protocol.
+        /// Uses cmd=0x02 for JPEG, cmd=0x03 for RGB565 (PM=32 panels).
         /// </summary>
-        private byte[] BuildDisplayHeader(int jpegSize)
+        private byte[] BuildDisplayHeader(int dataSize)
         {
             var header = new byte[HEADER_SIZE];
 
             // Bytes 0-3: Magic 0x12345678
             Array.Copy(MAGIC_BYTES, 0, header, 0, 4);
 
-            // Bytes 4-7: Command = 2 (display frame)
-            BitConverter.GetBytes(COMMAND_DISPLAY).CopyTo(header, 4);
+            // cmd=0x03 for RGB565 panels, 0x02 for JPEG
+            int cmd = _detectedModel?.PixelFormat is ThermalrightPixelFormat.Rgb565 or ThermalrightPixelFormat.Rgb565BigEndian
+                ? 0x03 : COMMAND_DISPLAY;
+
+            // Bytes 4-7: Command
+            BitConverter.GetBytes(cmd).CopyTo(header, 4);
 
             // Bytes 8-11: Width
             BitConverter.GetBytes(_panelWidth).CopyTo(header, 8);
@@ -99,11 +104,11 @@ namespace InfoPanel.Services
 
             // Bytes 16-55: Zero padding (already zeroed)
 
-            // Bytes 56-59: Command repeated = 2
-            BitConverter.GetBytes(COMMAND_DISPLAY).CopyTo(header, 56);
+            // Bytes 56-59: Command repeated
+            BitConverter.GetBytes(cmd).CopyTo(header, 56);
 
-            // Bytes 60-63: JPEG size (little-endian)
-            BitConverter.GetBytes(jpegSize).CopyTo(header, 60);
+            // Bytes 60-63: Data size (little-endian)
+            BitConverter.GetBytes(dataSize).CopyTo(header, 60);
 
             return header;
         }
@@ -341,7 +346,7 @@ namespace InfoPanel.Services
             // Boot detection: device responds A1A2A3A4 while still booting — retry up to 5 times
             ErrorCode ec = ErrorCode.None;
             int bytesRead = 0;
-            var responseBuffer = new byte[64];
+            var responseBuffer = new byte[1024]; // ChiZhu init response is up to 1024 bytes (PM at [24], SUB at [36])
             const int MAX_BOOT_RETRIES = 5;
 
             for (int bootAttempt = 0; bootAttempt < MAX_BOOT_RETRIES; bootAttempt++)
@@ -403,6 +408,31 @@ namespace InfoPanel.Services
                             _device, deviceIdentifier, _panelWidth, _panelHeight);
                     }
                 }
+
+                // Parse PM byte at offset 24 and SUB at offset 36 (ChiZhu 1024-byte response)
+                if (bytesRead >= 25)
+                {
+                    var pm = responseBuffer[24];
+                    Logger.Information("ThermalrightPanelDevice {Device}: ChiZhu PM byte at [24]: 0x{PM:X2} ({PMDec})", _device, pm, pm);
+
+                    if (bytesRead >= 37)
+                    {
+                        var sub = responseBuffer[36];
+                        Logger.Information("ThermalrightPanelDevice {Device}: ChiZhu SUB byte at [36]: 0x{SUB:X2} ({SUBDec})", _device, sub, sub);
+                    }
+
+                    // PM=0x20 on ChiZhu bulk (87AD:70DB) indicates 320x320 RGB565 big-endian variant
+                    if (pm == ThermalrightPanelModelDatabase.CHIZHU_320X320_PM_BYTE &&
+                        ThermalrightPanelModelDatabase.Models.TryGetValue(ThermalrightPanelModel.ChiZhuVision320x320, out var chizhuModel))
+                    {
+                        _detectedModel = chizhuModel;
+                        _panelWidth = chizhuModel.RenderWidth;
+                        _panelHeight = chizhuModel.RenderHeight;
+                        _device.Model = chizhuModel.Model;
+                        Logger.Information("ThermalrightPanelDevice {Device}: PM 0x{PM:X2} -> {Model} ({Width}x{Height})",
+                            _device, pm, chizhuModel.Name, _panelWidth, _panelHeight);
+                    }
+                }
             }
             else
             {
@@ -413,12 +443,12 @@ namespace InfoPanel.Services
             UpdateDeviceDisplayName();
             await Task.Delay(100, token);
 
-            await RunRenderSendLoop(jpegData =>
+            await RunRenderSendLoop(frameData =>
             {
-                var header = BuildDisplayHeader(jpegData.Length);
-                var packet = new byte[HEADER_SIZE + jpegData.Length];
+                var header = BuildDisplayHeader(frameData.Length);
+                var packet = new byte[HEADER_SIZE + frameData.Length];
                 Array.Copy(header, 0, packet, 0, HEADER_SIZE);
-                Array.Copy(jpegData, 0, packet, HEADER_SIZE, jpegData.Length);
+                Array.Copy(frameData, 0, packet, HEADER_SIZE, frameData.Length);
 
                 var writeEc = writer.Write(packet, 5000, out int bytesWritten);
                 if (writeEc != ErrorCode.None)

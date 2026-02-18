@@ -28,6 +28,18 @@ namespace InfoPanel.ThermalrightPanel
         // PM 0x0C -> 800x480
         TrofeoVision800x480,
 
+        // HID 0x5302 models identified by PM byte
+        AssassinSpirit120Vision,  // PM 0x24 (36)  -> 240x240, RGB565
+        AS120Vision,              // PM 0x32 (50)  -> 320x240, RGB565
+        AS120VisionB,             // PM 0x33 (51)  -> 320x240, RGB565
+        BA120Vision,              // PM 0x34 (52)  -> 320x240, RGB565
+        BA120VisionB,             // PM 0x35 (53)  -> 320x240, RGB565
+        FrozenWarframePro,        // PM 0x64 (100) -> 320x240, RGB565
+        EliteVisionHid,           // PM 0x65 (101) -> 320x240, RGB565
+
+        // ChiZhu bulk (87AD:70DB) PM=0x20 variant — 320x320, RGB565
+        ChiZhuVision320x320,
+
         // Backward compatibility alias (was renamed to TrofeoVision)
         TrofeoVision686 = TrofeoVision,
     }
