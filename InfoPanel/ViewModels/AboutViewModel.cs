@@ -50,7 +50,7 @@ namespace InfoPanel.ViewModels
         {
             var assembly = Assembly.GetExecutingAssembly();
             var buildTime = File.GetLastWriteTime(assembly.Location);
-            Version = $"{assembly.GetName().Version!.ToString(3)} Experimental {buildTime:dd MMM HH:mm}";
+            Version = $"{assembly.GetName().Version!.ToString(3)} Experimental {buildTime:dd MMM yyyy HH:mm}";
             InitializeCollections();
         }
 
