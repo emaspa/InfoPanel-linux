@@ -18,6 +18,16 @@ namespace InfoPanel.ThermalrightPanel
         // Frozen Warframe 240/360 - HID (VID 0x0416 / PID 0x5302), same identifier as Trofeo 6.86" but PM byte 0x3A -> 320x240
         FrozenWarframe,
 
+        // Generic HID Trofeo panels identified only by PM byte (model unknown)
+        // PM 0x20 -> 320x320, RGB565, big-endian
+        TrofeoVision320,
+        // PM 0x40 -> 1600x720
+        TrofeoVision1600x720,
+        // PM 0x0A -> 960x540
+        TrofeoVision960x540,
+        // PM 0x0C -> 800x480
+        TrofeoVision800x480,
+
         // Backward compatibility alias (was renamed to TrofeoVision)
         TrofeoVision686 = TrofeoVision,
     }

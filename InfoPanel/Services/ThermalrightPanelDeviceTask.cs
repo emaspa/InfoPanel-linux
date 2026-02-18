@@ -111,7 +111,7 @@ namespace InfoPanel.Services
         public byte[] GenerateFrameBuffer()
         {
             var pixelFormat = _detectedModel?.PixelFormat ?? ThermalrightPixelFormat.Jpeg;
-            return pixelFormat == ThermalrightPixelFormat.Rgb565
+            return pixelFormat is ThermalrightPixelFormat.Rgb565 or ThermalrightPixelFormat.Rgb565BigEndian
                 ? GenerateRgb565Buffer()
                 : GenerateJpegBuffer();
         }
@@ -143,6 +143,7 @@ namespace InfoPanel.Services
         private byte[] GenerateRgb565Buffer()
         {
             var profileGuid = _device.ProfileGuid;
+            bool bigEndian = _detectedModel?.PixelFormat == ThermalrightPixelFormat.Rgb565BigEndian;
 
             if (ConfigModel.Instance.GetProfile(profileGuid) is Profile profile)
             {
@@ -155,11 +156,23 @@ namespace InfoPanel.Services
                 using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
                 using var rgb565Bitmap = resizedBitmap.Copy(SKColorType.Rgb565);
 
-                return rgb565Bitmap.Bytes;
+                var bytes = rgb565Bitmap.Bytes;
+                if (bigEndian) SwapRgb565Endianness(bytes);
+                return bytes;
             }
 
-            // No profile — black RGB565 as keepalive (all zeros = black)
+            // No profile — black RGB565 as keepalive (0x0000 is black in both endiannesses)
             return _blackFrame ??= new byte[_panelWidth * _panelHeight * 2];
+        }
+
+        /// <summary>
+        /// Byte-swaps each 16-bit pixel in-place for big-endian RGB565.
+        /// Required for 320x320 panels per TRCC Linux protocol spec.
+        /// </summary>
+        private static void SwapRgb565Endianness(byte[] data)
+        {
+            for (int i = 0; i < data.Length - 1; i += 2)
+                (data[i], data[i + 1]) = (data[i + 1], data[i]);
         }
 
         private byte[]? _blackFrame;
@@ -401,7 +414,7 @@ namespace InfoPanel.Services
             initPacket[12] = 0x01;
 
             Logger.Information("ThermalrightPanelDevice {Device}: Sending Trofeo init command (512 bytes)", _device);
-            var ec = writer.Write(initPacket, 5000, out int initWritten);
+            var ec = writer.Write(initPacket, 1000, out int initWritten);
             bool initSent = ec == ErrorCode.None;
             if (!initSent)
             {
@@ -510,6 +523,9 @@ namespace InfoPanel.Services
 
                 Logger.Information("ThermalrightPanelDevice {Device}: HID device opened successfully!", _device);
 
+                // Pre-init delay (TRCC Linux: 50ms before sending init)
+                await Task.Delay(50, token);
+
                 // Send HID init command
                 if (!hidDevice.SendInit())
                 {
@@ -517,6 +533,9 @@ namespace InfoPanel.Services
                     _device.UpdateRuntimeProperties(errorMessage: "HID init command failed");
                     return;
                 }
+
+                // Post-init delay (TRCC Linux: 200ms after sending init, before reading response)
+                await Task.Delay(200, token);
 
                 // Read init response to determine panel model from PM byte and identifier
                 var response = hidDevice.ReadInitResponse();
@@ -591,7 +610,7 @@ namespace InfoPanel.Services
                 var pixelFormat = _detectedModel?.PixelFormat ?? ThermalrightPixelFormat.Jpeg;
                 await RunRenderSendLoop(frameData =>
                 {
-                    bool ok = pixelFormat == ThermalrightPixelFormat.Rgb565
+                    bool ok = pixelFormat is ThermalrightPixelFormat.Rgb565 or ThermalrightPixelFormat.Rgb565BigEndian
                         ? hidDevice.SendRgb565Frame(frameData, width, height)
                         : hidDevice.SendJpegFrame(frameData, width, height);
                     if (!ok) throw new Exception("HID frame send failed");

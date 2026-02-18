@@ -18,8 +18,12 @@ namespace InfoPanel.ThermalrightPanel
         public const string TROFEO_686_HID_IDENTIFIER = "BP21940";
 
         // PM byte (init response byte[5]) for Trofeo HID panels
-        public const byte TROFEO_686_PM_BYTE = 128;   // 0x80 -> 1280x480 (6.86")
-        public const byte TROFEO_240_PM_BYTE = 0x3A;  // 58  -> 320x240  (2.4")
+        public const byte TROFEO_686_PM_BYTE  = 0x80;  // 128 -> 1280x480 (6.86")
+        public const byte TROFEO_240_PM_BYTE  = 0x3A;  //  58 -> 320x240  (2.4")
+        public const byte TROFEO_320_PM_BYTE  = 0x20;  //  32 -> 320x320  (big-endian RGB565)
+        public const byte TROFEO_1600_PM_BYTE = 0x40;  //  64 -> 1600x720
+        public const byte TROFEO_960_PM_BYTE  = 0x0A;  //  10 -> 960x540
+        public const byte TROFEO_800_PM_BYTE  = 0x0C;  //  12 -> 800x480
 
         // All supported VID/PID pairs for device scanning
         public static readonly (int Vid, int Pid)[] SupportedDevices =
@@ -115,6 +119,67 @@ namespace InfoPanel.ThermalrightPanel
                 VendorId = TROFEO_VENDOR_ID,
                 ProductId = TROFEO_PRODUCT_ID_916,
                 ProtocolType = ThermalrightProtocolType.Trofeo
+            },
+            [ThermalrightPanelModel.TrofeoVision320] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.TrofeoVision320,
+                Name = "Trofeo Vision 320x320",
+                DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
+                Width = 320,
+                Height = 320,
+                RenderWidth = 320,
+                RenderHeight = 320,
+                VendorId = TROFEO_VENDOR_ID,
+                ProductId = TROFEO_PRODUCT_ID_686,
+                TransportType = ThermalrightTransportType.Hid,
+                ProtocolType = ThermalrightProtocolType.Trofeo,
+                PixelFormat = ThermalrightPixelFormat.Rgb565BigEndian,
+                PmByte = TROFEO_320_PM_BYTE
+            },
+            [ThermalrightPanelModel.TrofeoVision1600x720] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.TrofeoVision1600x720,
+                Name = "Trofeo Vision 1600x720",
+                DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
+                Width = 1600,
+                Height = 720,
+                RenderWidth = 1600,
+                RenderHeight = 720,
+                VendorId = TROFEO_VENDOR_ID,
+                ProductId = TROFEO_PRODUCT_ID_686,
+                TransportType = ThermalrightTransportType.Hid,
+                ProtocolType = ThermalrightProtocolType.Trofeo,
+                PmByte = TROFEO_1600_PM_BYTE
+            },
+            [ThermalrightPanelModel.TrofeoVision960x540] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.TrofeoVision960x540,
+                Name = "Trofeo Vision 960x540",
+                DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
+                Width = 960,
+                Height = 540,
+                RenderWidth = 960,
+                RenderHeight = 540,
+                VendorId = TROFEO_VENDOR_ID,
+                ProductId = TROFEO_PRODUCT_ID_686,
+                TransportType = ThermalrightTransportType.Hid,
+                ProtocolType = ThermalrightProtocolType.Trofeo,
+                PmByte = TROFEO_960_PM_BYTE
+            },
+            [ThermalrightPanelModel.TrofeoVision800x480] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.TrofeoVision800x480,
+                Name = "Trofeo Vision 800x480",
+                DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
+                Width = 800,
+                Height = 480,
+                RenderWidth = 800,
+                RenderHeight = 480,
+                VendorId = TROFEO_VENDOR_ID,
+                ProductId = TROFEO_PRODUCT_ID_686,
+                TransportType = ThermalrightTransportType.Hid,
+                ProtocolType = ThermalrightProtocolType.Trofeo,
+                PmByte = TROFEO_800_PM_BYTE
             }
         };
 
@@ -141,9 +206,13 @@ namespace InfoPanel.ThermalrightPanel
         {
             return pm switch
             {
-                TROFEO_686_PM_BYTE => (1280, 480, "6.86\""),
-                65 => (1920, 462, "9.16\""),
-                TROFEO_240_PM_BYTE => (320, 240, "2.4\""),
+                TROFEO_686_PM_BYTE  => (1280, 480,  "6.86\""),
+                65                  => (1920, 462,  "9.16\""),
+                TROFEO_240_PM_BYTE  => (320,  240,  "2.4\""),
+                TROFEO_320_PM_BYTE  => (320,  320,  "320x320"),
+                TROFEO_1600_PM_BYTE => (1600, 720,  "1600x720"),
+                TROFEO_960_PM_BYTE  => (960,  540,  "960x540"),
+                TROFEO_800_PM_BYTE  => (800,  480,  "800x480"),
                 _ => null
             };
         }
