@@ -14,5 +14,8 @@ namespace InfoPanel.ThermalrightPanel
         TrofeoVision,
         // Trofeo Vision 9.16" - USB bulk (VID 0x0416 / PID 0x5408)
         TrofeoVision916,
+
+        // Backward compatibility alias (was renamed to TrofeoVision)
+        TrofeoVision686 = TrofeoVision,
     }
 }
