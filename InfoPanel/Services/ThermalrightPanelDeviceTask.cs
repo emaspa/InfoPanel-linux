@@ -503,8 +503,8 @@ namespace InfoPanel.Services
         {
             var modelName = _detectedModel?.Name ?? "Panel";
             _device.RuntimeProperties.Name = $"Thermalright {modelName} ({_panelWidth}x{_panelHeight})";
-            Logger.Information("ThermalrightPanelDevice {Device}: Connected to {Name} (native {NativeW}x{NativeH}, rendering at {RenderW}x{RenderH})",
-                _device, modelName, nativeWidth, nativeHeight, _panelWidth, _panelHeight);
+            Logger.Information("ThermalrightPanelDevice {Device}: Connected to {Name}, rendering at {RenderW}x{RenderH}",
+                _device, modelName, _panelWidth, _panelHeight);
         }
 
         /// <summary>
