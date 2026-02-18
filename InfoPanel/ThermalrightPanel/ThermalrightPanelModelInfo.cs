@@ -12,6 +12,12 @@ namespace InfoPanel.ThermalrightPanel
         Trofeo    // DA DB DC DD magic, 512-byte chunked packets (Trofeo Vision)
     }
 
+    public enum ThermalrightPixelFormat
+    {
+        Jpeg,    // JPEG compressed — header byte[6]=0x00, width at [8-9], height at [10-11]
+        Rgb565   // Raw 16-bit pixels — header byte[6]=0x01, height at [8-9], width at [10-11]
+    }
+
     public class ThermalrightPanelModelInfo
     {
         public ThermalrightPanelModel Model { get; init; }
@@ -25,6 +31,7 @@ namespace InfoPanel.ThermalrightPanel
         public int ProductId { get; init; }
         public ThermalrightTransportType TransportType { get; init; } = ThermalrightTransportType.WinUsb;
         public ThermalrightProtocolType ProtocolType { get; init; } = ThermalrightProtocolType.ChiZhu;
+        public ThermalrightPixelFormat PixelFormat { get; init; } = ThermalrightPixelFormat.Jpeg;
         public byte? PmByte { get; init; }  // HID init response PM byte (byte[5]) for Trofeo HID panels
 
         public override string ToString() => $"{Name} ({RenderWidth}x{RenderHeight}) - {DeviceIdentifier}";

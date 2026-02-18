@@ -108,7 +108,15 @@ namespace InfoPanel.Services
             return header;
         }
 
-        public byte[] GenerateJpegBuffer()
+        public byte[] GenerateFrameBuffer()
+        {
+            var pixelFormat = _detectedModel?.PixelFormat ?? ThermalrightPixelFormat.Jpeg;
+            return pixelFormat == ThermalrightPixelFormat.Rgb565
+                ? GenerateRgb565Buffer()
+                : GenerateJpegBuffer();
+        }
+
+        private byte[] GenerateJpegBuffer()
         {
             var profileGuid = _device.ProfileGuid;
 
@@ -116,23 +124,42 @@ namespace InfoPanel.Services
             {
                 var rotation = _device.Rotation;
 
-                // Render to RGBA bitmap
                 using var bitmap = PanelDrawTask.RenderSK(profile, false,
                     colorType: SKColorType.Rgba8888,
                     alphaType: SKAlphaType.Opaque);
 
-                // Resize to panel resolution with rotation
                 using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
 
-                // Encode as JPEG
                 using var image = SKImage.FromBitmap(resizedBitmap);
                 using var data = image.Encode(SKEncodedImageFormat.Jpeg, JPEG_QUALITY);
 
                 return data.ToArray();
             }
 
-            // No profile assigned — return a black frame as keepalive to prevent USB selective suspend
+            // No profile — black JPEG as keepalive
             return _blackFrame ??= GenerateBlackJpeg();
+        }
+
+        private byte[] GenerateRgb565Buffer()
+        {
+            var profileGuid = _device.ProfileGuid;
+
+            if (ConfigModel.Instance.GetProfile(profileGuid) is Profile profile)
+            {
+                var rotation = _device.Rotation;
+
+                using var bitmap = PanelDrawTask.RenderSK(profile, false,
+                    colorType: SKColorType.Rgba8888,
+                    alphaType: SKAlphaType.Opaque);
+
+                using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+                using var rgb565Bitmap = resizedBitmap.Copy(SKColorType.Rgb565);
+
+                return rgb565Bitmap.Bytes;
+            }
+
+            // No profile — black RGB565 as keepalive (all zeros = black)
+            return _blackFrame ??= new byte[_panelWidth * _panelHeight * 2];
         }
 
         private byte[]? _blackFrame;
@@ -556,12 +583,13 @@ namespace InfoPanel.Services
                 // Run the render+send loop using HID reports
                 var width = _panelWidth;
                 var height = _panelHeight;
-                await RunRenderSendLoop(jpegData =>
+                var pixelFormat = _detectedModel?.PixelFormat ?? ThermalrightPixelFormat.Jpeg;
+                await RunRenderSendLoop(frameData =>
                 {
-                    if (!hidDevice.SendJpegFrame(jpegData, width, height))
-                    {
-                        throw new Exception("HID frame send failed");
-                    }
+                    bool ok = pixelFormat == ThermalrightPixelFormat.Rgb565
+                        ? hidDevice.SendRgb565Frame(frameData, width, height)
+                        : hidDevice.SendJpegFrame(frameData, width, height);
+                    if (!ok) throw new Exception("HID frame send failed");
                 }, token);
             }
             catch (TaskCanceledException)
@@ -610,7 +638,7 @@ namespace InfoPanel.Services
                 while (!renderToken.IsCancellationRequested)
                 {
                     stopwatch.Restart();
-                    var frame = GenerateJpegBuffer();
+                    var frame = GenerateFrameBuffer();
                     Interlocked.Exchange(ref _latestFrame, frame);
                     _frameAvailable.Set();
 

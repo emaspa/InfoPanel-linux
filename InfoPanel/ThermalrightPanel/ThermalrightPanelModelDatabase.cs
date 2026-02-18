@@ -100,6 +100,7 @@ namespace InfoPanel.ThermalrightPanel
                 ProductId = TROFEO_PRODUCT_ID_686,
                 TransportType = ThermalrightTransportType.Hid,
                 ProtocolType = ThermalrightProtocolType.Trofeo,
+                PixelFormat = ThermalrightPixelFormat.Rgb565,  // Uses raw RGB565, not JPEG
                 PmByte = TROFEO_240_PM_BYTE
             },
             [ThermalrightPanelModel.TrofeoVision916] = new ThermalrightPanelModelInfo
