@@ -292,7 +292,7 @@ namespace InfoPanel.ThermalrightPanel
             [ThermalrightPanelModel.EliteVisionHid] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.EliteVisionHid,
-                Name = "Elite Vision",
+                Name = "Elite Vision 2.73\"",
                 DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
                 Width = 320,
                 Height = 240,
