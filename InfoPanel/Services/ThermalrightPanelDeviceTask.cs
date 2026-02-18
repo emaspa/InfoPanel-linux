@@ -167,7 +167,7 @@ namespace InfoPanel.Services
 
         /// <summary>
         /// Byte-swaps each 16-bit pixel in-place for big-endian RGB565.
-        /// Required for 320x320 panels per TRCC Linux protocol spec.
+        /// Required for 320x320 panels.
         /// </summary>
         private static void SwapRgb565Endianness(byte[] data)
         {
@@ -338,7 +338,7 @@ namespace InfoPanel.Services
             // Send initialization command (magic + zeros + 0x01 at offset 56)
             var initCommand = BuildInitCommand();
 
-            // Boot detection: device responds A1A2A3A4 while still booting — retry up to 5 times (TRCC Linux)
+            // Boot detection: device responds A1A2A3A4 while still booting — retry up to 5 times
             ErrorCode ec = ErrorCode.None;
             int bytesRead = 0;
             var responseBuffer = new byte[64];
@@ -428,7 +428,7 @@ namespace InfoPanel.Services
                 if (packet.Length % 512 == 0)
                     writer.Write(Array.Empty<byte>(), 1000, out _);
 
-                // TRCC Linux: 15ms inter-frame delay for ChiZhu bulk
+                // 15ms inter-frame delay required by ChiZhu bulk protocol
                 Thread.Sleep(15);
             }, token);
         }
@@ -554,7 +554,7 @@ namespace InfoPanel.Services
 
                 Logger.Information("ThermalrightPanelDevice {Device}: HID device opened successfully!", _device);
 
-                // HID init with retry (TRCC Linux: up to 3 attempts, 500ms between)
+                // HID init with retry: up to 3 attempts, 500ms between
                 byte[]? response = null;
                 bool initOk = false;
                 for (int attempt = 1; attempt <= 3 && !initOk; attempt++)
@@ -565,7 +565,7 @@ namespace InfoPanel.Services
                         await Task.Delay(500, token);
                     }
 
-                    // Pre-init delay (TRCC Linux: 50ms before sending init)
+                    // 50ms pre-init delay
                     await Task.Delay(50, token);
 
                     if (!hidDevice.SendInit())
@@ -574,7 +574,7 @@ namespace InfoPanel.Services
                         continue;
                     }
 
-                    // Post-init delay (TRCC Linux: 200ms after sending init, before reading response)
+                    // 200ms post-init delay before reading response
                     await Task.Delay(200, token);
 
                     response = hidDevice.ReadInitResponse();
@@ -667,7 +667,7 @@ namespace InfoPanel.Services
                         ? hidDevice.SendRgb565Frame(frameData, width, height)
                         : hidDevice.SendJpegFrame(frameData, width, height);
                     if (!ok) throw new Exception("HID frame send failed");
-                    Thread.Sleep(1); // TRCC Linux: 1ms inter-frame delay for HID Type 2
+                    Thread.Sleep(1); // 1ms inter-frame delay required by HID protocol
                 }, token);
             }
             catch (TaskCanceledException)
