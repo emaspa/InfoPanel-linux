@@ -1,6 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
 using InfoPanel.Models;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Reflection;
 
 namespace InfoPanel.ViewModels
@@ -45,7 +46,9 @@ namespace InfoPanel.ViewModels
 
         public UpdatesViewModel()
         {
-            Version = Assembly.GetExecutingAssembly().GetName().Version!.ToString(3);
+            var assembly = Assembly.GetExecutingAssembly();
+            var buildTime = File.GetLastWriteTime(assembly.Location);
+            Version = $"{assembly.GetName().Version!.ToString(3)} Experimental {buildTime:dd MMM HH:mm}";
 
             var version128 = new UpdateVersion()
             {
