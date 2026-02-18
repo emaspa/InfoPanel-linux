@@ -185,8 +185,8 @@ namespace InfoPanel.Services
                     Logger.Warning("ThermalrightPanelDevice {Device}: USB device not found", _device);
                     _device.UpdateRuntimeProperties(errorMessage:
                         "USB device not found. Make sure:\n" +
-                        "1. WinUSB driver is installed (use Zadig)\n" +
-                        "2. The device is connected");
+                        "1. The device is connected\n" +
+                        "2. No other application is using the device");
                     await Task.Delay(OPEN_FAILURE_BACKOFF_MS, token);
                     return;
                 }

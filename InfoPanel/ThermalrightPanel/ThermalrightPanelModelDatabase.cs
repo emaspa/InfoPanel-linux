@@ -11,7 +11,7 @@ namespace InfoPanel.ThermalrightPanel
         // Trofeo Vision panels
         public const int TROFEO_VENDOR_ID = 0x0416;
         public const int TROFEO_PRODUCT_ID_686 = 0x5302;  // 6.86" - HID transport
-        public const int TROFEO_PRODUCT_ID_916 = 0x5408;  // 9.16" - USB bulk transport (needs WinUSB driver via Zadig)
+        public const int TROFEO_PRODUCT_ID_916 = 0x5408;  // 9.16" - USB bulk transport
 
         // All supported VID/PID pairs for device scanning
         public static readonly (int Vid, int Pid)[] SupportedDevices =
@@ -82,7 +82,7 @@ namespace InfoPanel.ThermalrightPanel
             {
                 Model = ThermalrightPanelModel.TrofeoVision916,
                 Name = "Trofeo Vision 9.16\"",
-                DeviceIdentifier = "",  // Identified by unique VID/PID, needs WinUSB driver via Zadig
+                DeviceIdentifier = "",  // Identified by unique VID/PID
                 Width = 1920,
                 Height = 462,
                 RenderWidth = 1920,
