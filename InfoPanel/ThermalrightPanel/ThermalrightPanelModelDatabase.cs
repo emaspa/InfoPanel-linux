@@ -212,7 +212,7 @@ namespace InfoPanel.ThermalrightPanel
             [ThermalrightPanelModel.AS120Vision] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.AS120Vision,
-                Name = "AS120 Vision",
+                Name = "AS120 Vision 1.54\"",
                 DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
                 Width = 320,
                 Height = 240,
