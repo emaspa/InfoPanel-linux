@@ -334,18 +334,38 @@ namespace InfoPanel.Services
                     return;
                 }
 
-                // Read init response (optional - for logging)
+                // Read init response to determine panel resolution from PM byte
                 var response = hidDevice.ReadInitResponse();
-                if (response != null && response.Length >= 20)
+                if (response != null && response.Length >= 6)
                 {
-                    // Log the identifier portion (bytes 20+ are typically an ASCII identifier like "BP13288")
-                    var identifierBytes = new byte[Math.Min(8, response.Length - 20)];
-                    Array.Copy(response, 20, identifierBytes, 0, identifierBytes.Length);
-                    var identifier = System.Text.Encoding.ASCII.GetString(identifierBytes).TrimEnd('\0');
-                    Logger.Information("ThermalrightPanelDevice {Device}: HID device identifier: {Id}", _device, identifier);
+                    // Byte[5] = PM (Product Mode) - maps to resolution
+                    var pm = response[5];
+                    Logger.Information("ThermalrightPanelDevice {Device}: HID PM byte: 0x{PM:X2} ({PMDec})", _device, pm, pm);
+
+                    var resolution = ThermalrightPanelModelDatabase.GetResolutionFromPM(pm);
+                    if (resolution != null)
+                    {
+                        _panelWidth = resolution.Value.Width;
+                        _panelHeight = resolution.Value.Height;
+                        Logger.Information("ThermalrightPanelDevice {Device}: PM {PM} -> {Width}x{Height} ({Size})",
+                            _device, pm, _panelWidth, _panelHeight, resolution.Value.SizeName);
+                    }
+                    else
+                    {
+                        Logger.Warning("ThermalrightPanelDevice {Device}: Unknown PM value 0x{PM:X2}, using default {Width}x{Height}",
+                            _device, pm, _panelWidth, _panelHeight);
+                    }
+
+                    // Log identifier portion (bytes 20+)
+                    if (response.Length >= 28)
+                    {
+                        var identifierBytes = new byte[Math.Min(8, response.Length - 20)];
+                        Array.Copy(response, 20, identifierBytes, 0, identifierBytes.Length);
+                        var identifier = System.Text.Encoding.ASCII.GetString(identifierBytes).TrimEnd('\0');
+                        Logger.Information("ThermalrightPanelDevice {Device}: HID device identifier: {Id}", _device, identifier);
+                    }
                 }
 
-                // Model is already known from VID/PID (no identifier-based detection needed)
                 UpdateDeviceDisplayName();
 
                 await Task.Delay(100, token); // Small delay after init
@@ -379,9 +399,7 @@ namespace InfoPanel.Services
         private void UpdateDeviceDisplayName()
         {
             var modelName = _detectedModel?.Name ?? "Panel";
-            var nativeWidth = _detectedModel?.Width ?? _panelWidth;
-            var nativeHeight = _detectedModel?.Height ?? _panelHeight;
-            _device.RuntimeProperties.Name = $"Thermalright {modelName} ({nativeWidth}x{nativeHeight})";
+            _device.RuntimeProperties.Name = $"Thermalright {modelName} ({_panelWidth}x{_panelHeight})";
             Logger.Information("ThermalrightPanelDevice {Device}: Connected to {Name} (native {NativeW}x{NativeH}, rendering at {RenderW}x{RenderH})",
                 _device, modelName, nativeWidth, nativeHeight, _panelWidth, _panelHeight);
         }
