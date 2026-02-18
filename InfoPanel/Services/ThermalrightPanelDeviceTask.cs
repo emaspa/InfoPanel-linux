@@ -108,7 +108,7 @@ namespace InfoPanel.Services
             return header;
         }
 
-        public byte[]? GenerateJpegBuffer()
+        public byte[] GenerateJpegBuffer()
         {
             var profileGuid = _device.ProfileGuid;
 
@@ -131,7 +131,19 @@ namespace InfoPanel.Services
                 return data.ToArray();
             }
 
-            return null;
+            // No profile assigned — return a black frame as keepalive to prevent USB selective suspend
+            return _blackFrame ??= GenerateBlackJpeg();
+        }
+
+        private byte[]? _blackFrame;
+
+        private byte[] GenerateBlackJpeg()
+        {
+            using var bitmap = new SKBitmap(_panelWidth, _panelHeight, SKColorType.Rgba8888, SKAlphaType.Opaque);
+            bitmap.Erase(SKColors.Black);
+            using var image = SKImage.FromBitmap(bitmap);
+            using var data = image.Encode(SKEncodedImageFormat.Jpeg, JPEG_QUALITY);
+            return data.ToArray();
         }
 
         protected override async Task DoWorkAsync(CancellationToken token)
@@ -599,12 +611,8 @@ namespace InfoPanel.Services
                 {
                     stopwatch.Restart();
                     var frame = GenerateJpegBuffer();
-
-                    if (frame != null)
-                    {
-                        Interlocked.Exchange(ref _latestFrame, frame);
-                        _frameAvailable.Set();
-                    }
+                    Interlocked.Exchange(ref _latestFrame, frame);
+                    _frameAvailable.Set();
 
                     var targetFrameTime = 1000 / ConfigModel.Instance.Settings.TargetFrameRate;
                     var desiredFrameTime = Math.Max((int)(fpsCounter.FrameTime * 0.9), targetFrameTime);
