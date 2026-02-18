@@ -25,6 +25,7 @@ namespace InfoPanel.ThermalrightPanel
         public int ProductId { get; init; }
         public ThermalrightTransportType TransportType { get; init; } = ThermalrightTransportType.WinUsb;
         public ThermalrightProtocolType ProtocolType { get; init; } = ThermalrightProtocolType.ChiZhu;
+        public byte? PmByte { get; init; }  // HID init response PM byte (byte[5]) for Trofeo HID panels
 
         public override string ToString() => $"{Name} ({RenderWidth}x{RenderHeight}) - {DeviceIdentifier}";
     }

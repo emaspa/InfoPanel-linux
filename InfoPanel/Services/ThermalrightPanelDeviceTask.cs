@@ -1,4 +1,5 @@
 using InfoPanel.Extensions;
+using System.Linq;
 using InfoPanel.Models;
 using InfoPanel.ThermalrightPanel;
 using InfoPanel.Utils;
@@ -473,46 +474,65 @@ namespace InfoPanel.Services
                     return;
                 }
 
-                // Read init response to determine panel resolution from PM byte
+                // Read init response to determine panel model from PM byte and identifier
                 var response = hidDevice.ReadInitResponse();
                 if (response != null && response.Length >= 6)
                 {
-                    // Byte[5] = PM (Product Mode) - maps to resolution
+                    // Byte[5] = PM (Product Mode) - primary discriminator for Trofeo HID panels
                     var pm = response[5];
                     Logger.Information("ThermalrightPanelDevice {Device}: HID PM byte: 0x{PM:X2} ({PMDec})", _device, pm, pm);
 
-                    var resolution = ThermalrightPanelModelDatabase.GetResolutionFromPM(pm);
-                    if (resolution != null)
+                    var pmModel = ThermalrightPanelModelDatabase.GetModelByPM(pm);
+                    if (pmModel != null)
                     {
-                        _panelWidth = resolution.Value.Width;
-                        _panelHeight = resolution.Value.Height;
-                        Logger.Information("ThermalrightPanelDevice {Device}: PM {PM} -> {Width}x{Height} ({Size})",
-                            _device, pm, _panelWidth, _panelHeight, resolution.Value.SizeName);
+                        _detectedModel = pmModel;
+                        _panelWidth = pmModel.RenderWidth;
+                        _panelHeight = pmModel.RenderHeight;
+                        _device.Model = pmModel.Model;
+                        Logger.Information("ThermalrightPanelDevice {Device}: PM 0x{PM:X2} -> {Model} ({Width}x{Height})",
+                            _device, pm, pmModel.Name, _panelWidth, _panelHeight);
                     }
                     else
                     {
-                        Logger.Warning("ThermalrightPanelDevice {Device}: Unknown PM value 0x{PM:X2}, using default {Width}x{Height}",
-                            _device, pm, _panelWidth, _panelHeight);
+                        // Fall back to resolution-only lookup
+                        var resolution = ThermalrightPanelModelDatabase.GetResolutionFromPM(pm);
+                        if (resolution != null)
+                        {
+                            _panelWidth = resolution.Value.Width;
+                            _panelHeight = resolution.Value.Height;
+                            Logger.Information("ThermalrightPanelDevice {Device}: PM 0x{PM:X2} -> {Width}x{Height} ({Size})",
+                                _device, pm, _panelWidth, _panelHeight, resolution.Value.SizeName);
+                        }
+                        else
+                        {
+                            Logger.Warning("ThermalrightPanelDevice {Device}: Unknown PM value 0x{PM:X2}, using default {Width}x{Height}",
+                                _device, pm, _panelWidth, _panelHeight);
+                        }
                     }
 
-                    // Use identifier (bytes 20+) to refine model detection
+                    // Log identifier for diagnostics; use for model detection if PM didn't resolve it
                     if (response.Length >= 28)
                     {
                         var identifierBytes = new byte[Math.Min(8, response.Length - 20)];
                         Array.Copy(response, 20, identifierBytes, 0, identifierBytes.Length);
-                        var identifier = System.Text.Encoding.ASCII.GetString(identifierBytes).TrimEnd('\0');
+                        // Strip non-printable chars (some panels append BEL/0x07 after the identifier)
+                        var identifier = new string(System.Text.Encoding.ASCII.GetString(identifierBytes)
+                            .Where(c => c >= ' ').ToArray());
                         Logger.Information("ThermalrightPanelDevice {Device}: HID device identifier: {Id}", _device, identifier);
 
-                        var identifiedModel = ThermalrightPanelModelDatabase.GetModelByIdentifier(identifier);
-                        if (identifiedModel != null)
+                        if (_detectedModel == null)
                         {
-                            _detectedModel = identifiedModel;
-                            _device.Model = identifiedModel.Model;
-                            Logger.Information("ThermalrightPanelDevice {Device}: Identified as {Model} via HID identifier", _device, identifiedModel.Name);
-                        }
-                        else
-                        {
-                            Logger.Warning("ThermalrightPanelDevice {Device}: Unknown HID identifier '{Id}'", _device, identifier);
+                            var identifiedModel = ThermalrightPanelModelDatabase.GetModelByIdentifier(identifier);
+                            if (identifiedModel != null)
+                            {
+                                _detectedModel = identifiedModel;
+                                _device.Model = identifiedModel.Model;
+                                Logger.Information("ThermalrightPanelDevice {Device}: Identified as {Model} via HID identifier", _device, identifiedModel.Name);
+                            }
+                            else
+                            {
+                                Logger.Warning("ThermalrightPanelDevice {Device}: Unknown HID identifier '{Id}'", _device, identifier);
+                            }
                         }
                     }
                 }
