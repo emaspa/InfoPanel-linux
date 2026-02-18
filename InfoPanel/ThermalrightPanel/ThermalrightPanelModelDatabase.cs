@@ -119,12 +119,17 @@ namespace InfoPanel.ThermalrightPanel
 
         public static ThermalrightPanelModelInfo? GetModelByVidPid(int vid, int pid)
         {
+            ThermalrightPanelModelInfo? match = null;
             foreach (var model in Models.Values)
             {
                 if (model.VendorId == vid && model.ProductId == pid)
-                    return model;
+                {
+                    if (match != null)
+                        return null; // Multiple models share this VID/PID — can't determine at scan time
+                    match = model;
+                }
             }
-            return null;
+            return match;
         }
 
         /// <summary>
