@@ -29,9 +29,18 @@
                 </ui:Button.Icon>
             </ui:Button>
             <ui:Button
-                Appearance="Secondary"
                 Command="{Binding ViewModel.CopyToClipboardCommand}"
                 Content="Copy to Clipboard">
+                <ui:Button.Style>
+                    <Style TargetType="ui:Button">
+                        <Setter Property="Appearance" Value="Secondary" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding ViewModel.HasLogs}" Value="True">
+                                <Setter Property="Appearance" Value="Success" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </ui:Button.Style>
                 <ui:Button.Icon>
                     <ui:SymbolIcon Symbol="Copy20" />
                 </ui:Button.Icon>
