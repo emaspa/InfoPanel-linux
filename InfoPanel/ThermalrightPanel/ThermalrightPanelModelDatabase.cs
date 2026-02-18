@@ -276,7 +276,7 @@ namespace InfoPanel.ThermalrightPanel
             [ThermalrightPanelModel.FrozenWarframePro] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.FrozenWarframePro,
-                Name = "Frozen Warframe Pro",
+                Name = "Frozen Warframe Pro 2.73\"",
                 DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
                 Width = 320,
                 Height = 240,
