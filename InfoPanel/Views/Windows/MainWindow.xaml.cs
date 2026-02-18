@@ -1,5 +1,6 @@
 ﻿using System.Reflection;
 using System;
+using System.IO;
 using System.Windows;
 using Wpf.Ui;
 using System.Windows.Controls;
@@ -37,11 +38,13 @@ namespace InfoPanel.Views.Windows
             snackbarService.SetSnackbarPresenter(RootSnackbar);
             contentDialogService.SetDialogHost(RootContentDialog);
 
-            var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3);
+            var assembly = Assembly.GetExecutingAssembly();
+            var version = assembly.GetName().Version?.ToString(3);
 
             if (version != null)
             {
-                RootTitleBar.Title = $"InfoPanel - v{version}";
+                var buildTime = File.GetLastWriteTime(assembly.Location);
+                RootTitleBar.Title = $"InfoPanel - v{version} Experimental {buildTime:dd MMM yyyy HH:mm}";
             }
 
             Loaded += MainWindow_Loaded;
