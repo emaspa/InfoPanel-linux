@@ -130,7 +130,7 @@ namespace InfoPanel.ThermalrightPanel
 
         /// <summary>
         /// Sends a JPEG frame using the Trofeo HID protocol.
-        /// Header packet (512 bytes): magic[0:3], resolution[8:11], jpeg_size[16:19], jpeg_data[20:511]
+        /// Header packet (512 bytes): magic[0:3], cmd=0x02[4], resolution[8:11], type=0x02[12], jpeg_size[16:19], jpeg_data[20:511]
         /// Remaining JPEG data sent in 512-byte chunks.
         /// </summary>
         public bool SendJpegFrame(byte[] jpegData, int width, int height)
@@ -145,11 +145,17 @@ namespace InfoPanel.ThermalrightPanel
                 // Bytes 0-3: Magic DA DB DC DD
                 Array.Copy(MAGIC_BYTES, 0, header, 0, 4);
 
+                // Byte 4: Frame command = 0x02
+                header[4] = 0x02;
+
                 // Bytes 8-9: Width (uint16 LE)
                 BitConverter.GetBytes((ushort)width).CopyTo(header, 8);
 
                 // Bytes 10-11: Height (uint16 LE)
                 BitConverter.GetBytes((ushort)height).CopyTo(header, 10);
+
+                // Byte 12: Frame type indicator = 0x02
+                header[12] = 0x02;
 
                 // Bytes 16-19: JPEG data size (uint32 LE)
                 BitConverter.GetBytes(jpegData.Length).CopyTo(header, 16);
