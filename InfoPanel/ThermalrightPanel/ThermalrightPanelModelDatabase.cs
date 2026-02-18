@@ -196,7 +196,7 @@ namespace InfoPanel.ThermalrightPanel
             [ThermalrightPanelModel.AssassinSpirit120Vision] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.AssassinSpirit120Vision,
-                Name = "Assassin Spirit 120 Vision",
+                Name = "Assassin Spirit 120 Vision 1.54\"",
                 DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
                 Width = 240,
                 Height = 240,
