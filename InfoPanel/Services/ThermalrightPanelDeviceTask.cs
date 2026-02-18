@@ -402,42 +402,47 @@ namespace InfoPanel.Services
 
             Logger.Information("ThermalrightPanelDevice {Device}: Sending Trofeo init command (512 bytes)", _device);
             var ec = writer.Write(initPacket, 5000, out int initWritten);
-            if (ec != ErrorCode.None)
+            bool initSent = ec == ErrorCode.None;
+            if (!initSent)
             {
-                Logger.Error("ThermalrightPanelDevice {Device}: Trofeo init command failed: {Error}", _device, ec);
-                _device.UpdateRuntimeProperties(errorMessage: $"Init command failed: {ec}");
-                return;
-            }
-            Logger.Information("ThermalrightPanelDevice {Device}: Trofeo init sent ({Bytes} bytes)", _device, initWritten);
-
-            // Read init response
-            var responseBuffer = new byte[TROFEO_PACKET_SIZE];
-            ec = reader.Read(responseBuffer, 5000, out int bytesRead);
-            if (ec == ErrorCode.None && bytesRead > 0)
-            {
-                Logger.Information("ThermalrightPanelDevice {Device}: Trofeo response ({Bytes} bytes): {Hex}",
-                    _device, bytesRead, BitConverter.ToString(responseBuffer, 0, Math.Min(bytesRead, 36)).Replace("-", " "));
-
-                // Parse PM byte for resolution detection
-                if (bytesRead >= 6)
-                {
-                    var pm = responseBuffer[5];
-                    Logger.Information("ThermalrightPanelDevice {Device}: Trofeo PM byte: 0x{PM:X2} ({PMDec})", _device, pm, pm);
-
-                    var resolution = ThermalrightPanelModelDatabase.GetResolutionFromPM(pm);
-                    if (resolution != null)
-                    {
-                        _panelWidth = resolution.Value.Width;
-                        _panelHeight = resolution.Value.Height;
-                        Logger.Information("ThermalrightPanelDevice {Device}: PM {PM} -> {Width}x{Height} ({Size})",
-                            _device, pm, _panelWidth, _panelHeight, resolution.Value.SizeName);
-                    }
-                }
+                Logger.Warning("ThermalrightPanelDevice {Device}: Trofeo init command failed: {Error} — continuing without init", _device, ec);
             }
             else
             {
-                Logger.Warning("ThermalrightPanelDevice {Device}: No Trofeo init response (ec={Error}), using default {Width}x{Height}",
-                    _device, ec, _panelWidth, _panelHeight);
+                Logger.Information("ThermalrightPanelDevice {Device}: Trofeo init sent ({Bytes} bytes)", _device, initWritten);
+            }
+
+            // Read init response (only if init was sent successfully)
+            if (initSent)
+            {
+                var responseBuffer = new byte[TROFEO_PACKET_SIZE];
+                ec = reader.Read(responseBuffer, 5000, out int bytesRead);
+                if (ec == ErrorCode.None && bytesRead > 0)
+                {
+                    Logger.Information("ThermalrightPanelDevice {Device}: Trofeo response ({Bytes} bytes): {Hex}",
+                        _device, bytesRead, BitConverter.ToString(responseBuffer, 0, Math.Min(bytesRead, 36)).Replace("-", " "));
+
+                    // Parse PM byte for resolution detection
+                    if (bytesRead >= 6)
+                    {
+                        var pm = responseBuffer[5];
+                        Logger.Information("ThermalrightPanelDevice {Device}: Trofeo PM byte: 0x{PM:X2} ({PMDec})", _device, pm, pm);
+
+                        var resolution = ThermalrightPanelModelDatabase.GetResolutionFromPM(pm);
+                        if (resolution != null)
+                        {
+                            _panelWidth = resolution.Value.Width;
+                            _panelHeight = resolution.Value.Height;
+                            Logger.Information("ThermalrightPanelDevice {Device}: PM {PM} -> {Width}x{Height} ({Size})",
+                                _device, pm, _panelWidth, _panelHeight, resolution.Value.SizeName);
+                        }
+                    }
+                }
+                else
+                {
+                    Logger.Warning("ThermalrightPanelDevice {Device}: No Trofeo init response (ec={Error}), using default {Width}x{Height}",
+                        _device, ec, _panelWidth, _panelHeight);
+                }
             }
 
             UpdateDeviceDisplayName();
