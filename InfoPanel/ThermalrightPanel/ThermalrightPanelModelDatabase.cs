@@ -244,7 +244,7 @@ namespace InfoPanel.ThermalrightPanel
             [ThermalrightPanelModel.BA120Vision] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.BA120Vision,
-                Name = "BA120 Vision",
+                Name = "BA120 Vision 2.4\"",
                 DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
                 Width = 320,
                 Height = 240,
@@ -260,7 +260,7 @@ namespace InfoPanel.ThermalrightPanel
             [ThermalrightPanelModel.BA120VisionB] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.BA120VisionB,
-                Name = "BA120 Vision (B)",
+                Name = "BA120 Vision 2.4\" (B)",
                 DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
                 Width = 320,
                 Height = 240,
