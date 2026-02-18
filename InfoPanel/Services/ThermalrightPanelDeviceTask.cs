@@ -212,8 +212,44 @@ namespace InfoPanel.Services
 
                 Logger.Information("ThermalrightPanelDevice {Device}: Device opened successfully!", _device);
 
-                using var writer = usbDevice.OpenEndpointWriter(WriteEndpointID.Ep01);
-                using var reader = usbDevice.OpenEndpointReader(ReadEndpointID.Ep01);
+                // Enumerate endpoints to discover correct addresses
+                WriteEndpointID writeEp = WriteEndpointID.Ep01;
+                ReadEndpointID readEp = ReadEndpointID.Ep01;
+                bool foundWrite = false, foundRead = false;
+
+                foreach (var config in usbDevice.Configs)
+                {
+                    foreach (var iface in config.InterfaceInfoList)
+                    {
+                        Logger.Information("ThermalrightPanelDevice {Device}: Interface {Iface}, endpoints: {Count}",
+                            _device, iface.Descriptor.InterfaceID, iface.EndpointInfoList.Count);
+
+                        foreach (var ep in iface.EndpointInfoList)
+                        {
+                            var addr = (byte)ep.Descriptor.EndpointID;
+                            var isOut = (addr & 0x80) == 0;
+                            Logger.Information("ThermalrightPanelDevice {Device}:   EP 0x{Addr:X2} ({Dir}, {Type})",
+                                _device, addr, isOut ? "OUT" : "IN", ep.Descriptor.Attributes & 0x03);
+
+                            if (isOut && !foundWrite)
+                            {
+                                writeEp = (WriteEndpointID)addr;
+                                foundWrite = true;
+                            }
+                            else if (!isOut && !foundRead)
+                            {
+                                readEp = (ReadEndpointID)addr;
+                                foundRead = true;
+                            }
+                        }
+                    }
+                }
+
+                Logger.Information("ThermalrightPanelDevice {Device}: Using write EP 0x{WEp:X2}, read EP 0x{REp:X2}",
+                    _device, (byte)writeEp, (byte)readEp);
+
+                using var writer = usbDevice.OpenEndpointWriter(writeEp);
+                using var reader = usbDevice.OpenEndpointReader(readEp);
 
                 var protocolType = _device.ModelInfo?.ProtocolType ?? ThermalrightProtocolType.ChiZhu;
 
