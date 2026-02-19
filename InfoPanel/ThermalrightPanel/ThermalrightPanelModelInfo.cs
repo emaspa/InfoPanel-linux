@@ -35,6 +35,7 @@ namespace InfoPanel.ThermalrightPanel
         public ThermalrightProtocolType ProtocolType { get; init; } = ThermalrightProtocolType.ChiZhu;
         public ThermalrightPixelFormat PixelFormat { get; init; } = ThermalrightPixelFormat.Jpeg;
         public byte? PmByte { get; init; }  // HID init response PM byte (byte[5]) for Trofeo HID panels
+        public byte? SubByte { get; init; } // ChiZhu init response SUB byte (byte[36]) for SSCRM-V3 differentiation
 
         public override string ToString() => $"{Name} ({RenderWidth}x{RenderHeight}) - {DeviceIdentifier}";
     }
