@@ -190,7 +190,7 @@ namespace InfoPanel.ThermalrightPanel
 
         /// <summary>
         /// Sends a raw RGB565 frame using the Trofeo HID protocol.
-        /// Header differs from JPEG: byte[6]=0x01, height at [8-9], width at [10-11].
+        /// Header differs from JPEG: byte[6]=0x01 for RGB565 format flag.
         /// Used by panels like Frozen Warframe 240/360.
         /// </summary>
         public bool SendRgb565Frame(byte[] rgb565Data, int width, int height)
