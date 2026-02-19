@@ -205,9 +205,9 @@ namespace InfoPanel.ThermalrightPanel
                 header[4] = 0x02;   // Frame command
                 header[6] = 0x01;   // RGB565 format flag
 
-                // Height first, then width (reversed from JPEG header)
-                BitConverter.GetBytes((ushort)height).CopyTo(header, 8);
-                BitConverter.GetBytes((ushort)width).CopyTo(header, 10);
+                // Width at [8-9], height at [10-11] (same order as JPEG header)
+                BitConverter.GetBytes((ushort)width).CopyTo(header, 8);
+                BitConverter.GetBytes((ushort)height).CopyTo(header, 10);
 
                 header[12] = 0x02;
                 BitConverter.GetBytes(rgb565Data.Length).CopyTo(header, 16);
