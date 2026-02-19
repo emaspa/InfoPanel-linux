@@ -135,10 +135,23 @@ namespace InfoPanel.Services
 
                 using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
 
-                using var image = SKImage.FromBitmap(resizedBitmap);
-                using var data = image.Encode(SKEncodedImageFormat.Jpeg, JPEG_QUALITY);
-
-                return data.ToArray();
+                SKBitmap encodeBitmap = resizedBitmap;
+                SKBitmap? dimmed = null;
+                try
+                {
+                    if (_device.Brightness < 100)
+                    {
+                        dimmed = ApplyBrightness(resizedBitmap);
+                        encodeBitmap = dimmed;
+                    }
+                    using var image = SKImage.FromBitmap(encodeBitmap);
+                    using var data = image.Encode(SKEncodedImageFormat.Jpeg, JPEG_QUALITY);
+                    return data.ToArray();
+                }
+                finally
+                {
+                    dimmed?.Dispose();
+                }
             }
 
             // No profile — black JPEG as keepalive
@@ -159,15 +172,51 @@ namespace InfoPanel.Services
                     alphaType: SKAlphaType.Opaque);
 
                 using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
-                using var rgb565Bitmap = resizedBitmap.Copy(SKColorType.Rgb565);
 
-                var bytes = rgb565Bitmap.Bytes;
-                if (bigEndian) SwapRgb565Endianness(bytes);
-                return bytes;
+                SKBitmap convertBitmap = resizedBitmap;
+                SKBitmap? dimmed = null;
+                try
+                {
+                    if (_device.Brightness < 100)
+                    {
+                        dimmed = ApplyBrightness(resizedBitmap);
+                        convertBitmap = dimmed;
+                    }
+                    using var rgb565Bitmap = convertBitmap.Copy(SKColorType.Rgb565);
+                    var bytes = rgb565Bitmap.Bytes;
+                    if (bigEndian) SwapRgb565Endianness(bytes);
+                    return bytes;
+                }
+                finally
+                {
+                    dimmed?.Dispose();
+                }
             }
 
             // No profile — black RGB565 as keepalive (0x0000 is black in both endiannesses)
             return _blackFrame ??= new byte[_panelWidth * _panelHeight * 2];
+        }
+
+        /// <summary>
+        /// Software brightness: dims the image by scaling RGB channels via color matrix.
+        /// Always returns a new bitmap (caller must dispose).
+        /// </summary>
+        private SKBitmap ApplyBrightness(SKBitmap source)
+        {
+            float scale = Math.Clamp(_device.Brightness, 0, 100) / 100f;
+
+            var result = new SKBitmap(source.Width, source.Height, source.ColorType, source.AlphaType);
+            using var canvas = new SKCanvas(result);
+            using var paint = new SKPaint();
+            paint.ColorFilter = SKColorFilter.CreateColorMatrix(
+            [
+                scale, 0,     0,     0, 0,
+                0,     scale, 0,     0, 0,
+                0,     0,     scale, 0, 0,
+                0,     0,     0,     1, 0
+            ]);
+            canvas.DrawBitmap(source, 0, 0, paint);
+            return result;
         }
 
         /// <summary>
