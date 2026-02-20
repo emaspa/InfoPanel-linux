@@ -69,57 +69,6 @@
 		<ProjectReference Include="..\InfoPanel.Plugins.Loader\InfoPanel.Plugins.Loader.csproj" />
 	</ItemGroup>
 
-	<!-- Exclude all WPF XAML files, code-behind, and WPF-dependent code -->
-	<ItemGroup>
-		<Compile Remove="App.xaml.cs" />
-		<Compile Remove="Views\**" />
-		<Compile Remove="PerformanceSettings.xaml.cs" />
-		<Compile Remove="ViewModels\**" />
-		<Compile Remove="Services\PageService.cs" />
-		<Compile Remove="Services\ApplicationHostService.cs" />
-		<Compile Remove="DisplayWindowThread.cs" />
-		<!-- Exclude Windows-only files -->
-		<Compile Remove="Utils\PawnIoHelper.cs" />
-		<!-- ScreenHelper.cs rewritten for Avalonia in Phase 2 -->
-		<Compile Remove="WpfSingleInstance.cs" />
-		<Compile Remove="Effects\**" />
-		<Compile Remove="Extensions\WriteableBitmapExtensions.cs" />
-		<Compile Remove="AssemblyInfo.cs" />
-	</ItemGroup>
-
-	<!-- Phase 1: Selectively re-include new Avalonia UI files -->
-	<ItemGroup>
-		<Compile Include="Views\MainWindow.axaml.cs" />
-		<Compile Include="Views\Pages\HomePage.axaml.cs" />
-		<Compile Include="Views\Pages\ProfilesPage.axaml.cs" />
-		<Compile Include="Views\Pages\DesignPage.axaml.cs" />
-		<Compile Include="Views\Pages\PluginsPage.axaml.cs" />
-		<Compile Include="Views\Pages\SettingsPage.axaml.cs" />
-		<Compile Include="Views\Pages\UpdatesPage.axaml.cs" />
-		<Compile Include="Views\Pages\UsbPanelsPage.axaml.cs" />
-		<Compile Include="Views\Pages\LogsPage.axaml.cs" />
-		<Compile Include="Views\Pages\AboutPage.axaml.cs" />
-		<Compile Include="ViewModels\MainWindowViewModel.cs" />
-		<Compile Include="ViewModels\HomePageViewModel.cs" />
-		<Compile Include="ViewModels\ProfilesPageViewModel.cs" />
-		<Compile Include="ViewModels\SettingsPageViewModel.cs" />
-		<Compile Include="ViewModels\LogsPageViewModel.cs" />
-		<Compile Include="ViewModels\AboutPageViewModel.cs" />
-		<Compile Include="ViewModels\UpdatesPageViewModel.cs" />
-		<Compile Include="ViewModels\PluginsPageViewModel.cs" />
-		<Compile Include="ViewModels\UsbPanelsPageViewModel.cs" />
-		<Compile Include="ViewModels\DesignPageViewModel.cs" />
-		<!-- Phase 2: Display system -->
-		<Compile Include="Views\DisplayWindow.axaml.cs" />
-		<Compile Include="Views\Controls\SkiaCanvas.cs" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<Compile Remove="Images\**" />
-		<EmbeddedResource Remove="Images\**" />
-		<None Remove="Images\**" />
-	</ItemGroup>
-
 	<!-- Image and content resources (Avalonia) -->
 	<ItemGroup>
 		<AvaloniaResource Include="Resources\Images\**\*" />
