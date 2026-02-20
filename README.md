@@ -1,120 +1,125 @@
-# InfoPanel
+# InfoPanel for Linux
 
 <p align=center>
-  <a href="https://www.infopanel.net">
-    <img src="Images/logo.png" width=60/>
-  </a>
+  <img src="Images/logo.png" width=60/>
 </p>
 
-<p align=center>InfoPanel is a powerful desktop visualization software that transforms how you monitor your system. It displays hardware information on your desktop or external displays as sensor panels, with special support for USB LCD panels like BeadaPanel and Turing Smart Screen/Turzx.</span>
+<p align=center>
+Unofficial Linux port of <a href="https://github.com/habibrehmansg/infopanel">InfoPanel</a>, a desktop visualization tool that displays hardware monitoring data on desktop overlays and USB LCD panels (BeadaPanel, Turing Smart Screen, Thermalright).
+</p>
 
-<br />
+> **Status:** Work in progress. The app builds and runs on Linux. Desktop overlays, USB panel discovery, and device communication are functional. Some UI pages are stubs awaiting full implementation.
 
-[Releases][release] | [Reddit][reddit] | [Website][website] | [HWiNFO Forum][forum] | [Discord][discord] | [Microsoft Store][msstore]
+## What is InfoPanel?
 
-![build status](https://github.com/habibrehmansg/infopanel/actions/workflows/dotnet-desktop.yml/badge.svg?branch=main) 
+InfoPanel is a Windows application by [habibrehmansg](https://github.com/habibrehmansg/infopanel) that renders hardware sensor data (CPU temps, GPU load, fan speeds, etc.) onto desktop overlays and USB LCD panels. It supports a wide range of visualization types (gauges, charts, bars, images, text) and a plugin system for custom data sources.
 
-## Features
+This fork ports InfoPanel to Linux, replacing all Windows-specific dependencies with cross-platform alternatives.
 
-- **Multiple Data Sources**: 
-  - HWiNFO integration via Shared Memory (SHM) for extensive hardware monitoring
-  - LibreHardwareMonitor for additional sensor data without requiring HWiNFO
-  - Extensible plugin system with built-in and third-party plugins
+## Differences from the Windows version
 
-- **Display Options**:
-  - Desktop overlay with customizable transparency and positioning
-  - External display support for monitors
-  - USB LCD panel support including BeadaPanel via WinUSB API
-  - Multiple visualization types: text, gauges, graphs, bars, donuts, and images
+| Area | Windows (upstream) | Linux (this fork) |
+|---|---|---|
+| **UI framework** | WPF | Avalonia 11 |
+| **Graphics** | DirectX + SkiaSharp | SkiaSharp only |
+| **USB discovery** | Windows SetupAPI (`DeviceProperties["DeviceID"]`) | LibUsbDotNet `DevicePath` fallback |
+| **Serial port discovery** | WMI (`Win32_SerialPort`) | Linux sysfs (`/sys/bus/usb-serial/devices/`, `/sys/class/tty/`) |
+| **SCSI panel I/O** | `kernel32.dll` P/Invoke (`CreateFile`, `DeviceIoControl`) | `libc` P/Invoke (`open`, `ioctl` with `SG_IO`) |
+| **HID panels** | HidSharp (cross-platform) | HidSharp (no changes needed) |
+| **Hardware monitoring** | HWiNFO SHM, LibreHardwareMonitor | Not yet ported (plugin system is functional) |
+| **Desktop overlay** | WPF transparent window | Avalonia transparent window with SkiaSharp canvas |
+| **Installer** | Microsoft Store / MSI | Manual build (see below), udev rules provided |
 
-- **Advanced Visualization**:
-  - GIF animation support for dynamic visualizations
-  - High refresh rates for smooth updates
-  - Customizable layouts, colors, and fonts
-  - Multiple profiles for different use cases or displays
+### What works
 
-- **Plugin System**:
-  - Built-in system information plugins (CPU, memory, network, drives)
-  - Weather information integration
-  - Support for third-party plugins
-  - Sensor data tables with customizable formatting
+- App builds and launches on Linux (.NET 8.0 + Avalonia)
+- Main window with sidebar navigation (Home, Profiles, Design, USB Panels, Plugins, Settings, Logs, Updates, About)
+- Desktop overlay windows with SkiaSharp rendering
+- BeadaPanel USB device discovery and communication (via LibUsbDotNet)
+- Turing Smart Screen serial device discovery (via sysfs) and communication
+- Turing Smart Screen USB device discovery and communication
+- Thermalright HID panel discovery (via HidSharp) and communication
+- Thermalright WinUSB/bulk panel discovery (via LibUsbDotNet) and communication
+- Thermalright SCSI panel discovery and communication (via Linux SG_IO ioctl)
+- Plugin loading system
+- Configuration persistence
 
-![InfoPanel](./Images/infopanel-design-view.png)
+### What doesn't work yet
 
-## Supported Hardware
+- Hardware monitoring data sources (HWiNFO is Windows-only; LibreHardwareMonitor needs a Linux alternative)
+- Full UI for profile editing, sensor binding, drag-and-drop layout
+- DirectX-accelerated rendering (Linux uses SkiaSharp software rendering)
+- Auto-update system
 
-- All hardware sensors exposed by HWiNFO
-- CPU, GPU, RAM, storage, and network monitoring via LibreHardwareMonitor
-- BeadaPanel USB LCD panels (all models supported)
-- TuringPanel/TURZX displays (Models A, C, and E)
-- Any standard monitor or display
+## Building
 
-For detailed information about supported panels and recommendations, see our [Display Panels Guide](PANELS.md).
+### Prerequisites
 
-## Usage
+- .NET 8.0 SDK
+- Linux (tested on Ubuntu)
+- `libusb-1.0` for USB panel communication
 
-1. Install either HWiNFO (with Shared Memory support enabled) or use the built-in LibreHardwareMonitor integration
-2. Install InfoPanel from the [Microsoft Store][msstore] or the [website][website]
-3. Configure your display profile with sensors, gauges, and visualizations
-4. Customize layouts with drag-and-drop interface
-5. Connect USB displays or position on your desktop
-6. (Optional) Install additional plugins for enhanced functionality
+```bash
+# Install .NET 8.0 SDK (if not already installed)
+# See https://learn.microsoft.com/dotnet/core/install/linux
 
-## Plugins
+# Install libusb
+sudo apt install libusb-1.0-0-dev
 
-InfoPanel features a robust plugin system that extends its capabilities:
+# Clone and build
+git clone https://github.com/emaspa/InfoPanel-linux.git
+cd InfoPanel-linux
+dotnet build InfoPanel.sln -c Debug
 
-### Built-in Plugins
-- **System Info Plugin**: CPU usage, memory usage, process statistics, and system uptime
-- **Network Info Plugin**: Network interfaces, IP addresses, and connection statistics
-- **Drive Info Plugin**: Storage device information and usage statistics
-- **Volume Plugin**: Audio volume control and monitoring
-- **Weather Plugin**: Current weather conditions and forecasts
+# Run
+dotnet run --project InfoPanel/InfoPanel.csproj
+```
 
-### Community Plugins
-- [InfoPanel Spotify Plugin](https://github.com/F3NN3X/InfoPanel.Spotify) - Displays currently playing tracks and album art from Spotify
-- [InfoPanel FPS Plugin](https://github.com/F3NN3X/InfoPanel.FPS) - Shows FPS and performance metrics for gaming sessions
+### USB device permissions (udev rules)
 
-### Plugin Development
-InfoPanel provides a comprehensive API for plugin development that allows access to:
-- Sensor data creation and publishing
-- Custom visualizations
-- Data tables for complex information
-- Configuration interfaces
+USB panels require permission rules for non-root access. Install the provided udev rules:
 
-For detailed instructions on developing plugins, see our [Plugin Development Guide](PLUGINS.md).
+```bash
+sudo cp InfoPanel/packaging/99-infopanel.rules /etc/udev/rules.d/
+sudo udevadm control --reload
+sudo udevadm trigger
+```
 
-## Demo
-![InfoPanel Demo](./Images/beadapanel-demo-1.gif)
+This grants access to all supported panel families: BeadaPanel, Turing Smart Screen (serial and USB), and Thermalright (HID, bulk, and SCSI).
 
-*A demonstration of InfoPanel in action on a BeadaPanel USB LCD*
+## Supported USB panels
 
-## Development
+| Family | Models | Transport | Linux status |
+|---|---|---|---|
+| **BeadaPanel** | All (VID `4E58`) | LibUsbDotNet bulk | Working |
+| **Turing Smart Screen** | 3.5", 5", 8.8" Rev 1.0 | Serial (CH340) | Working |
+| **Turing Smart Screen** | 2.1", 8.8" Rev 1.1, 8", 9.2", 5" USB, 1.6", 10.2" | LibUsbDotNet bulk | Working |
+| **Thermalright** | Trofeo HID variants | HidSharp | Working (cross-platform, no changes needed) |
+| **Thermalright** | ChiZhu, Trofeo bulk variants | LibUsbDotNet bulk | Working |
+| **Thermalright** | Frozen Warframe Elite Vision 360 | SCSI (SG_IO) | Working |
 
-InfoPanel is built with C# and WPF for a modern Windows UI experience. The architecture features:
+## Project structure
 
-- Modular design with MVVM pattern
-- Extensible plugin system
-- DirectX acceleration for UI elements
-- High-performance graphics rendering for external displays
-- Cross-device synchronization
+```
+InfoPanel/                    # Main application
+  Services/                   # Background tasks for panel communication
+  TuringPanel/                # Turing Smart Screen protocol + discovery
+  ThermalrightPanel/          # Thermalright protocol + discovery
+  BeadaPanel/                 # BeadaPanel protocol + discovery
+  Views/                      # Avalonia UI (AXAML)
+  Models/                     # Data models and configuration
+  Drawing/                    # SkiaSharp rendering
+  packaging/                  # udev rules
+InfoPanel.Plugins/            # Plugin interface definitions
+InfoPanel.Plugins.Loader/     # Plugin discovery and loading
+InfoPanel.Extras/             # Built-in plugins
+```
+
+## Credits
+
+- [InfoPanel](https://github.com/habibrehmansg/infopanel) by habibrehmansg - the original Windows application
+- [Lexonight1/thermalright-trcc-linux](https://github.com/Lexonight1/thermalright-trcc-linux) - Thermalright SCSI protocol reference
 
 ## License
 
-InfoPanel is licensed under GPL 3.0 - see the [license file][license] for details.
-
----
-
-InfoPanel is not affiliated with HWiNFO. HWiNFO is a registered trademark of its respective owners.
-
-<!--
-References
--->
-
-[reddit]: https://www.reddit.com/r/InfoPanel/
-[website]: https://www.infopanel.net
-[forum]: https://www.hwinfo.com/forum/threads/infopanel-desktop-visualisation-software.8673/
-[discord]: https://discord.gg/aNGeJxjE7Q
-[msstore]: https://apps.microsoft.com/store/detail/XPFP7C8H5446ZD
-[release]: https://github.com/habibrehmansg/infopanel/releases
-[license]: https://github.com/habibrehmansg/infopanel/blob/main/LICENSE
+GPL 3.0 - see the [LICENSE](LICENSE) file. Same license as the upstream project.
