@@ -4,7 +4,6 @@ using InfoPanel.Plugins;
 using LibreHardwareMonitor.Hardware;
 using System;
 using System.Text;
-using System.Windows.Documents;
 
 namespace InfoPanel.Models
 {

@@ -1,5 +1,4 @@
-﻿using FlyleafLib.MediaPlayer;
-using InfoPanel.Extensions;
+﻿using InfoPanel.Extensions;
 using InfoPanel.Models;
 using InfoPanel.Plugins;
 using InfoPanel.Utils;
@@ -639,7 +638,7 @@ namespace InfoPanel.Drawing
             }
         }
 
-        private static SKBitmap CreateVideoOverlay(float imageWidth, double progress, TimeSpan currentTime, TimeSpan duration, double frameRate, float volume, Status playerStatus)
+        private static SKBitmap CreateVideoOverlay(float imageWidth, double progress, TimeSpan currentTime, TimeSpan duration, double frameRate, float volume, VideoPlayerStatus playerStatus)
         {
             const int overlayHeight = 40;
             var overlayBitmap = new SKBitmap((int)imageWidth, overlayHeight);
@@ -675,7 +674,7 @@ namespace InfoPanel.Drawing
                 var progressWidth = isLive ? progressBarWidth : (float)(progressBarWidth * Math.Min(progress, 1.0));
                 var progressRect = SKRect.Create(progressBarLeft, progressBarY, progressWidth, progressBarHeight);
                 
-                if (isLive && playerStatus == Status.Playing)
+                if (isLive && playerStatus == VideoPlayerStatus.Playing)
                 {
                     // Create animated gradient for live content
                     var animationTime = (float)(DateTime.Now.Ticks / TimeSpan.TicksPerMillisecond % 3000) / 3000f;
@@ -754,7 +753,7 @@ namespace InfoPanel.Drawing
                 using var liveFont = new SKFont(SKTypeface.FromFamilyName("Segoe UI Symbol", SKFontStyle.Bold), 12f);
                 using var livePaint = new SKPaint { Color = SKColor.Parse("#FF0000"), IsAntialias = true };
 
-                var liveText = playerStatus == Status.Playing ? "LIVE" : "CONNECTING..";
+                var liveText = playerStatus == VideoPlayerStatus.Playing ? "LIVE" : "CONNECTING..";
                 overlayCanvas.DrawText(liveText, progressBarLeft, overlayHeight - 8f, liveFont, livePaint);
 
                 // Measure the LIVE text width

@@ -1,6 +1,4 @@
-﻿using FlyleafLib;
-using FlyleafLib.MediaPlayer;
-using InfoPanel.Extensions;
+﻿using InfoPanel.Extensions;
 using InfoPanel.Utils;
 using Microsoft.Extensions.Caching.Memory;
 using SkiaSharp;
@@ -9,13 +7,10 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using Serilog;
-using System.Drawing;
-using System.Drawing.Imaging;
 using System.IO;
 using System.Net.Http;
 using System.Text;
 using System.Threading;
-using System.Windows.Threading;
 
 namespace InfoPanel.Models
 {
@@ -45,37 +40,22 @@ namespace InfoPanel.Models
 
         private readonly SKSvg? SKSvg;
 
-        private readonly Player? _backgroundVideoPlayer;
-        private readonly Config? _config;
+        // Video player stubbed out for Linux port (FlyleafLib is Windows-only)
+        // TODO: Replace with LibVLCSharp in Phase 5.5
 
-        public TimeSpan? CurrentTime => TimeSpan.FromMilliseconds(_backgroundVideoPlayer?.CurTime / 10000 ?? 0);
-        public TimeSpan? Duration => TimeSpan.FromMilliseconds(_backgroundVideoPlayer?.Duration / 10000 ?? 0);
-        public double? FrameRate => _backgroundVideoPlayer?.Video.FPS;
+        public TimeSpan? CurrentTime => null;
+        public TimeSpan? Duration => null;
+        public double? FrameRate => null;
 
-        public bool HasAudio => !_backgroundVideoPlayer?.Audio.Mute ?? false;
+        public bool HasAudio => false;
 
-        public bool IsLive => _backgroundVideoPlayer?.IsLive ?? false;
-        public Status? VideoPlayerStatus => _backgroundVideoPlayer?.Status;
+        public bool IsLive => false;
+        public VideoPlayerStatus? VideoPlayerStatus => null;
 
         public float Volume
         {
-            get
-            {
-                if (_backgroundVideoPlayer?.Audio != null && _config?.Player != null)
-                {
-                    return (float)_backgroundVideoPlayer.Audio.Volume / _config.Player.VolumeMax;
-                }
-                return 0f;
-            }
-            set
-            {
-                if (_backgroundVideoPlayer?.Audio != null && _config?.Player != null)
-                {
-                    // Clamp value between 0 and 1
-                    value = Math.Clamp(value, 0f, 1f);
-                    _backgroundVideoPlayer.Audio.Volume = (int)Math.Round(value * _config.Player.VolumeMax);
-                }
-            }
+            get => 0f;
+            set { }
         }
 
         public readonly long Frames;
@@ -123,49 +103,11 @@ namespace InfoPanel.Models
                         }
                     }
 
-                    try
-                    {
-                        Type = ImageType.FFMPEG;
-
-                        _config = new Config();
-                        _config.Player.AutoPlay = true;
-
-                        if(ImagePath.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase) || ImagePath.StartsWith("rtsps://", StringComparison.OrdinalIgnoreCase))
-                        {
-                            _config.Player.MaxLatency = TimeSpan.FromMilliseconds(100).Ticks; //100ms latency
-                        }
-
-                        // Inform the lib to refresh stats
-                        _config.Player.Stats = true;
-
-                        _backgroundVideoPlayer = new(_config)
-                        {
-                            LoopPlayback = true,
-                        };
-
-                        _backgroundVideoPlayer.Audio.Volume = 0; // Start muted
-                        _backgroundVideoPlayer.Open(ImagePath);
-
-                        Thread.Sleep(50);
-
-                        Width = _backgroundVideoPlayer.Video.Width;
-                        Height = _backgroundVideoPlayer.Video.Height;
-                        Frames = _backgroundVideoPlayer.Video.FramesTotal;
-
-                        if (Frames == 0 && _backgroundVideoPlayer.IsLive)
-                        {
-                            Frames = long.MaxValue;
-                        }
-
-                        TotalFrameTime = _backgroundVideoPlayer.Duration;
-
-                        Loaded = true;
-                        return;
-                    }
-                    catch (Exception e)
-                    {
-                        throw new ArgumentException($"Error initializing video player: {e.Message}");
-                    }
+                    // Video playback not yet supported on Linux (FlyleafLib is Windows-only)
+                    // TODO: Replace with LibVLCSharp in Phase 5.5
+                    Type = ImageType.FFMPEG;
+                    Logger.Warning("Video playback is not yet supported on Linux: {ImagePath}", ImagePath);
+                    throw new PlatformNotSupportedException("Video playback requires FlyleafLib which is Windows-only. LibVLCSharp support is planned.");
                 }
                 else if (ImagePath.IsUrl())
                 {
@@ -546,34 +488,9 @@ namespace InfoPanel.Models
             }
         }
 
-        public static SKImage ConvertToSKImage(Bitmap bitmap)
-        {
-            var bitmapData = bitmap.LockBits(
-                new Rectangle(0, 0, bitmap.Width, bitmap.Height),
-                ImageLockMode.ReadOnly,
-                bitmap.PixelFormat);
-
-            try
-            {
-                var colorType = bitmap.PixelFormat switch
-                {
-                    PixelFormat.Format32bppArgb => SKColorType.Bgra8888,
-                    PixelFormat.Format32bppRgb => SKColorType.Bgra8888,
-                    PixelFormat.Format24bppRgb => SKColorType.Rgb888x,
-                    PixelFormat.Format8bppIndexed => SKColorType.Gray8,
-                    _ => SKColorType.Bgra8888
-                };
-
-                var info = new SKImageInfo(bitmap.Width, bitmap.Height, colorType);
-
-                // Create SKImage directly from pixels
-                return SKImage.FromPixelCopy(info, bitmapData.Scan0, bitmapData.Stride);
-            }
-            finally
-            {
-                bitmap.UnlockBits(bitmapData);
-            }
-        }
+        // ConvertToSKImage(System.Drawing.Bitmap) removed for Linux port
+        // System.Drawing.Bitmap is not available on Linux
+        // TODO: Reimplement with LibVLCSharp frame capture in Phase 5.5
 
         public void AccessSK(int targetWidth, int targetHeight, Action<SKImage> access, bool cache = true, string cacheHint = "default", GRContext? grContext = null)
         {
@@ -591,16 +508,7 @@ namespace InfoPanel.Models
             {
                 if (Type == ImageType.FFMPEG)
                 {
-                    if (_backgroundVideoPlayer != null)
-                    {
-                        using var bitmap = _backgroundVideoPlayer.renderer.GetBitmap(targetWidth, targetHeight);
-                        if (bitmap != null)
-                        {
-                            using var image = ConvertToSKImage(bitmap);
-                            access(image);
-                        }
-                    }
-
+                    // Video rendering not yet supported on Linux
                     return;
                 }
 
@@ -694,8 +602,7 @@ namespace InfoPanel.Models
 
                     SKSvg?.Dispose();
 
-                    _backgroundVideoPlayer?.Stop();
-                    _backgroundVideoPlayer?.Dispose();
+                    // Video player disposed with FlyleafLib (stubbed out for Linux)
 
                     _codec?.Dispose();
                     _stream?.Dispose();
@@ -748,17 +655,14 @@ namespace InfoPanel.Models
                 {
                     if (image.IsTextureBacked)
                     {
-                        if(DisplayWindowManager.Instance.Dispatcher is Dispatcher dispatcher)
+                        var dispatcher = Avalonia.Threading.Dispatcher.UIThread;
+                        if (dispatcher.CheckAccess())
                         {
-                            if(dispatcher.CheckAccess())
-                            {
-                                image.Dispose();
-                            }
-                            else
-                            {
-                                // If not on the UI thread, use BeginInvoke to dispose
-                                dispatcher.BeginInvoke(() => image.Dispose());
-                            }
+                            image.Dispose();
+                        }
+                        else
+                        {
+                            dispatcher.Post(() => image.Dispose());
                         }
                     }
                     else

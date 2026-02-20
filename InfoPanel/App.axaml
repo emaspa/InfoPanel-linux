@@ -1,0 +1,33 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="InfoPanel.App"
+             RequestedThemeVariant="Dark">
+    <Application.Styles>
+        <FluentTheme />
+    </Application.Styles>
+
+    <TrayIcon.Icons>
+        <TrayIcons>
+            <TrayIcon ToolTipText="InfoPanel"
+                      Clicked="TrayIcon_Clicked">
+                <TrayIcon.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Open" Click="TrayMenu_Open" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Profiles" Click="TrayMenu_Profiles" />
+                        <NativeMenuItem Header="Design" Click="TrayMenu_Design" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Updates" Click="TrayMenu_Updates" />
+                        <NativeMenuItem Header="Plugins" Click="TrayMenu_Plugins" />
+                        <NativeMenuItem Header="USB Panels" Click="TrayMenu_UsbPanels" />
+                        <NativeMenuItem Header="Settings" Click="TrayMenu_Settings" />
+                        <NativeMenuItem Header="Logs" Click="TrayMenu_Logs" />
+                        <NativeMenuItem Header="About" Click="TrayMenu_About" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Exit" Click="TrayMenu_Exit" />
+                    </NativeMenu>
+                </TrayIcon.Menu>
+            </TrayIcon>
+        </TrayIcons>
+    </TrayIcon.Icons>
+</Application>

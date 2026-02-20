@@ -5,7 +5,6 @@ using InfoPanel.Extensions;
 using InfoPanel.Models;
 using InfoPanel.Services;
 using InfoPanel.Utils;
-using InfoPanel.ViewModels;
 using LibUsbDotNet;
 using LibUsbDotNet.Main;
 using Serilog;
@@ -17,7 +16,6 @@ using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows;
 
 namespace InfoPanel
 {

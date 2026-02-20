@@ -56,8 +56,10 @@ namespace InfoPanel.ThermalrightPanel
                 {
                     if (deviceReg.Vid == vendorId && deviceReg.Pid == productId)
                     {
-                        var deviceId = deviceReg.DeviceProperties["DeviceID"] as string;
-                        var deviceLocation = deviceReg.DeviceProperties["LocationInformation"] as string;
+                        var deviceId = deviceReg.DeviceProperties["DeviceID"] as string
+                            ?? deviceReg.DevicePath ?? "";
+                        var deviceLocation = deviceReg.DeviceProperties["LocationInformation"] as string
+                            ?? deviceReg.DevicePath ?? "";
 
                         Logger.Information("ThermalrightPanelHelper: WinUSB device found - Path: {Path}", deviceReg.DevicePath);
 

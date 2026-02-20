@@ -1,15 +1,14 @@
-using Microsoft.Win32.SafeHandles;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Runtime.InteropServices;
-using System.Text;
 
 namespace InfoPanel.ThermalrightPanel
 {
     /// <summary>
     /// SCSI pass-through wrapper for Thermalright LCD panels that present as USB Mass Storage devices.
-    /// Uses IOCTL_SCSI_PASS_THROUGH_DIRECT to send F5-prefixed CDB commands.
+    /// Uses Linux SG_IO ioctl to send F5-prefixed CDB commands via /dev/sgN.
     /// Protocol reference: Lexonight1/thermalright-trcc-linux USBLCD_PROTOCOL.md
     /// </summary>
     public sealed class ScsiPanelDevice : IDisposable
@@ -20,107 +19,68 @@ namespace InfoPanel.ThermalrightPanel
         private const int POLL_BUFFER_SIZE = 0xE100;   // 57,600 bytes — poll/init buffer size
         private const int FRAME_CHUNK_SIZE = 0x10000;  // 65,536 bytes — 64KB frame chunks
         private const byte SCSI_PROTOCOL_MARKER = 0xF5;
-        private const byte SCSI_IOCTL_DATA_IN = 1;
-        private const byte SCSI_IOCTL_DATA_OUT = 0;
 
-        // Win32 constants
-        private const uint GENERIC_READ = 0x80000000;
-        private const uint GENERIC_WRITE = 0x40000000;
-        private const uint FILE_SHARE_READ = 0x00000001;
-        private const uint FILE_SHARE_WRITE = 0x00000002;
-        private const uint OPEN_EXISTING = 3;
-        private const uint IOCTL_SCSI_PASS_THROUGH_DIRECT = 0x4D014;
-        private const uint IOCTL_STORAGE_QUERY_PROPERTY = 0x2D1400;
+        // Linux SG_IO constants
+        private const uint SG_IO = 0x2285;
+        private const int SG_DXFER_FROM_DEV = -3;
+        private const int SG_DXFER_TO_DEV = -2;
+        private const int O_RDWR = 2;
+        private const int SENSE_BUFFER_SIZE = 32;
 
-        // Storage property query constants
-        private const int StorageDeviceProperty = 0;
-        private const int PropertyStandardQuery = 0;
+        #region P/Invoke (libc)
 
-        #region P/Invoke
+        [DllImport("libc", EntryPoint = "open", SetLastError = true)]
+        private static extern int LinuxOpen([MarshalAs(UnmanagedType.LPStr)] string pathname, int flags);
 
-        [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Auto)]
-        private static extern SafeFileHandle CreateFile(
-            string lpFileName,
-            uint dwDesiredAccess,
-            uint dwShareMode,
-            IntPtr lpSecurityAttributes,
-            uint dwCreationDisposition,
-            uint dwFlagsAndAttributes,
-            IntPtr hTemplateFile);
+        [DllImport("libc", EntryPoint = "close", SetLastError = true)]
+        private static extern int LinuxClose(int fd);
 
-        [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern bool DeviceIoControl(
-            SafeFileHandle hDevice,
-            uint dwIoControlCode,
-            IntPtr lpInBuffer,
-            uint nInBufferSize,
-            IntPtr lpOutBuffer,
-            uint nOutBufferSize,
-            out uint lpBytesReturned,
-            IntPtr lpOverlapped);
+        [DllImport("libc", EntryPoint = "ioctl", SetLastError = true)]
+        private static extern int LinuxIoctl(int fd, uint request, IntPtr argp);
 
         #endregion
 
         #region Native Structures
 
-        [StructLayout(LayoutKind.Sequential)]
-        private struct STORAGE_PROPERTY_QUERY
-        {
-            public int PropertyId;
-            public int QueryType;
-            public byte AdditionalParameters;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct STORAGE_DEVICE_DESCRIPTOR
-        {
-            public uint Version;
-            public uint Size;
-            public byte DeviceType;
-            public byte DeviceTypeModifier;
-            public byte RemovableMedia;
-            public byte CommandQueueing;
-            public uint VendorIdOffset;
-            public uint ProductIdOffset;
-            public uint ProductRevisionOffset;
-            public uint SerialNumberOffset;
-            public byte BusType;
-            public uint RawPropertiesLength;
-            // Followed by variable-length raw data
-        }
-
-        // SCSI_PASS_THROUGH_DIRECT with appended sense buffer, explicit layout for x64
+        /// <summary>
+        /// Linux sg_io_hdr_t structure for SG_IO ioctl (x64 layout).
+        /// See linux/sg.h — total size 88 bytes on x86_64.
+        /// </summary>
         [StructLayout(LayoutKind.Explicit, Size = 88)]
-        private unsafe struct SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER
+        private struct sg_io_hdr_t
         {
-            [FieldOffset(0)] public ushort Length;
-            [FieldOffset(2)] public byte ScsiStatus;
-            [FieldOffset(3)] public byte PathId;
-            [FieldOffset(4)] public byte TargetId;
-            [FieldOffset(5)] public byte Lun;
-            [FieldOffset(6)] public byte CdbLength;
-            [FieldOffset(7)] public byte SenseInfoLength;
-            [FieldOffset(8)] public byte DataIn;
-            // 3 bytes padding (9-11)
-            [FieldOffset(12)] public uint DataTransferLength;
-            [FieldOffset(16)] public uint TimeOutValue;
-            // 4 bytes padding (20-23) for pointer alignment on x64
-            [FieldOffset(24)] public IntPtr DataBuffer;
-            [FieldOffset(32)] public uint SenseInfoOffset;
-            // CDB at offset 36, 16 bytes
-            [FieldOffset(36)] public fixed byte Cdb[16];
-            // Sense buffer at offset 56, 32 bytes
-            [FieldOffset(56)] public fixed byte SenseBuf[32];
+            [FieldOffset(0)]  public int interface_id;       // 'S' for SCSI
+            [FieldOffset(4)]  public int dxfer_direction;    // SG_DXFER_FROM_DEV or SG_DXFER_TO_DEV
+            [FieldOffset(8)]  public byte cmd_len;           // CDB length
+            [FieldOffset(9)]  public byte mx_sb_len;         // max sense buffer length
+            [FieldOffset(10)] public ushort iovec_count;     // 0 for simple I/O
+            [FieldOffset(12)] public uint dxfer_len;         // data transfer length
+            [FieldOffset(16)] public IntPtr dxferp;          // pointer to data buffer
+            [FieldOffset(24)] public IntPtr cmdp;            // pointer to CDB
+            [FieldOffset(32)] public IntPtr sbp;             // pointer to sense buffer
+            [FieldOffset(40)] public uint timeout;           // timeout in milliseconds
+            [FieldOffset(44)] public uint flags;             // 0
+            [FieldOffset(48)] public int pack_id;            // unused
+            [FieldOffset(56)] public IntPtr usr_ptr;         // unused
+            [FieldOffset(64)] public byte status;            // SCSI status
+            [FieldOffset(65)] public byte masked_status;
+            [FieldOffset(66)] public byte msg_status;
+            [FieldOffset(67)] public byte sb_len_wr;         // sense buffer bytes written
+            [FieldOffset(68)] public ushort host_status;
+            [FieldOffset(70)] public ushort driver_status;
+            [FieldOffset(72)] public int resid;
+            [FieldOffset(76)] public uint duration;
+            [FieldOffset(80)] public uint info;
         }
 
         #endregion
 
-        private SafeFileHandle _handle;
+        private int _fd = -1;
         private readonly string _devicePath;
 
-        private ScsiPanelDevice(SafeFileHandle handle, string devicePath)
+        private ScsiPanelDevice(int fd, string devicePath)
         {
-            _handle = handle;
+            _fd = fd;
             _devicePath = devicePath;
         }
 
@@ -135,7 +95,8 @@ namespace InfoPanel.ThermalrightPanel
         }
 
         /// <summary>
-        /// Enumerates PhysicalDrive0-15 and returns any that have "USBLCD" as the SCSI vendor string.
+        /// Enumerates /dev/sg0 through /dev/sg15 and returns any that have "USBLCD" as the vendor string
+        /// (read from /sys/class/scsi_generic/sgN/device/vendor).
         /// </summary>
         public static List<ScsiDeviceInfo> FindDevices()
         {
@@ -143,32 +104,37 @@ namespace InfoPanel.ThermalrightPanel
 
             for (int i = 0; i < 16; i++)
             {
-                var path = $"\\\\.\\PhysicalDrive{i}";
+                var devPath = $"/dev/sg{i}";
+                var vendorPath = $"/sys/class/scsi_generic/sg{i}/device/vendor";
+                var modelPath = $"/sys/class/scsi_generic/sg{i}/device/model";
+
                 try
                 {
-                    using var handle = CreateFile(path,
-                        GENERIC_READ | GENERIC_WRITE,
-                        FILE_SHARE_READ | FILE_SHARE_WRITE,
-                        IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
-
-                    if (handle.IsInvalid)
+                    if (!File.Exists(devPath))
                         continue;
 
-                    var info = QueryStorageDeviceDescriptor(handle);
-                    if (info == null)
+                    if (!File.Exists(vendorPath))
                         continue;
 
-                    if (info.VendorId.Contains("USBLCD", StringComparison.OrdinalIgnoreCase))
+                    var vendor = File.ReadAllText(vendorPath).Trim();
+                    var model = File.Exists(modelPath) ? File.ReadAllText(modelPath).Trim() : "";
+
+                    if (vendor.Contains("USBLCD", StringComparison.OrdinalIgnoreCase))
                     {
-                        Logger.Information("ScsiPanelDevice: Found USBLCD device at {Path} (Vendor={Vendor}, Product={Product})",
-                            path, info.VendorId, info.ProductId);
-                        info.DevicePath = path;
-                        devices.Add(info);
+                        Logger.Information("ScsiPanelDevice: Found USBLCD device at {Path} (Vendor={Vendor}, Model={Model})",
+                            devPath, vendor, model);
+
+                        devices.Add(new ScsiDeviceInfo
+                        {
+                            DevicePath = devPath,
+                            VendorId = vendor,
+                            ProductId = model
+                        });
                     }
                 }
                 catch (Exception ex)
                 {
-                    Logger.Debug("ScsiPanelDevice: Error probing {Path}: {Error}", path, ex.Message);
+                    Logger.Debug("ScsiPanelDevice: Error probing {Path}: {Error}", devPath, ex.Message);
                 }
             }
 
@@ -176,71 +142,21 @@ namespace InfoPanel.ThermalrightPanel
         }
 
         /// <summary>
-        /// Queries the storage device descriptor for a given device handle to get vendor/product strings.
-        /// </summary>
-        private static ScsiDeviceInfo? QueryStorageDeviceDescriptor(SafeFileHandle handle)
-        {
-            var query = new STORAGE_PROPERTY_QUERY
-            {
-                PropertyId = StorageDeviceProperty,
-                QueryType = PropertyStandardQuery
-            };
-
-            int querySize = Marshal.SizeOf<STORAGE_PROPERTY_QUERY>();
-            int outputSize = 1024; // Large enough for descriptor + strings
-            var queryPtr = Marshal.AllocHGlobal(querySize);
-            var outputPtr = Marshal.AllocHGlobal(outputSize);
-
-            try
-            {
-                Marshal.StructureToPtr(query, queryPtr, false);
-
-                if (!DeviceIoControl(handle, IOCTL_STORAGE_QUERY_PROPERTY,
-                    queryPtr, (uint)querySize,
-                    outputPtr, (uint)outputSize,
-                    out _, IntPtr.Zero))
-                {
-                    return null;
-                }
-
-                var descriptor = Marshal.PtrToStructure<STORAGE_DEVICE_DESCRIPTOR>(outputPtr);
-
-                string vendorId = descriptor.VendorIdOffset > 0
-                    ? Marshal.PtrToStringAnsi(outputPtr + (int)descriptor.VendorIdOffset)?.Trim() ?? ""
-                    : "";
-
-                string productId = descriptor.ProductIdOffset > 0
-                    ? Marshal.PtrToStringAnsi(outputPtr + (int)descriptor.ProductIdOffset)?.Trim() ?? ""
-                    : "";
-
-                return new ScsiDeviceInfo { VendorId = vendorId, ProductId = productId };
-            }
-            finally
-            {
-                Marshal.FreeHGlobal(queryPtr);
-                Marshal.FreeHGlobal(outputPtr);
-            }
-        }
-
-        /// <summary>
-        /// Opens a SCSI panel device at the given path (e.g., \\.\PhysicalDrive1).
+        /// Opens a SCSI generic device at the given path (e.g., /dev/sg2).
         /// </summary>
         public static ScsiPanelDevice? Open(string devicePath)
         {
-            var handle = CreateFile(devicePath,
-                GENERIC_READ | GENERIC_WRITE,
-                FILE_SHARE_READ | FILE_SHARE_WRITE,
-                IntPtr.Zero, OPEN_EXISTING, 0, IntPtr.Zero);
+            int fd = LinuxOpen(devicePath, O_RDWR);
 
-            if (handle.IsInvalid)
+            if (fd < 0)
             {
-                int error = Marshal.GetLastWin32Error();
-                Logger.Warning("ScsiPanelDevice: Failed to open {Path}, Win32 error {Error}", devicePath, error);
+                int errno = Marshal.GetLastSystemError();
+                Logger.Warning("ScsiPanelDevice: Failed to open {Path}, errno {Error}", devicePath, errno);
                 return null;
             }
 
-            Logger.Information("ScsiPanelDevice: Opened {Path}", devicePath);
-            return new ScsiPanelDevice(handle, devicePath);
+            Logger.Information("ScsiPanelDevice: Opened {Path} (fd={Fd})", devicePath, fd);
+            return new ScsiPanelDevice(fd, devicePath);
         }
 
         /// <summary>
@@ -256,7 +172,7 @@ namespace InfoPanel.ThermalrightPanel
             cdb[3] = 0x00;
 
             var response = new byte[POLL_BUFFER_SIZE];
-            if (SendScsiCommand(cdb, response, SCSI_IOCTL_DATA_IN))
+            if (SendScsiCommand(cdb, response, SG_DXFER_FROM_DEV))
                 return response;
 
             return null;
@@ -286,7 +202,7 @@ namespace InfoPanel.ThermalrightPanel
             cdb[3] = 0x00;
 
             var data = new byte[POLL_BUFFER_SIZE]; // 0xE100 zero bytes
-            return SendScsiCommand(cdb, data, SCSI_IOCTL_DATA_OUT);
+            return SendScsiCommand(cdb, data, SG_DXFER_TO_DEV);
         }
 
         /// <summary>
@@ -312,7 +228,7 @@ namespace InfoPanel.ThermalrightPanel
                 var chunk = new byte[chunkSize];
                 Array.Copy(rgb565Data, offset, chunk, 0, chunkSize);
 
-                if (!SendScsiCommand(cdb, chunk, SCSI_IOCTL_DATA_OUT))
+                if (!SendScsiCommand(cdb, chunk, SG_DXFER_TO_DEV))
                 {
                     Logger.Warning("ScsiPanelDevice: Failed to send frame chunk {Index} ({Size} bytes)",
                         chunkIndex, chunkSize);
@@ -327,48 +243,56 @@ namespace InfoPanel.ThermalrightPanel
         }
 
         /// <summary>
-        /// Sends a SCSI CDB command with data transfer via IOCTL_SCSI_PASS_THROUGH_DIRECT.
+        /// Sends a SCSI CDB command with data transfer via Linux SG_IO ioctl.
         /// </summary>
-        private unsafe bool SendScsiCommand(byte[] cdb, byte[] data, byte direction)
+        private bool SendScsiCommand(byte[] cdb, byte[] data, int direction)
         {
+            var cdbHandle = GCHandle.Alloc(cdb, GCHandleType.Pinned);
             var dataHandle = GCHandle.Alloc(data, GCHandleType.Pinned);
+            var senseBuffer = new byte[SENSE_BUFFER_SIZE];
+            var senseHandle = GCHandle.Alloc(senseBuffer, GCHandleType.Pinned);
+
             try
             {
-                var sptd = new SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER();
-                sptd.Length = (ushort)Marshal.OffsetOf<SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER>(nameof(SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER.SenseBuf));
-                sptd.CdbLength = 16;
-                sptd.SenseInfoLength = 32;
-                sptd.DataIn = direction;
-                sptd.DataTransferLength = (uint)data.Length;
-                sptd.TimeOutValue = 10; // 10 seconds
-                sptd.DataBuffer = dataHandle.AddrOfPinnedObject();
-                sptd.SenseInfoOffset = (uint)Marshal.OffsetOf<SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER>(nameof(SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER.SenseBuf));
+                var hdr = new sg_io_hdr_t
+                {
+                    interface_id = 'S',
+                    dxfer_direction = direction,
+                    cmd_len = (byte)cdb.Length,
+                    mx_sb_len = SENSE_BUFFER_SIZE,
+                    dxfer_len = (uint)data.Length,
+                    dxferp = dataHandle.AddrOfPinnedObject(),
+                    cmdp = cdbHandle.AddrOfPinnedObject(),
+                    sbp = senseHandle.AddrOfPinnedObject(),
+                    timeout = 10000 // 10 seconds in milliseconds
+                };
 
-                // Copy CDB bytes
-                for (int i = 0; i < Math.Min(cdb.Length, 16); i++)
-                    sptd.Cdb[i] = cdb[i];
-
-                int sptdSize = Marshal.SizeOf<SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER>();
-                var sptdPtr = Marshal.AllocHGlobal(sptdSize);
+                int hdrSize = Marshal.SizeOf<sg_io_hdr_t>();
+                var hdrPtr = Marshal.AllocHGlobal(hdrSize);
                 try
                 {
-                    Marshal.StructureToPtr(sptd, sptdPtr, false);
+                    Marshal.StructureToPtr(hdr, hdrPtr, false);
 
-                    if (!DeviceIoControl(_handle, IOCTL_SCSI_PASS_THROUGH_DIRECT,
-                        sptdPtr, (uint)sptdSize,
-                        sptdPtr, (uint)sptdSize,
-                        out _, IntPtr.Zero))
+                    int ret = LinuxIoctl(_fd, SG_IO, hdrPtr);
+                    if (ret < 0)
                     {
-                        int error = Marshal.GetLastWin32Error();
-                        Logger.Warning("ScsiPanelDevice: DeviceIoControl failed, Win32 error {Error}", error);
+                        int errno = Marshal.GetLastSystemError();
+                        Logger.Warning("ScsiPanelDevice: SG_IO ioctl failed, errno {Error}", errno);
                         return false;
                     }
 
-                    // Check SCSI status
-                    var result = Marshal.PtrToStructure<SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER>(sptdPtr);
-                    if (result.ScsiStatus != 0)
+                    // Read back the header to check SCSI status
+                    var result = Marshal.PtrToStructure<sg_io_hdr_t>(hdrPtr);
+                    if (result.status != 0)
                     {
-                        Logger.Warning("ScsiPanelDevice: SCSI command failed with status 0x{Status:X2}", result.ScsiStatus);
+                        Logger.Warning("ScsiPanelDevice: SCSI command failed with status 0x{Status:X2}", result.status);
+                        return false;
+                    }
+
+                    if (result.host_status != 0 || result.driver_status != 0)
+                    {
+                        Logger.Warning("ScsiPanelDevice: Transport error host=0x{Host:X4} driver=0x{Driver:X4}",
+                            result.host_status, result.driver_status);
                         return false;
                     }
 
@@ -376,21 +300,24 @@ namespace InfoPanel.ThermalrightPanel
                 }
                 finally
                 {
-                    Marshal.FreeHGlobal(sptdPtr);
+                    Marshal.FreeHGlobal(hdrPtr);
                 }
             }
             finally
             {
+                cdbHandle.Free();
                 dataHandle.Free();
+                senseHandle.Free();
             }
         }
 
         public void Dispose()
         {
-            if (_handle != null && !_handle.IsInvalid)
+            if (_fd >= 0)
             {
-                _handle.Dispose();
+                LinuxClose(_fd);
                 Logger.Debug("ScsiPanelDevice: Closed {Path}", _devicePath);
+                _fd = -1;
             }
         }
     }

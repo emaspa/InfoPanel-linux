@@ -4,9 +4,9 @@ using LibUsbDotNet.Main;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.IO.Ports;
 using System.Linq;
-using System.Management;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
@@ -31,7 +31,12 @@ namespace InfoPanel.TuringPanel
                 {
                     if (TuringPanelModelDatabase.TryGetModelInfo(deviceReg.Vid, deviceReg.Pid, true, out var modelInfo))
                     {
-                        if (deviceReg.DeviceProperties["DeviceID"] is string deviceId && deviceReg.DeviceProperties["LocationInformation"] is string deviceLocation)
+                        var deviceId = deviceReg.DeviceProperties["DeviceID"] as string
+                            ?? deviceReg.DevicePath ?? "";
+                        var deviceLocation = deviceReg.DeviceProperties["LocationInformation"] as string
+                            ?? deviceReg.DevicePath ?? "";
+
+                        if (!string.IsNullOrEmpty(deviceId) && !string.IsNullOrEmpty(deviceLocation))
                         {
                             Logger.Information("Found Turing panel device: {Name} at {Location} (ID: {DeviceId})",
                                 modelInfo.Name, deviceLocation, deviceId);
@@ -63,6 +68,85 @@ namespace InfoPanel.TuringPanel
         }
 
 
+        /// <summary>
+        /// Discovers Linux serial ports backed by USB devices via sysfs.
+        /// Enumerates /sys/bus/usb-serial/devices/ (ttyUSB*) and /sys/class/tty/ (ttyACM*).
+        /// </summary>
+        private static List<(string portPath, int vid, int pid)> GetLinuxSerialPorts()
+        {
+            var results = new List<(string portPath, int vid, int pid)>();
+
+            // ttyUSB devices (e.g. CH340-based Turing panels)
+            string usbSerialPath = "/sys/bus/usb-serial/devices";
+            if (Directory.Exists(usbSerialPath))
+            {
+                foreach (var entry in Directory.GetDirectories(usbSerialPath))
+                {
+                    var name = Path.GetFileName(entry);
+                    var portPath = $"/dev/{name}";
+                    var vidPath = Path.Combine(entry, "..", "..", "idVendor");
+                    var pidPath = Path.Combine(entry, "..", "..", "idProduct");
+
+                    if (TryReadSysfsHex(vidPath, out var vid) && TryReadSysfsHex(pidPath, out var pid))
+                    {
+                        results.Add((portPath, vid, pid));
+                    }
+                }
+            }
+
+            // ttyACM devices (CDC ACM class)
+            string ttyClassPath = "/sys/class/tty";
+            if (Directory.Exists(ttyClassPath))
+            {
+                foreach (var entry in Directory.GetDirectories(ttyClassPath, "ttyACM*"))
+                {
+                    var name = Path.GetFileName(entry);
+                    var portPath = $"/dev/{name}";
+
+                    // Walk up from /sys/class/tty/ttyACMN/device to find the USB device with idVendor/idProduct
+                    var deviceLink = Path.Combine(entry, "device");
+                    if (!Directory.Exists(deviceLink))
+                        continue;
+
+                    var resolved = Path.GetFullPath(deviceLink);
+                    // Walk up until we find idVendor
+                    var current = resolved;
+                    while (current != null && current != "/")
+                    {
+                        var vidPath = Path.Combine(current, "idVendor");
+                        var pidPath = Path.Combine(current, "idProduct");
+                        if (File.Exists(vidPath) && File.Exists(pidPath)
+                            && TryReadSysfsHex(vidPath, out var vid) && TryReadSysfsHex(pidPath, out var pid))
+                        {
+                            results.Add((portPath, vid, pid));
+                            break;
+                        }
+                        current = Path.GetDirectoryName(current);
+                    }
+                }
+            }
+
+            return results;
+        }
+
+        private static bool TryReadSysfsHex(string path, out int value)
+        {
+            value = 0;
+            try
+            {
+                var fullPath = Path.GetFullPath(path);
+                if (!File.Exists(fullPath))
+                    return false;
+                var text = File.ReadAllText(fullPath).Trim();
+                value = Convert.ToInt32(text, 16);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         public static async Task<List<TuringPanelDevice>> GetSerialDevices()
         {
             await _semaphore.WaitAsync();
@@ -87,31 +171,19 @@ namespace InfoPanel.TuringPanel
                 return await Task.Run(() =>
                 {
                     List<TuringPanelDevice> devices = [];
-                    var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_SerialPort");
-                    var serialPorts = searcher.Get().Cast<ManagementObject>().ToList();
+                    var serialPorts = GetLinuxSerialPorts();
 
-                    // Check for CT13INCH identifier port (VID_1A86&PID_CA11)
+                    // Check for CT13INCH identifier port (VID=0x1A86, PID=0xCA11)
                     // When present, the companion 0525:A4A7 port is a 10.2" panel, not an 8.8"
-                    bool hasCt13Inch = serialPorts.Any(obj =>
-                    {
-                        string? pnp = obj["PNPDeviceID"]?.ToString();
-                        return pnp != null && pnp.Contains("VID_1A86") && pnp.Contains("PID_CA11");
-                    });
+                    bool hasCt13Inch = serialPorts.Any(p => p.vid == 0x1a86 && p.pid == 0xca11);
 
                     if (hasCt13Inch)
                     {
                         Logger.Information("Detected CT13INCH identifier port");
                     }
 
-                    foreach (ManagementObject queryObj in serialPorts)
+                    foreach (var (portPath, vid, pid) in serialPorts)
                     {
-                        string? comPort = queryObj["DeviceID"]?.ToString();
-                        string? pnpDeviceId = queryObj["PNPDeviceID"]?.ToString();
-                        if (comPort == null || pnpDeviceId == null || !TryParseVidPid(pnpDeviceId, out var vid, out var pid))
-                        {
-                            continue;
-                        }
-
                         // Skip CT13INCH CH340 port from normal matching
                         if (vid == 0x1a86 && pid == 0xca11)
                         {
@@ -130,12 +202,12 @@ namespace InfoPanel.TuringPanel
                                 }
 
                                 var modelInfo = TuringPanelModelDatabase.Models[model];
-                                Logger.Information("Found Turing panel device: {Name} on {ComPort}", modelInfo.Name, comPort);
+                                Logger.Information("Found Turing panel device: {Name} on {PortPath}", modelInfo.Name, portPath);
 
                                 TuringPanelDevice device = new()
                                 {
-                                    DeviceId = pnpDeviceId,
-                                    DeviceLocation = comPort,
+                                    DeviceId = $"USB\\VID_{vid:X4}&PID_{pid:X4}",
+                                    DeviceLocation = portPath,
                                     Model = model.ToString()
                                 };
 
@@ -167,25 +239,23 @@ namespace InfoPanel.TuringPanel
                 return await Task.Run(() =>
                 {
                     var count = 0;
-                    var searcher = new ManagementObjectSearcher("SELECT * FROM Win32_SerialPort");
-                    foreach (ManagementObject queryObj in searcher.Get().Cast<ManagementObject>())
-                    {
-                        string? comPort = queryObj["DeviceID"]?.ToString();
-                        string? pnpDeviceId = queryObj["PNPDeviceID"]?.ToString();
+                    var serialPorts = GetLinuxSerialPorts();
 
-                        if (comPort == null || pnpDeviceId == null || !pnpDeviceId.Contains("VID_1A86") || !pnpDeviceId.Contains("PID_5722"))
-                        {
-                            continue; // Skip devices that are not CH340 USB to Serial converters
-                        }
+                    foreach (var (portPath, vid, pid) in serialPorts)
+                    {
+                        // Only wake CH340 USB to Serial converters
+                        if (vid != 0x1a86 || pid != 0x5722)
+                            continue;
 
                         try
                         {
-                            using var serialPort = new SerialPort(comPort, 115200);
+                            using var serialPort = new SerialPort(portPath, 115200);
                             serialPort.Open();
                             serialPort.Close();
-                        }catch (Exception ex)
+                        }
+                        catch (Exception ex)
                         {
-                            Logger.Warning(ex, "TuringPanelHelper: Error opening device on {ComPort}", comPort);
+                            Logger.Warning(ex, "TuringPanelHelper: Error opening device on {PortPath}", portPath);
                         }
                         count++;
                     }

@@ -1,10 +1,9 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using InfoPanel.ThermalrightPanel;
-using InfoPanel.ViewModels;
-using System;
 using Serilog;
+using System;
 using System.Linq;
-using System.Windows.Threading;
 
 namespace InfoPanel.Models
 {
@@ -141,9 +140,7 @@ namespace InfoPanel.Models
 
         private void DispatchUpdate(bool? isRunning, int? frameRate, long? frameTime, string? errorMessage)
         {
-            if (System.Windows.Application.Current?.Dispatcher is Dispatcher dispatcher)
-            {
-                dispatcher.BeginInvoke(() =>
+            Dispatcher.UIThread.Post(() =>
                 {
                     if (isRunning != null)
                     {
@@ -165,7 +162,6 @@ namespace InfoPanel.Models
                         RuntimeProperties.ErrorMessage = errorMessage;
                     }
                 });
-            }
         }
 
         public override string ToString()

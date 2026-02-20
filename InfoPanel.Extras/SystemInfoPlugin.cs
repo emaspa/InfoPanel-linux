@@ -1,7 +1,9 @@
-﻿using InfoPanel.Plugins;
+using InfoPanel.Plugins;
 using System;
 using System.Data;
 using System.Diagnostics;
+using System.IO;
+using System.Linq;
 
 namespace InfoPanel.Extras
 {
@@ -18,19 +20,20 @@ namespace InfoPanel.Extras
         private readonly PluginSensor _handleCountSensor = new("Handle Count", 0);
 
         private readonly PluginSensor _cpuUsage = new("CPU Usage", 0, "%");
-        private readonly PluginSensor _cpuUtility = new("CPU Utility", 0, "%");
         private readonly PluginSensor _memoryUsage = new("Memory Usage", 0, " MB");
-        private readonly PluginSensor _memoryCompression = new("Memory Compression", 0, " MB");
 
         private static readonly string _defaultTopFormat = "0:200|1:60|2:70|3:100";
         private readonly PluginTable _topCpuUsage = new("Top CPU Usage", new DataTable(), _defaultTopFormat);
-        private readonly PluginTable _topCpuUtility = new("Top CPU Utility", new DataTable(), _defaultTopFormat);
         private readonly PluginTable _topMemoryUsage = new("Top Memory Usage", new DataTable(), _defaultTopFormat);
 
         public override string? ConfigFilePath => Config.FilePath;
         public override TimeSpan UpdateInterval => TimeSpan.FromSeconds(1);
 
         private string[] blacklist = [];
+
+        // For CPU usage calculation from /proc/stat
+        private long _prevIdleTime;
+        private long _prevTotalTime;
 
         public SystemInfoPlugin() : base("system-info-plugin", "System Info", "Misc system information and statistics.")
         {
@@ -43,6 +46,9 @@ namespace InfoPanel.Extras
             {
                 blacklist = result.Split(',');
             }
+
+            // Initialize CPU counters from /proc/stat
+            ReadCpuTimes(out _prevIdleTime, out _prevTotalTime);
         }
 
         public override void Load(List<IPluginContainer> containers)
@@ -61,11 +67,8 @@ namespace InfoPanel.Extras
             container.Entries.Add(_threadCountSensor);
             container.Entries.Add(_handleCountSensor);
             container.Entries.Add(_cpuUsage);
-            container.Entries.Add(_cpuUtility);
             container.Entries.Add(_memoryUsage);
-            container.Entries.Add(_memoryCompression);
             container.Entries.Add(_topCpuUsage);
-            container.Entries.Add(_topCpuUtility);
             container.Entries.Add(_topMemoryUsage);
 
             containers.Add(container);
@@ -90,10 +93,7 @@ namespace InfoPanel.Extras
 
         private void GetUptime()
         {
-            // Get the system uptime in milliseconds
             long uptimeMilliseconds = Environment.TickCount64;
-
-            // Convert milliseconds to TimeSpan
             TimeSpan uptime = TimeSpan.FromMilliseconds(uptimeMilliseconds);
 
             _uptimeFormattedSensor.Value = $"{uptime.Days}:{uptime.Hours:D2}:{uptime.Minutes:D2}:{uptime.Seconds:D2}";
@@ -103,11 +103,60 @@ namespace InfoPanel.Extras
             _uptimeSecondsSensor.Value = $"{uptime.Seconds:D2}";
         }
 
-       
-        PerformanceCounter? utility;
-        PerformanceCounter? usage;
+        private static void ReadCpuTimes(out long idleTime, out long totalTime)
+        {
+            idleTime = 0;
+            totalTime = 0;
 
-        Dictionary<string, double> firstUsageSample = [];
+            try
+            {
+                var line = File.ReadLines("/proc/stat").FirstOrDefault(l => l.StartsWith("cpu "));
+                if (line != null)
+                {
+                    var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                    // cpu user nice system idle iowait irq softirq steal
+                    if (parts.Length >= 5)
+                    {
+                        for (int i = 1; i < parts.Length; i++)
+                        {
+                            if (long.TryParse(parts[i], out var val))
+                                totalTime += val;
+                        }
+                        if (long.TryParse(parts[4], out var idle))
+                            idleTime = idle;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private static long GetMemoryUsageMB()
+        {
+            try
+            {
+                long memTotal = 0, memAvailable = 0;
+                foreach (var line in File.ReadLines("/proc/meminfo"))
+                {
+                    if (line.StartsWith("MemTotal:"))
+                        memTotal = ParseMemInfoLine(line);
+                    else if (line.StartsWith("MemAvailable:"))
+                        memAvailable = ParseMemInfoLine(line);
+
+                    if (memTotal > 0 && memAvailable > 0)
+                        break;
+                }
+                return (memTotal - memAvailable) / 1024; // kB to MB
+            }
+            catch { return 0; }
+        }
+
+        private static long ParseMemInfoLine(string line)
+        {
+            var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length >= 2 && long.TryParse(parts[1], out var val))
+                return val;
+            return 0;
+        }
 
         private void GetProcessInfo()
         {
@@ -115,120 +164,55 @@ namespace InfoPanel.Extras
             _processCountSensor.Value = processes.Length;
 
             int totalThreadCount = 0;
-            int totalHandleCount = 0;
 
             foreach (var process in processes)
             {
                 try
                 {
-                    // Add the number of threads for the process to the total
                     totalThreadCount += process.Threads.Count;
-
-                    // Add the handle count for the process to the total
-                    totalHandleCount += process.HandleCount;
                 }
-                catch (Exception ex)
-                {
-                    // Handle any exceptions that might occur (e.g., access denied)
-                    Console.WriteLine($"Could not access process {process.ProcessName}: {ex.Message}");
-                }
+                catch { }
             }
 
             _threadCountSensor.Value = totalThreadCount;
-            _handleCountSensor.Value = totalHandleCount;
+            _handleCountSensor.Value = 0; // Handle count not meaningful on Linux
 
+            // CPU usage from /proc/stat
+            ReadCpuTimes(out var currentIdle, out var currentTotal);
+            var idleDelta = currentIdle - _prevIdleTime;
+            var totalDelta = currentTotal - _prevTotalTime;
+
+            if (totalDelta > 0)
+            {
+                _cpuUsage.Value = (float)((1.0 - (double)idleDelta / totalDelta) * 100.0);
+            }
+
+            _prevIdleTime = currentIdle;
+            _prevTotalTime = currentTotal;
+
+            // Memory usage from /proc/meminfo
+            _memoryUsage.Value = GetMemoryUsageMB();
+
+            // Process-level stats
             var processGroups = processes.GroupBy(p => p.ProcessName);
+            var instances = new List<Instance>();
 
-            utility ??= new PerformanceCounter("Processor Information", "% Processor Utility", "_Total");
-            usage ??= new PerformanceCounter("Processor Information", "% Processor Time", "_Total");
-
-            var utilityDelta = utility.NextValue();
-            _cpuUtility.Value = utilityDelta;
-
-            var usageDelta = usage.NextValue();
-            _cpuUsage.Value = usageDelta;
-
-            var category = new PerformanceCounterCategory("Process V2");
-            var categoryData = category.ReadCategory();
-            var usageData = categoryData["% Processor Time"];
-            var memoryData = categoryData["Working Set - Private"];
-
-            // Second sample
-            var secondUsageSample = new Dictionary<string, double>();
-            foreach (InstanceData data in usageData.Values)
+            foreach (var group in processGroups)
             {
-                secondUsageSample[data.InstanceName] = data.RawValue;
-            }
-
-            var memorySample = new Dictionary<string, long>();
-            foreach (InstanceData data in memoryData.Values)
-            {
-                memorySample[data.InstanceName] = data.RawValue;
-            }
-
-            Dictionary<string, Instance> instances = [];
-
-            if (firstUsageSample.TryGetValue("_Total", out var firstTotalValue) && secondUsageSample.TryGetValue("_Total", out var secondTotalValue))
-            {
-                var totalDelta = secondTotalValue - firstTotalValue;
-
-                foreach (var kvp in secondUsageSample)
+                long memoryBytes = 0;
+                foreach (var p in group)
                 {
-                    var proceessName = kvp.Key.Split(':', 2)[0];
-
-                    if (firstUsageSample.TryGetValue(kvp.Key, out var firstValue) && memorySample.TryGetValue(kvp.Key, out var memoryValue))
-                    {
-                        double secondValue = kvp.Value;
-                        double delta = secondValue - firstValue;
-
-                        double cpuUsage = (delta / totalDelta) * 100;
-                        double cpuUtility = 0.0;
-                        if (usageDelta > 0 && cpuUsage <= usageDelta)
-                        {
-                            cpuUtility = cpuUsage / usageDelta * utilityDelta;
-                        }
-
-                        if (instances.TryGetValue(proceessName, out var instance))
-                        {
-                            instance.Usage += cpuUsage;
-                            instance.Utility += cpuUtility;
-                            instance.PrivateMemory += memoryValue;
-                        }
-                        else
-                        {
-                            instances.TryAdd(proceessName, new Instance { Name = proceessName, Usage = cpuUsage, Utility = cpuUtility, PrivateMemory = memoryValue });
-                        }
-                    }
+                    try { memoryBytes += p.WorkingSet64; } catch { }
                 }
+                instances.Add(new Instance { Name = group.Key, PrivateMemory = memoryBytes });
             }
 
-            if(instances.TryGetValue("_Total", out var totalInstance))
-            {
-                _memoryUsage.Value = (float) totalInstance.PrivateMemory / 1024 / 1024;
-            }
+            // Memory top
+            instances.Sort((a, b) => b.PrivateMemory.CompareTo(a.PrivateMemory));
+            _topMemoryUsage.Value = BuildDataTable(instances, blacklist);
 
-            if (instances.TryGetValue("Memory Compression", out var memoryCompression))
-            {
-                _memoryCompression.Value = (float) memoryCompression.PrivateMemory / 1024 / 1024;
-            }
-
-
-            var result = instances.Values.ToList();
-
-            //cpu usage
-            result.Sort((a, b) => b.Usage.CompareTo(a.Usage));
-            _topCpuUsage.Value = BuildDataTable(result, blacklist);
-
-            //cpu utility
-            result.Sort((a, b) => b.Utility.CompareTo(a.Utility));
-            _topCpuUtility.Value = BuildDataTable(result, blacklist);
-
-            //memory
-            result.Sort((a, b) => b.PrivateMemory.CompareTo(a.PrivateMemory));
-            _topMemoryUsage.Value = BuildDataTable(result, blacklist);
-
-            //set default
-            firstUsageSample = secondUsageSample;
+            // CPU top (based on memory for now - per-process CPU requires sampling /proc/[pid]/stat)
+            _topCpuUsage.Value = BuildDataTable(instances, blacklist);
         }
 
         private static DataTable BuildDataTable(List<Instance> instances, string[] blacklist)
@@ -249,9 +233,9 @@ namespace InfoPanel.Extras
 
                 var row = dataTable.NewRow();
                 row[0] = new PluginText("Process Name", instance.Name);
-                row[1] = new PluginSensor("Usage", (float)instance.Usage, "%");
-                row[2] = new PluginSensor("Utility", (float)instance.Utility, "%");
-                row[3] = new PluginSensor("Memory", (float) (instance.PrivateMemory) / 1024 / 1024, " MB");
+                row[1] = new PluginSensor("Usage", 0, "%");
+                row[2] = new PluginSensor("Utility", 0, "%");
+                row[3] = new PluginSensor("Memory", (float)(instance.PrivateMemory) / 1024 / 1024, " MB");
                 dataTable.Rows.Add(row);
             }
 
@@ -261,8 +245,6 @@ namespace InfoPanel.Extras
         class Instance
         {
             public required string Name { get; set; }
-            public double Usage { get; set; }
-            public double Utility { get; set; }
             public long PrivateMemory { get; set; }
         }
     }

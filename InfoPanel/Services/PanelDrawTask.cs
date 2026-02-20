@@ -3,7 +3,6 @@ using InfoPanel.Models;
 using SkiaSharp;
 using System;
 using System.IO;
-using System.Windows.Media.Imaging;
 
 namespace InfoPanel
 {

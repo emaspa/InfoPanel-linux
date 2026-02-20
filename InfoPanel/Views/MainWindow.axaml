@@ -1,0 +1,82 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:InfoPanel.ViewModels"
+        x:Class="InfoPanel.Views.MainWindow"
+        x:DataType="vm:MainWindowViewModel"
+        Title="{Binding Title}"
+        MinWidth="800"
+        MinHeight="600"
+        WindowStartupLocation="CenterScreen">
+
+    <SplitView IsPaneOpen="{Binding IsPaneOpen, Mode=TwoWay}"
+               DisplayMode="CompactInline"
+               OpenPaneLength="200"
+               CompactPaneLength="48">
+
+        <SplitView.Pane>
+            <Border Background="{DynamicResource SystemControlBackgroundChromeMediumLowBrush}">
+                <DockPanel>
+                    <!-- Hamburger toggle -->
+                    <Button DockPanel.Dock="Top"
+                            Command="{Binding TogglePaneCommand}"
+                            Width="48" Height="40"
+                            HorizontalAlignment="Left"
+                            HorizontalContentAlignment="Center"
+                            VerticalContentAlignment="Center"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            FontSize="18">
+                        <TextBlock Text="&#x2630;" />
+                    </Button>
+
+                    <!-- Footer nav items (docked to bottom) -->
+                    <ListBox DockPanel.Dock="Bottom"
+                             x:Name="FooterNav"
+                             ItemsSource="{Binding FooterMenuItems}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             SelectionChanged="OnFooterSelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NavigationItem">
+                                <TextBlock Text="{Binding Label}"
+                                           Padding="12,8"
+                                           FontSize="13" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <!-- Separator -->
+                    <Separator DockPanel.Dock="Bottom" Margin="12,4" />
+
+                    <!-- Top nav items (fill remaining space) -->
+                    <ListBox x:Name="TopNav"
+                             ItemsSource="{Binding TopMenuItems}"
+                             Background="Transparent"
+                             BorderThickness="0"
+                             SelectionChanged="OnTopSelectionChanged">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:NavigationItem">
+                                <TextBlock Text="{Binding Label}"
+                                           Padding="12,8"
+                                           FontSize="13" />
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+        </SplitView.Pane>
+
+        <SplitView.Content>
+            <DockPanel>
+                <!-- Page title header -->
+                <Border DockPanel.Dock="Top" Padding="24,20,24,10">
+                    <TextBlock Text="{Binding SelectedPage}"
+                               FontSize="24" FontWeight="DemiBold" />
+                </Border>
+
+                <!-- Page content -->
+                <ContentControl Content="{Binding CurrentPageControl}" />
+            </DockPanel>
+        </SplitView.Content>
+    </SplitView>
+</Window>

@@ -1,4 +1,4 @@
-﻿using InfoPanel.ViewModels;
+﻿using InfoPanel.Models;
 using SkiaSharp;
 using System;
 

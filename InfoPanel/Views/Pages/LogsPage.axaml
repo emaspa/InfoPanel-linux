@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="InfoPanel.Views.Pages.LogsPage">
+    <StackPanel Margin="20" VerticalAlignment="Center" HorizontalAlignment="Center">
+        <TextBlock Text="Logs"
+                   FontSize="28" FontWeight="Bold"
+                   HorizontalAlignment="Center" />
+        <TextBlock Text="Log viewer coming soon."
+                   FontSize="18" Opacity="0.7"
+                   Margin="0,10,0,0"
+                   HorizontalAlignment="Center" />
+    </StackPanel>
+</UserControl>

@@ -17,8 +17,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Threading;
+using Avalonia.Threading;
 using System.Xml;
 using System.Xml.Linq;
 using System.Xml.Serialization;
@@ -160,19 +159,16 @@ namespace InfoPanel
                 return;
             }
 
-            if (Application.Current.Dispatcher is Dispatcher dispatcher)
+            if (Dispatcher.UIThread.CheckAccess())
             {
-                if (dispatcher.CheckAccess())
+                action(collection);
+            }
+            else
+            {
+                Dispatcher.UIThread.Invoke(() =>
                 {
                     action(collection);
-                }
-                else
-                {
-                    dispatcher.Invoke(() =>
-                    {
-                        action(collection);
-                    });
-                }
+                });
             }
         }
 
@@ -1173,7 +1169,7 @@ namespace InfoPanel
 
                 SaveDisplayItems(profile, displayItems);
 
-                Dispatcher.CurrentDispatcher.Invoke(() =>
+                Dispatcher.UIThread.Invoke(() =>
                 {
                     ConfigModel.Instance.AddProfile(profile);
                     ConfigModel.Instance.SaveProfiles();

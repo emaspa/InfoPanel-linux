@@ -41,7 +41,7 @@ public abstract partial class DisplayItem : ObservableObject, ICloneable
     }
 
     [XmlIgnore]
-    public System.Windows.Point MouseOffset { get; set; }
+    public SKPoint MouseOffset { get; set; }
 
     private string _name;
     public string Name
@@ -170,7 +170,7 @@ public abstract partial class DisplayItem : ObservableObject, ICloneable
 
     public abstract object Clone();
 
-    public bool ContainsPoint(System.Windows.Point worldPoint)
+    public bool ContainsPoint(SKPoint worldPoint)
     {
         var bounds = EvaluateBounds();
         double centerX = bounds.MidX;

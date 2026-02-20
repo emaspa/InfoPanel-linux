@@ -2,7 +2,6 @@
 using SkiaSharp;
 using System;
 using System.Linq;
-using System.Windows.Media;
 using System.Xml.Serialization;
 
 namespace InfoPanel.Models
@@ -152,7 +151,7 @@ namespace InfoPanel.Models
 
         }
 
-        private string _font = Fonts.SystemFontFamilies.First().ToString();
+        private string _font = "Inter";
 
         public string Font
         {

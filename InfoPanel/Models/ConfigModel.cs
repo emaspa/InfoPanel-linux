@@ -1,28 +1,25 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+﻿using Avalonia.Threading;
+using CommunityToolkit.Mvvm.ComponentModel;
 using InfoPanel.Models;
 using InfoPanel.Monitors;
-using Microsoft.Win32;
-using Microsoft.Win32.TaskScheduler;
+using InfoPanel.Services;
+using InfoPanel.TuringPanel;
+using InfoPanel.ThermalrightPanel;
+using HidSharp;
+using Serilog;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
-using Serilog;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading;
-using System.Windows.Forms;
-using System.Windows.Threading;
 using System.Xml;
 using System.Xml.Serialization;
 using Task = System.Threading.Tasks.Task;
 using Timer = System.Threading.Timer;
-using InfoPanel.Services;
-using InfoPanel.TuringPanel;
-using InfoPanel.ThermalrightPanel;
-using HidSharp;
 
 namespace InfoPanel
 {
@@ -30,7 +27,7 @@ namespace InfoPanel
     {
         private static readonly ILogger Logger = Log.ForContext<ConfigModel>();
         private const int CurrentVersion = 131;
-        private const string RegistryRunKey = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+        // Auto-start on Linux uses XDG autostart desktop files
         private static readonly Lazy<ConfigModel> lazy = new(() => new ConfigModel());
 
         public static ConfigModel Instance { get { return lazy.Value; } }
@@ -80,19 +77,16 @@ namespace InfoPanel
 
         public void AccessSettings(Action<Settings> action)
         {
-            if (System.Windows.Application.Current.Dispatcher is Dispatcher dispatcher)
+            if (Dispatcher.UIThread.CheckAccess())
             {
-                if (dispatcher.CheckAccess())
+                action(Settings);
+            }
+            else
+            {
+                Dispatcher.UIThread.Invoke(() =>
                 {
                     action(Settings);
-                }
-                else
-                {
-                    dispatcher.Invoke(() =>
-                    {
-                        action(Settings);
-                    });
-                }
+                });
             }
         }
 
@@ -104,7 +98,7 @@ namespace InfoPanel
                 {
                     if (profile.Active)
                     {
-                        if (System.Windows.Application.Current is App app)
+                        if (Avalonia.Application.Current is App app)
                         {
                             app.ShowDisplayWindow(profile);
                         }
@@ -118,7 +112,7 @@ namespace InfoPanel
             {
                 foreach (Profile profile in e.OldItems)
                 {
-                    if (System.Windows.Application.Current is App app)
+                    if (Avalonia.Application.Current is App app)
                     {
                         app.CloseDisplayWindow(profile);
                     }
@@ -136,14 +130,14 @@ namespace InfoPanel
                 {
                     if (profile.Active)
                     {
-                        if (System.Windows.Application.Current is App app)
+                        if (Avalonia.Application.Current is App app)
                         {
                             app.ShowDisplayWindow(profile);
                         }
                     }
                     else
                     {
-                        if (System.Windows.Application.Current is App app)
+                        if (Avalonia.Application.Current is App app)
                         {
                             app.CloseDisplayWindow(profile);
                         }
@@ -154,34 +148,34 @@ namespace InfoPanel
 
         private void ValidateStartup()
         {
-            //legacy startup removal
-            using var registryKey = Registry.CurrentUser?.OpenSubKey(RegistryRunKey, true);
-            registryKey?.DeleteValue("InfoPanel", false);
-
-            //new startup removal
-            using var taskService = new TaskService();
+            var autostartDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                ".config", "autostart");
+            var desktopFile = Path.Combine(autostartDir, "infopanel.desktop");
 
             if (!Settings.AutoStart)
             {
-                //delete task if exists
-                taskService.RootFolder.DeleteTask("InfoPanel", false);
+                // Remove autostart entry
+                if (File.Exists(desktopFile))
+                {
+                    try { File.Delete(desktopFile); } catch { }
+                }
             }
             else
             {
-                using var taskDefinition = taskService.NewTask();
-                taskDefinition.RegistrationInfo.Description = "Runs InfoPanel on startup.";
-                taskDefinition.RegistrationInfo.Author = "Habib Rehman";
-                taskDefinition.Triggers.Add(new LogonTrigger { Delay = TimeSpan.FromSeconds(Settings.AutoStartDelay) });
-                taskDefinition.Actions.Add(new ExecAction(Application.ExecutablePath));
-                taskDefinition.Principal.RunLevel = TaskRunLevel.Highest;
-                taskDefinition.Settings.DisallowStartIfOnBatteries = false;
-                taskDefinition.Settings.StopIfGoingOnBatteries = false;
-                taskDefinition.Settings.AllowDemandStart = true;
-                taskDefinition.Settings.AllowHardTerminate = true;
-                taskDefinition.Settings.ExecutionTimeLimit = TimeSpan.Zero;
-
-                taskService.RootFolder.RegisterTaskDefinition("InfoPanel", taskDefinition, TaskCreation.CreateOrUpdate,
-                    System.Security.Principal.WindowsIdentity.GetCurrent().Name, null, TaskLogonType.InteractiveToken);
+                // Create XDG autostart desktop file
+                Directory.CreateDirectory(autostartDir);
+                var exePath = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName ?? "InfoPanel";
+                var content = $"""
+                    [Desktop Entry]
+                    Type=Application
+                    Name=InfoPanel
+                    Comment=Hardware monitoring dashboard
+                    Exec={exePath}
+                    X-GNOME-Autostart-enabled=true
+                    X-GNOME-Autostart-Delay={Settings.AutoStartDelay}
+                    """;
+                File.WriteAllText(desktopFile, content);
             }
         }
 

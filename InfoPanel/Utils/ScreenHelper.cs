@@ -1,89 +1,39 @@
-﻿using SkiaSharp;
-using System;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Platform;
+using SkiaSharp;
 using System.Collections.Generic;
 using System.Linq;
-using System.Runtime.InteropServices;
-using System.Windows;
-using System.Windows.Interop;
 
 namespace InfoPanel.Utils
 {
     public class ScreenHelper
     {
-        [DllImport("user32.dll")]
-        private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
-
-        [DllImport("user32.dll", CharSet = CharSet.Auto)]
-        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFOEX lpmi);
-
-        private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT
-        {
-            public int Left;
-            public int Top;
-            public int Right;
-            public int Bottom;
-        }
-
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
-        private struct MONITORINFOEX
-        {
-            public int cbSize;
-            public RECT rcMonitor;
-            public RECT rcWork;
-            public uint dwFlags;
-            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
-            public string szDevice;
-        }
-
-        private const int CCHDEVICENAME = 32;
-        private const uint MONITORINFOF_PRIMARY = 0x00000001;
-
-        [DllImport("user32.dll")]
-        static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-
-        const uint SWP_NOSIZE = 0x0001;
-        const uint SWP_NOZORDER = 0x0004;
-
         public static void MoveWindowPhysical(Window window, int x, int y)
         {
-            var hwnd = new WindowInteropHelper(window).Handle;
-            SetWindowPos(hwnd, IntPtr.Zero, x, y, 0, 0, SWP_NOSIZE | SWP_NOZORDER);
+            window.Position = new PixelPoint(x, y);
         }
-
-        [DllImport("user32.dll")]
-        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
         public static SKPoint GetWindowPositionPhysical(Window window)
         {
-            var hWnd = new WindowInteropHelper(window).Handle;
-            GetWindowRect(hWnd, out var rect);
-            return new SKPoint(rect.Left, rect.Top);
+            return new SKPoint(window.Position.X, window.Position.Y);
         }
 
         public static MonitorInfo? GetWindowScreen(Window window)
         {
-            var hwnd = new WindowInteropHelper(window).Handle;
-            if (!GetWindowRect(hwnd, out var rect))
-                return null;
+            var position = new SKPoint(window.Position.X, window.Position.Y);
+            var monitors = GetAllMonitors(window);
 
-            var windowPos = new SKPoint(rect.Left, rect.Top);
-            var monitors = GetAllMonitors();
-
-            // Find the monitor whose bounds contain the window position
             foreach (var monitor in monitors)
             {
-                if (monitor.Bounds.Contains(windowPos))
+                if (monitor.Bounds.Contains(position))
                 {
                     return monitor;
                 }
             }
 
-            // If not contained (e.g., overlapping), return the closest by distance
             return monitors
-                .OrderBy(m => DistanceSquared(windowPos, m.Bounds))
+                .OrderBy(m => DistanceSquared(position, m.Bounds))
                 .FirstOrDefault();
         }
 
@@ -98,40 +48,44 @@ namespace InfoPanel.Utils
 
         public static Point GetWindowRelativePosition(MonitorInfo screen, SKPoint absolutePosition)
         {
-            var relativeX = absolutePosition.X - (int) screen.Bounds.Left;
-            var relativeY = absolutePosition.Y - (int) screen.Bounds.Top;
+            var relativeX = absolutePosition.X - (int)screen.Bounds.Left;
+            var relativeY = absolutePosition.Y - (int)screen.Bounds.Top;
 
             return new Point(relativeX, relativeY);
         }
 
-        // Get fresh monitor list using Win32 API
-        public static List<MonitorInfo> GetAllMonitors()
+        public static List<MonitorInfo> GetAllMonitors(Window window)
         {
             var monitors = new List<MonitorInfo>();
 
-            EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (IntPtr hMonitor, IntPtr hdcMonitor, ref RECT lprcMonitor, IntPtr dwData) =>
-            {
-                var info = new MONITORINFOEX();
-                info.cbSize = Marshal.SizeOf(info);
+            var screens = window.Screens;
+            if (screens == null) return monitors;
 
-                if (GetMonitorInfo(hMonitor, ref info))
-                {
-                    monitors.Add(new MonitorInfo
-                    {
-                        DeviceName = info.szDevice,
-                        Bounds = SKRect.Create(info.rcMonitor.Left, info.rcMonitor.Top,
-                            info.rcMonitor.Right - info.rcMonitor.Left,
-                            info.rcMonitor.Bottom - info.rcMonitor.Top),
-                        WorkingArea = SKRect.Create(info.rcWork.Left, info.rcWork.Top,
-                            info.rcWork.Right - info.rcWork.Left,
-                            info.rcWork.Bottom - info.rcWork.Top),
-                        IsPrimary = (info.dwFlags & MONITORINFOF_PRIMARY) != 0
-                    });
-                }
-                return true;
-            }, IntPtr.Zero);
+            foreach (var screen in screens.All)
+            {
+                monitors.Add(FromAvaloniaScreen(screen));
+            }
 
             return monitors;
+        }
+
+        public static MonitorInfo FromAvaloniaScreen(Screen screen)
+        {
+            return new MonitorInfo
+            {
+                DeviceName = screen.DisplayName ?? $"Screen-{screen.GetHashCode()}",
+                Bounds = SKRect.Create(
+                    screen.Bounds.X,
+                    screen.Bounds.Y,
+                    screen.Bounds.Width,
+                    screen.Bounds.Height),
+                WorkingArea = SKRect.Create(
+                    screen.WorkingArea.X,
+                    screen.WorkingArea.Y,
+                    screen.WorkingArea.Width,
+                    screen.WorkingArea.Height),
+                IsPrimary = screen.IsPrimary
+            };
         }
     }
 
