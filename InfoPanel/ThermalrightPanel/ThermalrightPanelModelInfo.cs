@@ -3,7 +3,8 @@ namespace InfoPanel.ThermalrightPanel
     public enum ThermalrightTransportType
     {
         WinUsb,
-        Hid
+        Hid,
+        Scsi
     }
 
     public enum ThermalrightProtocolType

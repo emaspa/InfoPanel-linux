@@ -248,7 +248,9 @@ namespace InfoPanel.Services
             var protocolType = _device.ModelInfo?.ProtocolType ?? ThermalrightProtocolType.ChiZhu;
             Logger.Information("ThermalrightPanelDevice {Device}: Using {Transport} transport, {Protocol} protocol", _device, transportType, protocolType);
 
-            if (transportType == ThermalrightTransportType.Hid)
+            if (transportType == ThermalrightTransportType.Scsi)
+                await DoWorkScsiAsync(token);
+            else if (transportType == ThermalrightTransportType.Hid)
                 await DoWorkHidAsync(token);
             else
                 await DoWorkWinUsbAsync(token);
@@ -274,6 +276,97 @@ namespace InfoPanel.Services
                 }
             }
             return null;
+        }
+
+        private async Task DoWorkScsiAsync(CancellationToken token)
+        {
+            try
+            {
+                // Use DevicePath (e.g. \\.\PhysicalDrive1) stored during discovery
+                var devicePath = _device.DeviceLocation;
+                Logger.Information("ThermalrightPanelDevice {Device}: Opening SCSI device at {Path}...", _device, devicePath);
+
+                using var scsiDevice = ScsiPanelDevice.Open(devicePath);
+                if (scsiDevice == null)
+                {
+                    Logger.Warning("ThermalrightPanelDevice {Device}: Failed to open SCSI device", _device);
+                    _device.UpdateRuntimeProperties(errorMessage:
+                        "Failed to open SCSI device. Make sure:\n" +
+                        "1. The device is connected\n" +
+                        "2. No other application is using the device\n" +
+                        "3. Try running as Administrator");
+                    await Task.Delay(OPEN_FAILURE_BACKOFF_MS, token);
+                    return;
+                }
+
+                Logger.Information("ThermalrightPanelDevice {Device}: SCSI device opened, polling...", _device);
+
+                // Poll device to detect resolution and boot status
+                for (int attempt = 0; attempt < 5; attempt++)
+                {
+                    var pollResponse = scsiDevice.Poll();
+                    if (pollResponse == null)
+                    {
+                        Logger.Warning("ThermalrightPanelDevice {Device}: SCSI poll failed (attempt {Attempt}/5)",
+                            _device, attempt + 1);
+                        await Task.Delay(1000, token);
+                        continue;
+                    }
+
+                    // Check if device is still booting
+                    if (ScsiPanelDevice.IsDeviceBooting(pollResponse))
+                    {
+                        Logger.Information("ThermalrightPanelDevice {Device}: Device still booting, waiting 3s...", _device);
+                        await Task.Delay(3000, token);
+                        continue;
+                    }
+
+                    // Resolve resolution from poll byte[0]
+                    var pollByte = pollResponse[0];
+                    Logger.Information("ThermalrightPanelDevice {Device}: SCSI poll byte: 0x{PollByte:X2} ('{Char}')",
+                        _device, pollByte, (char)pollByte);
+
+                    var resolution = ThermalrightPanelModelDatabase.GetResolutionFromScsiPollByte(pollByte);
+                    if (resolution != null)
+                    {
+                        _panelWidth = resolution.Value.Width;
+                        _panelHeight = resolution.Value.Height;
+                        Logger.Information("ThermalrightPanelDevice {Device}: Detected resolution {Width}x{Height}",
+                            _device, _panelWidth, _panelHeight);
+                    }
+                    else
+                    {
+                        Logger.Warning("ThermalrightPanelDevice {Device}: Unknown poll byte 0x{PollByte:X2}, using default {Width}x{Height}",
+                            _device, pollByte, _panelWidth, _panelHeight);
+                    }
+                    break;
+                }
+
+                // Initialize display controller
+                Logger.Information("ThermalrightPanelDevice {Device}: Sending SCSI init...", _device);
+                if (!scsiDevice.Init())
+                {
+                    Logger.Error("ThermalrightPanelDevice {Device}: SCSI init failed", _device);
+                    _device.UpdateRuntimeProperties(errorMessage: "SCSI display init failed");
+                    return;
+                }
+
+                Logger.Information("ThermalrightPanelDevice {Device}: SCSI init complete, starting render loop ({Width}x{Height})...",
+                    _device, _panelWidth, _panelHeight);
+
+                // Run the shared render-send loop with SCSI frame sender
+                await RunRenderSendLoop(frameData =>
+                {
+                    if (!scsiDevice.SendFrame(frameData))
+                        throw new Exception("SCSI frame send failed");
+                }, token);
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception e)
+            {
+                Logger.Error(e, "ThermalrightPanelDevice {Device}: SCSI error", _device);
+                _device.UpdateRuntimeProperties(errorMessage: e.Message);
+            }
         }
 
         private async Task DoWorkWinUsbAsync(CancellationToken token)

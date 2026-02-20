@@ -42,6 +42,9 @@ namespace InfoPanel.ThermalrightPanel
         // ChiZhu bulk (87AD:70DB) PM=0x20 variant — 320x320, RGB565
         ChiZhuVision320x320,
 
+        // SCSI pass-through (VID 0x0402 / PID 0x3922) — resolution detected at runtime from poll response
+        EliteVisionScsi,
+
         // Backward compatibility alias (was renamed to TrofeoVision)
         TrofeoVision686 = TrofeoVision,
     }
