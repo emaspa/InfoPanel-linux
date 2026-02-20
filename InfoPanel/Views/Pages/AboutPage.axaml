@@ -25,7 +25,8 @@
                                         <TextBlock Text="{Binding Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
                                     </StackPanel>
                                     <Button Grid.Column="1" Content="{Binding ButtonText}"
-                                            Command="{Binding $parent[ItemsControl].((vm:AboutPageViewModel)DataContext).OpenUrlCommand}"
+                                            Command="{Binding $parent[ItemsControl].DataContext.OpenUrlCommand}"
+                                            x:CompileBindings="False"
                                             CommandParameter="{Binding NavigateUri}"
                                             VerticalAlignment="Center" Margin="8,0,0,0" />
                                 </Grid>

@@ -163,14 +163,21 @@ namespace InfoPanel
                 SharedModel.Instance.SaveDisplayItems();
             }
 
-            try
+            if (OperatingSystem.IsWindows())
             {
-                HWHash.SetDelay(300);
-                HWHash.Launch();
+                try
+                {
+                    HWHash.SetDelay(300);
+                    HWHash.Launch();
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "HWHash initialization failed");
+                }
             }
-            catch (Exception ex)
+            else
             {
-                Log.Warning(ex, "HWHash initialization failed (expected on Linux)");
+                Logger.Information("Skipping HWiNFO shared memory monitor (Windows-only)");
             }
 
             if (ConfigModel.Instance.Settings.LibreHardwareMonitor)

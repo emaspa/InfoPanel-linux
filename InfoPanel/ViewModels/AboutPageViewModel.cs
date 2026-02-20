@@ -95,6 +95,7 @@ namespace InfoPanel.ViewModels
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "System.IO.Ports", License = "MIT License. Copyright (c) Microsoft Corporation.", ProjectUrl = "https://github.com/dotnet/runtime" });
 
             Contributors.Add(new Contributor { Name = "habibrehmansg", Description = "Creator of the original InfoPanel for Windows." });
+            Contributors.Add(new Contributor { Name = "emaspa", Description = "Linux port and Thermalright panel support." });
             Contributors.Add(new Contributor { Name = "F3NN3X", Description = "For the countless support and awesome plugins." });
             Contributors.Add(new Contributor { Name = "/u/ME5ER", Description = "Special thanks for patiently troubleshooting the early and buggy software iterations over extended periods." });
             Contributors.Add(new Contributor { Name = "/u/DRA6N", Description = "Better known as RobOnTwoWheels our CM on Discord, without whom it would not have existed." });

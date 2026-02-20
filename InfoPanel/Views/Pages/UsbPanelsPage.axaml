@@ -15,7 +15,7 @@
                           IsChecked="{Binding Settings.BeadaPanelMultiDeviceMode}" />
                 <ItemsControl ItemsSource="{Binding BeadaPanelDevices}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="m:BeadaPanelDevice">
+                        <DataTemplate x:DataType="m:BeadaPanelDevice" x:CompileBindings="False">
                             <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
                                 <StackPanel Spacing="6">
                                     <TextBlock Text="{Binding RuntimeProperties.Name}" FontWeight="SemiBold" />
@@ -24,7 +24,7 @@
                                         <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
                                         <StackPanel Orientation="Horizontal" Spacing="4">
                                             <TextBlock Text="Rotation:" VerticalAlignment="Center" />
-                                            <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).RotationValues}"
+                                            <ComboBox ItemsSource="{Binding $parent[UserControl].DataContext.RotationValues}"
                                                       SelectedItem="{Binding Rotation}" Width="140" />
                                         </StackPanel>
                                     </StackPanel>
@@ -35,7 +35,7 @@
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Text="Profile:" VerticalAlignment="Center" />
-                                        <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).Profiles}"
+                                        <ComboBox ItemsSource="{Binding $parent[UserControl].DataContext.Profiles}"
                                                   SelectedValueBinding="{Binding Guid}"
                                                   SelectedValue="{Binding ProfileGuid}"
                                                   Width="200">
@@ -68,7 +68,7 @@
                           IsChecked="{Binding Settings.TuringPanelMultiDeviceMode}" />
                 <ItemsControl ItemsSource="{Binding TuringPanelDevices}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="m:TuringPanelDevice">
+                        <DataTemplate x:DataType="m:TuringPanelDevice" x:CompileBindings="False">
                             <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
                                 <StackPanel Spacing="6">
                                     <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
@@ -77,7 +77,7 @@
                                         <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
                                         <StackPanel Orientation="Horizontal" Spacing="4">
                                             <TextBlock Text="Rotation:" VerticalAlignment="Center" />
-                                            <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).RotationValues}"
+                                            <ComboBox ItemsSource="{Binding $parent[UserControl].DataContext.RotationValues}"
                                                       SelectedItem="{Binding Rotation}" Width="140" />
                                         </StackPanel>
                                     </StackPanel>
@@ -88,7 +88,7 @@
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Text="Profile:" VerticalAlignment="Center" />
-                                        <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).Profiles}"
+                                        <ComboBox ItemsSource="{Binding $parent[UserControl].DataContext.Profiles}"
                                                   SelectedValueBinding="{Binding Guid}"
                                                   SelectedValue="{Binding ProfileGuid}"
                                                   Width="200">
@@ -120,7 +120,7 @@
                           IsChecked="{Binding Settings.ThermalrightPanelMultiDeviceMode}" />
                 <ItemsControl ItemsSource="{Binding ThermalrightPanelDevices}">
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="m:ThermalrightPanelDevice">
+                        <DataTemplate x:DataType="m:ThermalrightPanelDevice" x:CompileBindings="False">
                             <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
                                 <StackPanel Spacing="6">
                                     <TextBlock Text="{Binding RuntimeProperties.Name}" FontWeight="SemiBold" />
@@ -129,7 +129,7 @@
                                         <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
                                         <StackPanel Orientation="Horizontal" Spacing="4">
                                             <TextBlock Text="Rotation:" VerticalAlignment="Center" />
-                                            <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).RotationValues}"
+                                            <ComboBox ItemsSource="{Binding $parent[UserControl].DataContext.RotationValues}"
                                                       SelectedItem="{Binding Rotation}" Width="140" />
                                         </StackPanel>
                                     </StackPanel>
@@ -140,7 +140,7 @@
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Spacing="4">
                                         <TextBlock Text="Profile:" VerticalAlignment="Center" />
-                                        <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).Profiles}"
+                                        <ComboBox ItemsSource="{Binding $parent[UserControl].DataContext.Profiles}"
                                                   SelectedValueBinding="{Binding Guid}"
                                                   SelectedValue="{Binding ProfileGuid}"
                                                   Width="200">

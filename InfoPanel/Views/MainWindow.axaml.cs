@@ -13,6 +13,7 @@ namespace InfoPanel.Views
 
         private bool _suppressTopSelection;
         private bool _suppressFooterSelection;
+        private bool _isShuttingDown;
 
         public MainWindow()
         {
@@ -96,7 +97,14 @@ namespace InfoPanel.Views
 
         protected override async void OnClosing(WindowClosingEventArgs e)
         {
+            if (_isShuttingDown)
+            {
+                // Allow the close to proceed during shutdown
+                return;
+            }
+
             e.Cancel = true;
+            _isShuttingDown = true;
             base.OnClosing(e);
 
             Logger.Information("MainWindow closing, initiating clean shutdown");

@@ -78,7 +78,8 @@
                 </Border>
 
                 <Button Content="Save Profiles" Margin="0,4,0,0"
-                        Command="{Binding $parent[UserControl].((vm:ProfilesPageViewModel)DataContext).SaveProfilesCommand}" />
+                        Command="{Binding $parent[UserControl].DataContext.SaveProfilesCommand}"
+                        x:CompileBindings="False" />
             </StackPanel>
         </ScrollViewer>
     </Grid>
