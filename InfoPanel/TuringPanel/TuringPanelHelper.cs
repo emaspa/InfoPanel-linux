@@ -31,10 +31,18 @@ namespace InfoPanel.TuringPanel
                 {
                     if (TuringPanelModelDatabase.TryGetModelInfo(deviceReg.Vid, deviceReg.Pid, true, out var modelInfo))
                     {
-                        var deviceId = deviceReg.DeviceProperties["DeviceID"] as string
-                            ?? deviceReg.DevicePath ?? "";
-                        var deviceLocation = deviceReg.DeviceProperties["LocationInformation"] as string
-                            ?? deviceReg.DevicePath ?? "";
+                        string deviceId;
+                        string deviceLocation;
+
+                        if (deviceReg.DeviceProperties.TryGetValue("DeviceID", out var devIdObj) && devIdObj is string devIdStr)
+                            deviceId = devIdStr;
+                        else
+                            deviceId = deviceReg.DevicePath ?? $"USB\\VID_{deviceReg.Vid:X4}&PID_{deviceReg.Pid:X4}";
+
+                        if (deviceReg.DeviceProperties.TryGetValue("LocationInformation", out var locObj) && locObj is string locStr)
+                            deviceLocation = locStr;
+                        else
+                            deviceLocation = deviceReg.DevicePath ?? deviceId;
 
                         if (!string.IsNullOrEmpty(deviceId) && !string.IsNullOrEmpty(deviceLocation))
                         {

@@ -270,7 +270,8 @@ namespace InfoPanel.Services
                     if (!matchDeviceId)
                         return deviceReg;
 
-                    var deviceId = deviceReg.DeviceProperties["DeviceID"] as string;
+                    var deviceId = deviceReg.DeviceProperties.TryGetValue("DeviceID", out var devIdObj) && devIdObj is string devIdStr
+                        ? devIdStr : deviceReg.DevicePath;
 
                     // Match by DeviceId if we have one, otherwise take first match
                     if (string.IsNullOrEmpty(_device.DeviceId) ||

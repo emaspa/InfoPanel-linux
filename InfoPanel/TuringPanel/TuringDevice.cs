@@ -13,6 +13,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 
@@ -64,6 +65,64 @@ namespace InfoPanel.TuringPanel
 
         public bool IsConnected => _device != null && !_device.IsOpen == false;
 
+        // P/Invoke to libusb for device-level reset on Linux
+        [DllImport("libusb-1.0", EntryPoint = "libusb_init")]
+        private static extern int LibusbInit(out IntPtr ctx);
+
+        [DllImport("libusb-1.0", EntryPoint = "libusb_exit")]
+        private static extern void LibusbExit(IntPtr ctx);
+
+        [DllImport("libusb-1.0", EntryPoint = "libusb_open_device_with_vid_pid")]
+        private static extern IntPtr LibusbOpenDeviceWithVidPid(IntPtr ctx, ushort vendorId, ushort productId);
+
+        [DllImport("libusb-1.0", EntryPoint = "libusb_reset_device")]
+        private static extern int LibusbResetDevice(IntPtr devHandle);
+
+        [DllImport("libusb-1.0", EntryPoint = "libusb_close")]
+        private static extern void LibusbClose(IntPtr devHandle);
+
+        /// <summary>
+        /// Reset the USB device via libusb to clear stale state from previous sessions.
+        /// </summary>
+        private static bool ResetUsbDevice(int vendorId, int productId)
+        {
+            try
+            {
+                if (LibusbInit(out IntPtr ctx) != 0)
+                    return false;
+
+                try
+                {
+                    IntPtr handle = LibusbOpenDeviceWithVidPid(ctx, (ushort)vendorId, (ushort)productId);
+                    if (handle == IntPtr.Zero)
+                    {
+                        Logger.Debug("libusb_open_device_with_vid_pid failed for {Vid:X4}:{Pid:X4}", vendorId, productId);
+                        return false;
+                    }
+
+                    try
+                    {
+                        int result = LibusbResetDevice(handle);
+                        Logger.Information("libusb_reset_device result: {Result}", result);
+                        return result == 0;
+                    }
+                    finally
+                    {
+                        LibusbClose(handle);
+                    }
+                }
+                finally
+                {
+                    LibusbExit(ctx);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Failed to reset USB device via libusb");
+                return false;
+            }
+        }
+
         public TuringDevice(string? ffmpegPath = null)
         {
             _ffmpegPath = ffmpegPath;
@@ -80,18 +139,27 @@ namespace InfoPanel.TuringPanel
 
                 if (_device == null)
                 {
-                    var error = "Failed to open device from registry.";
+                    var error = OperatingSystem.IsLinux()
+                        ? "Failed to open USB device. Check permissions — you may need a udev rule. See infopanel-udev.rules."
+                        : "Failed to open device from registry.";
                     Logger.Error(error);
                     throw new TuringDeviceException(error);
                 }
 
                 Logger.Information("Device found from registry.");
-                var deviceId = usbRegistry.DeviceProperties["DeviceID"] as string;
+                string? deviceId = usbRegistry.DeviceProperties.TryGetValue("DeviceID", out var devIdObj) && devIdObj is string devIdStr
+                    ? devIdStr : usbRegistry.DevicePath;
                 if (!string.IsNullOrEmpty(deviceId))
                     Logger.Debug("Device ID: {DeviceId}", deviceId);
 
                 if (_device is IUsbDevice wholeUsbDevice)
                 {
+                    if (OperatingSystem.IsLinux())
+                    {
+                        // Detach kernel driver (e.g. usbfs/usbhid) before claiming on Linux
+                        try { wholeUsbDevice.SetAutoDetachKernelDriver(true); }
+                        catch (Exception ex) { Logger.Warning(ex, "SetAutoDetachKernelDriver failed, continuing"); }
+                    }
                     wholeUsbDevice.SetConfiguration(1);
                     wholeUsbDevice.ClaimInterface(0);
                 }
@@ -105,6 +173,10 @@ namespace InfoPanel.TuringPanel
                     Logger.Error(error);
                     throw new TuringDeviceException(error);
                 }
+
+                // Reset endpoints to clear any stale state
+                try { _writer.Reset(); } catch { /* ignore */ }
+                try { _reader.Reset(); } catch { /* ignore */ }
 
                 Logger.Information("Device initialized successfully.");
                 return true;
@@ -295,7 +367,48 @@ namespace InfoPanel.TuringPanel
         }
         public bool WriteToDevice(byte[] data, int timeout = 2000)
         {
-            return WriteToDevice(data, timeout, out _);
+            if (_writer == null)
+                return false;
+
+            // Scale timeout for large transfers (PNG data can be hundreds of KB)
+            int adjustedTimeout = data.Length > 1024 ? Math.Max(timeout, 5000) : timeout;
+
+            try
+            {
+                ErrorCode ec = _writer.Write(data, adjustedTimeout, out int transferLength);
+
+                if (ec != ErrorCode.None)
+                {
+                    Logger.Warning("Write Error: {ErrorCode} (sent {Sent}/{Total} bytes)", ec, transferLength, data.Length);
+
+                    // Reset endpoint on error to prevent stale state
+                    try { _writer.Reset(); } catch { /* ignore */ }
+
+                    return false;
+                }
+
+                // For large payloads (image data), read the device response as flow
+                // control — the device ACKs each frame before accepting the next.
+                // Without this, frames queue up faster than the device can process
+                // them, eventually overflowing its USB receive buffer.
+                // For small command packets, skip the read (fire-and-forget).
+                if (_reader != null && data.Length > FULL_PACKET_SIZE)
+                {
+                    byte[] readBuffer = new byte[512];
+                    ec = _reader.Read(readBuffer, adjustedTimeout, out _);
+                    if (ec != ErrorCode.None && ec != ErrorCode.IoTimedOut)
+                    {
+                        Logger.Debug("Flow-control read returned {ErrorCode}", ec);
+                    }
+                }
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "Error writing to device");
+                return false;
+            }
         }
         public bool WriteToDevice(byte[] data, int timeout, out byte[] response)
         {
@@ -581,7 +694,8 @@ namespace InfoPanel.TuringPanel
                         _device = null;
                     }
 
-                    UsbDevice.Exit();
+                    // Note: Do NOT call UsbDevice.Exit() here — it destroys the global
+                    // libusb context and breaks other USB devices still running.
                 }
                 catch (Exception ex)
                 {

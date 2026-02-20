@@ -1,0 +1,36 @@
+# InfoPanel USB panel udev rules
+# Install: sudo cp infopanel-udev.rules /etc/udev/rules.d/99-infopanel.rules
+# Reload: sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# BeadaPanel (NXElec)
+SUBSYSTEM=="usb", ATTR{idVendor}=="4e58", ATTR{idProduct}=="1001", MODE="0666", GROUP="plugdev"
+
+# Turing Smart Screen - serial (CH340)
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5722", MODE="0666", GROUP="plugdev"
+# Turing Smart Screen - CT13INCH identifier
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="ca11", MODE="0666", GROUP="plugdev"
+# Turing Smart Screen - CDC ACM
+SUBSYSTEM=="usb", ATTR{idVendor}=="0525", ATTR{idProduct}=="a4a7", MODE="0666", GROUP="plugdev"
+# Turing Smart Screen - revision models
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d6b", ATTR{idProduct}=="0121", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d6b", ATTR{idProduct}=="0106", MODE="0666", GROUP="plugdev"
+# Turing Smart Screen - USB devices (Luminary Micro)
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0088", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0080", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0092", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0050", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0016", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0021", MODE="0666", GROUP="plugdev"
+
+# Thermalright / ChiZhu panels
+SUBSYSTEM=="usb", ATTR{idVendor}=="87ad", ATTR{idProduct}=="70db", MODE="0666", GROUP="plugdev"
+# Trofeo Vision panels
+SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5302", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5408", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5409", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5406", MODE="0666", GROUP="plugdev"
+# Trofeo alternate vendor
+SUBSYSTEM=="usb", ATTR{idVendor}=="0418", ATTR{idProduct}=="5303", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0418", ATTR{idProduct}=="5304", MODE="0666", GROUP="plugdev"
+# SCSI pass-through panels (Elite Vision 360)
+SUBSYSTEM=="usb", ATTR{idVendor}=="0402", ATTR{idProduct}=="3922", MODE="0666", GROUP="plugdev"

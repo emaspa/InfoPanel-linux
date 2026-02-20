@@ -64,10 +64,10 @@ namespace InfoPanel.Services
                         continue; // Skip this device if we can't get info
                     }
 
-                    var deviceId = deviceReg.DeviceProperties["DeviceID"] as string
-                        ?? deviceReg.DevicePath ?? "";
-                    var deviceLocation = deviceReg.DeviceProperties["LocationInformation"] as string
-                        ?? deviceReg.DevicePath ?? "";
+                    var deviceId = deviceReg.DeviceProperties.TryGetValue("DeviceID", out var devIdObj) && devIdObj is string devIdStr
+                        ? devIdStr : deviceReg.DevicePath ?? "";
+                    var deviceLocation = deviceReg.DeviceProperties.TryGetValue("LocationInformation", out var locObj) && locObj is string locStr
+                        ? locStr : deviceReg.DevicePath ?? "";
 
                     if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(deviceLocation))
                     {

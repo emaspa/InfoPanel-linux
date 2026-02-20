@@ -61,8 +61,18 @@ namespace InfoPanel.ViewModels
                 {
                     if (deviceReg.Vid == vendorId && deviceReg.Pid == productId)
                     {
-                        var deviceId = deviceReg.DeviceProperties["DeviceID"] as string;
-                        var deviceLocation = deviceReg.DeviceProperties["LocationInformation"] as string;
+                        string? deviceId;
+                        string? deviceLocation;
+
+                        if (deviceReg.DeviceProperties.TryGetValue("DeviceID", out var devIdObj) && devIdObj is string devIdStr)
+                            deviceId = devIdStr;
+                        else
+                            deviceId = deviceReg.DevicePath ?? $"USB\\VID_{deviceReg.Vid:X4}&PID_{deviceReg.Pid:X4}";
+
+                        if (deviceReg.DeviceProperties.TryGetValue("LocationInformation", out var locObj) && locObj is string locStr)
+                            deviceLocation = locStr;
+                        else
+                            deviceLocation = deviceReg.DevicePath ?? deviceId;
 
                         if (string.IsNullOrEmpty(deviceId) || string.IsNullOrEmpty(deviceLocation))
                         {

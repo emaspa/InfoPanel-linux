@@ -119,11 +119,14 @@ namespace InfoPanel.Services
                 return null;
             }
 
+            UsbRegistry? vidPidMatch = null;
+
             foreach (UsbRegistry deviceReg in UsbDevice.AllDevices)
             {
-                if (deviceReg.Vid == _device.ModelInfo.VendorId && deviceReg.Pid == _device.ModelInfo.ProductId) // VENDOR_ID and PRODUCT_ID from TuringDevice
+                if (deviceReg.Vid == _device.ModelInfo.VendorId && deviceReg.Pid == _device.ModelInfo.ProductId)
                 {
-                    var deviceId = deviceReg.DeviceProperties["DeviceID"] as string;
+                    string? deviceId = deviceReg.DeviceProperties.TryGetValue("DeviceID", out var devIdObj) && devIdObj is string devIdStr
+                        ? devIdStr : deviceReg.DevicePath;
 
                     if (string.IsNullOrEmpty(deviceId))
                     {
@@ -136,7 +139,23 @@ namespace InfoPanel.Services
                         Logger.Information("TuringPanelDevice {Device}: Found matching device with DeviceId {DeviceId}", _device, deviceId);
                         return deviceReg;
                     }
+
+                    // On Linux, device paths change after reset/replug. Keep the first
+                    // VID/PID match as a fallback.
+                    vidPidMatch ??= deviceReg;
                 }
+            }
+
+            // Fallback: if exact DeviceId didn't match but we found a device with the
+            // right VID/PID, use it and update the stored DeviceId.
+            if (vidPidMatch != null && OperatingSystem.IsLinux())
+            {
+                string? newDeviceId = vidPidMatch.DeviceProperties.TryGetValue("DeviceID", out var obj) && obj is string s
+                    ? s : vidPidMatch.DevicePath;
+                Logger.Information("TuringPanelDevice {Device}: Exact DeviceId not found, falling back to VID/PID match at {NewId}", _device, newDeviceId);
+                if (!string.IsNullOrEmpty(newDeviceId))
+                    _device.DeviceId = newDeviceId;
+                return vidPidMatch;
             }
 
             return null;

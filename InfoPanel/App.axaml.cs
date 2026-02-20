@@ -14,6 +14,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
 namespace InfoPanel
@@ -66,6 +67,20 @@ namespace InfoPanel
             // Exception handlers
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
+
+            // Register native library resolver for libusb on Linux
+            if (OperatingSystem.IsLinux())
+            {
+                NativeLibrary.SetDllImportResolver(typeof(MonoLibUsb.MonoUsbApi).Assembly, (libraryName, assembly, searchPath) =>
+                {
+                    if (libraryName == "libusb-1.0")
+                    {
+                        if (NativeLibrary.TryLoad("libusb-1.0.so.0", out var handle))
+                            return handle;
+                    }
+                    return IntPtr.Zero;
+                });
+            }
 
             SentrySdk.Init(o =>
             {
