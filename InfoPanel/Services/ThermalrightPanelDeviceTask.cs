@@ -258,13 +258,18 @@ namespace InfoPanel.Services
 
         /// <summary>
         /// Finds the matching UsbRegistry for this device by scanning all connected USB devices.
+        /// When matchDeviceId is false, returns the first device with matching VID/PID
+        /// (used for bulk interface discovery on composite devices).
         /// </summary>
-        private UsbRegistry? FindUsbRegistry(int vendorId, int productId)
+        private UsbRegistry? FindUsbRegistry(int vendorId, int productId, bool matchDeviceId = true)
         {
             foreach (UsbRegistry deviceReg in UsbDevice.AllDevices)
             {
                 if (deviceReg.Vid == vendorId && deviceReg.Pid == productId)
                 {
+                    if (!matchDeviceId)
+                        return deviceReg;
+
                     var deviceId = deviceReg.DeviceProperties["DeviceID"] as string;
 
                     // Match by DeviceId if we have one, otherwise take first match
@@ -669,41 +674,12 @@ namespace InfoPanel.Services
             UpdateDeviceDisplayName();
             await Task.Delay(100, token);
 
-            // Run render+send loop with Trofeo frame format over bulk USB (no HID report ID prefix)
+            // Run render+send loop with Trofeo frame format over bulk USB
             var width = _panelWidth;
             var height = _panelHeight;
             await RunRenderSendLoop(jpegData =>
             {
-                // Build 512-byte header: magic, cmd=0x02, width/height, type=0x02, jpeg size, first JPEG chunk
-                var header = new byte[TROFEO_PACKET_SIZE];
-                Array.Copy(TROFEO_MAGIC_BYTES, 0, header, 0, 4);
-                header[4] = 0x02; // Frame command
-                BitConverter.GetBytes((ushort)width).CopyTo(header, 8);
-                BitConverter.GetBytes((ushort)height).CopyTo(header, 10);
-                header[12] = 0x02; // Frame type
-                BitConverter.GetBytes(jpegData.Length).CopyTo(header, 16);
-
-                int firstChunkSize = Math.Min(jpegData.Length, TROFEO_PACKET_SIZE - TROFEO_HEADER_JPEG_OFFSET);
-                Array.Copy(jpegData, 0, header, TROFEO_HEADER_JPEG_OFFSET, firstChunkSize);
-
-                var writeEc = writer.Write(header, 5000, out _);
-                if (writeEc != ErrorCode.None)
-                    throw new Exception($"USB write failed: {writeEc}");
-
-                // Send remaining JPEG data in 512-byte chunks
-                int offset = firstChunkSize;
-                while (offset < jpegData.Length)
-                {
-                    var chunk = new byte[TROFEO_PACKET_SIZE];
-                    int chunkSize = Math.Min(jpegData.Length - offset, TROFEO_PACKET_SIZE);
-                    Array.Copy(jpegData, offset, chunk, 0, chunkSize);
-
-                    writeEc = writer.Write(chunk, 5000, out _);
-                    if (writeEc != ErrorCode.None)
-                        throw new Exception($"USB write failed: {writeEc}");
-
-                    offset += chunkSize;
-                }
+                SendTrofeoFrameOverBulk(writer, jpegData, width, height);
             }, token);
         }
 
@@ -890,6 +866,49 @@ namespace InfoPanel.Services
 
         }
 
+        /// <summary>
+        /// Sends a single frame using the Trofeo DA DB DC DD protocol over USB bulk.
+        /// 20-byte header (magic, cmd=0x02, width/height, type, payload_len) + frame data in 512-byte chunks.
+        /// Reused by DoWinUsbTrofeoProtocol and hybrid HID+Bulk mode.
+        /// </summary>
+        private static void SendTrofeoFrameOverBulk(
+            UsbEndpointWriter writer, byte[] frameData, int width, int height,
+            ThermalrightPixelFormat pixelFormat = ThermalrightPixelFormat.Jpeg)
+        {
+            var header = new byte[TROFEO_PACKET_SIZE];
+            Array.Copy(TROFEO_MAGIC_BYTES, 0, header, 0, 4);
+            header[4] = 0x02; // Frame command
+
+            if (pixelFormat is ThermalrightPixelFormat.Rgb565 or ThermalrightPixelFormat.Rgb565BigEndian)
+                header[6] = 0x01; // RGB565 format flag
+
+            BitConverter.GetBytes((ushort)width).CopyTo(header, 8);
+            BitConverter.GetBytes((ushort)height).CopyTo(header, 10);
+            header[12] = 0x02; // Frame type
+            BitConverter.GetBytes(frameData.Length).CopyTo(header, 16);
+
+            int firstChunkSize = Math.Min(frameData.Length, TROFEO_PACKET_SIZE - TROFEO_HEADER_JPEG_OFFSET);
+            Array.Copy(frameData, 0, header, TROFEO_HEADER_JPEG_OFFSET, firstChunkSize);
+
+            var writeEc = writer.Write(header, 5000, out _);
+            if (writeEc != ErrorCode.None)
+                throw new Exception($"USB bulk write failed: {writeEc}");
+
+            int offset = firstChunkSize;
+            while (offset < frameData.Length)
+            {
+                var chunk = new byte[TROFEO_PACKET_SIZE];
+                int chunkSize = Math.Min(frameData.Length - offset, TROFEO_PACKET_SIZE);
+                Array.Copy(frameData, offset, chunk, 0, chunkSize);
+
+                writeEc = writer.Write(chunk, 5000, out _);
+                if (writeEc != ErrorCode.None)
+                    throw new Exception($"USB bulk write failed: {writeEc}");
+
+                offset += chunkSize;
+            }
+        }
+
         private async Task DoWorkHidAsync(CancellationToken token)
         {
             try
@@ -955,10 +974,13 @@ namespace InfoPanel.Services
                 if (response != null && response.Length >= 6)
                 {
                     // Byte[5] = PM (Product Mode) - primary discriminator for Trofeo HID panels
+                    // Byte[4] = Sub byte - secondary discriminator (e.g. PM 0x3A sub 0 = FW SE, sub !=0 = LM26)
                     var pm = response[5];
-                    Logger.Information("ThermalrightPanelDevice {Device}: HID PM byte: 0x{PM:X2} ({PMDec})", _device, pm, pm);
+                    var sub = response[4];
+                    Logger.Information("ThermalrightPanelDevice {Device}: HID PM byte: 0x{PM:X2} ({PMDec}), sub byte: 0x{Sub:X2} ({SubDec})",
+                        _device, pm, pm, sub, sub);
 
-                    var pmModel = ThermalrightPanelModelDatabase.GetModelByPM(pm);
+                    var pmModel = ThermalrightPanelModelDatabase.GetModelByPM(pm, sub);
                     if (pmModel != null)
                     {
                         _detectedModel = pmModel;
@@ -1017,18 +1039,110 @@ namespace InfoPanel.Services
 
                 await Task.Delay(100, token); // Small delay after init
 
-                // Run the render+send loop using HID reports
+                // --- Attempt hybrid HID+Bulk upgrade ---
+                // 0416:5302 is a composite USB device: HID interface (auto-driver) + vendor-specific bulk interface.
+                // TRCC uses HID for init only, then switches to bulk for frame data (higher throughput).
+                // If the bulk interface has a WinUSB driver installed, we can do the same.
+                UsbEndpointWriter? bulkWriter = null;
+                UsbDevice? bulkDevice = null;
+                bool useBulk = false;
+
+                try
+                {
+                    var bulkRegistry = FindUsbRegistry(
+                        ThermalrightPanelModelDatabase.TROFEO_VENDOR_ID,
+                        ThermalrightPanelModelDatabase.TROFEO_PRODUCT_ID_686,
+                        matchDeviceId: false);
+
+                    if (bulkRegistry != null)
+                    {
+                        bulkDevice = bulkRegistry.Device;
+                        if (bulkDevice != null)
+                        {
+                            if (bulkDevice is IUsbDevice wholeBulkDevice)
+                            {
+                                wholeBulkDevice.SetConfiguration(1);
+                                wholeBulkDevice.ClaimInterface(0);
+                            }
+
+                            // Find write endpoint (prefer EP2 OUT as TRCC uses it)
+                            WriteEndpointID bulkWriteEp = WriteEndpointID.Ep02;
+                            foreach (var config in bulkDevice.Configs)
+                            {
+                                foreach (var iface in config.InterfaceInfoList)
+                                {
+                                    foreach (var ep in iface.EndpointInfoList)
+                                    {
+                                        var addr = (byte)ep.Descriptor.EndpointID;
+                                        if ((addr & 0x80) == 0) // OUT endpoint
+                                        {
+                                            bulkWriteEp = (WriteEndpointID)addr;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+
+                            bulkWriter = bulkDevice.OpenEndpointWriter(bulkWriteEp);
+                            useBulk = true;
+
+                            Logger.Information(
+                                "ThermalrightPanelDevice {Device}: Bulk upgrade successful! Using EP 0x{Ep:X2} for frame data",
+                                _device, (byte)bulkWriteEp);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Information(
+                        "ThermalrightPanelDevice {Device}: Bulk interface not available ({Message}), using HID fallback",
+                        _device, ex.Message);
+                    (bulkDevice as IDisposable)?.Dispose();
+                    bulkDevice = null;
+                    bulkWriter = null;
+                    useBulk = false;
+                }
+
+                if (!useBulk)
+                {
+                    Logger.Information(
+                        "ThermalrightPanelDevice {Device}: No WinUSB driver on bulk interface, continuing with HID transport",
+                        _device);
+                }
+
                 var width = _panelWidth;
                 var height = _panelHeight;
                 var pixelFormat = _detectedModel?.PixelFormat ?? ThermalrightPixelFormat.Jpeg;
-                await RunRenderSendLoop(frameData =>
+
+                try
                 {
-                    bool ok = pixelFormat is ThermalrightPixelFormat.Rgb565 or ThermalrightPixelFormat.Rgb565BigEndian
-                        ? hidDevice.SendRgb565Frame(frameData, width, height)
-                        : hidDevice.SendJpegFrame(frameData, width, height);
-                    if (!ok) throw new Exception("HID frame send failed");
-                    Thread.Sleep(1); // 1ms inter-frame delay required by HID protocol
-                }, token);
+                    if (useBulk && bulkWriter != null)
+                    {
+                        // Bulk mode: send frames over USB bulk (matches TRCC USBLCDNEW.exe behavior)
+                        await RunRenderSendLoop(frameData =>
+                        {
+                            SendTrofeoFrameOverBulk(bulkWriter, frameData, width, height, pixelFormat);
+                            Thread.Sleep(1); // 1ms inter-frame delay (from TRCC)
+                        }, token);
+                    }
+                    else
+                    {
+                        // HID fallback: send frames as HID output reports (existing behavior)
+                        await RunRenderSendLoop(frameData =>
+                        {
+                            bool ok = pixelFormat is ThermalrightPixelFormat.Rgb565 or ThermalrightPixelFormat.Rgb565BigEndian
+                                ? hidDevice.SendRgb565Frame(frameData, width, height)
+                                : hidDevice.SendJpegFrame(frameData, width, height);
+                            if (!ok) throw new Exception("HID frame send failed");
+                            Thread.Sleep(1); // 1ms inter-frame delay
+                        }, token);
+                    }
+                }
+                finally
+                {
+                    bulkWriter?.Dispose();
+                    (bulkDevice as IDisposable)?.Dispose();
+                }
             }
             catch (TaskCanceledException)
             {
