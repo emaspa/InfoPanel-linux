@@ -52,7 +52,7 @@ namespace InfoPanel.Models
 
         private static async Task FFmpegOperation(string inputFile, string operation, string outputFile, int timeLimit = 30)
         {
-            var ffmpegPath = "ffmpeg.exe";
+            var ffmpegPath = "ffmpeg";
             var startInfo = new ProcessStartInfo
             {
                 FileName = ffmpegPath,

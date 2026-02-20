@@ -666,12 +666,31 @@ namespace InfoPanel.TuringPanel
                 return outputPath;
             }
 
-            string ffmpegPath = _ffmpegPath ?? Path.Combine(Directory.GetCurrentDirectory(), "FFmpeg", "ffmpeg.exe");
+            string ffmpegPath = _ffmpegPath ?? "ffmpeg";
             if (!File.Exists(ffmpegPath))
             {
-                var error = "ffmpeg.exe not found. Please ensure ffmpeg is available.";
-                Logger.Debug("Error: {Error}", error);
-                throw new TuringDeviceException(error);
+                // Not a direct file path; verify it's available on PATH
+                try
+                {
+                    using var which = Process.Start(new ProcessStartInfo
+                    {
+                        FileName = ffmpegPath,
+                        Arguments = "-version",
+                        UseShellExecute = false,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        CreateNoWindow = true
+                    });
+                    which?.WaitForExit();
+                    if (which == null || which.ExitCode != 0)
+                        throw new Exception();
+                }
+                catch
+                {
+                    var error = "ffmpeg not found. Please install ffmpeg (e.g. sudo apt install ffmpeg).";
+                    Logger.Debug("Error: {Error}", error);
+                    throw new TuringDeviceException(error);
+                }
             }
 
             Logger.Information("Extracting H.264 from {FileName}...", Path.GetFileName(inputPath));
