@@ -110,6 +110,27 @@ namespace InfoPanel
             _host.Start();
             Logger.Debug("Application host started");
 
+            // Create and show the main window FIRST so the UI is responsive
+            // while background services start up
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            {
+                _mainWindow = new Views.MainWindow();
+                desktop.MainWindow = _mainWindow;
+                desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
+
+                // Handle start-minimized
+                if (ConfigModel.Instance.Settings.StartMinimized)
+                {
+                    _mainWindow.WindowState = Avalonia.Controls.WindowState.Minimized;
+                    if (ConfigModel.Instance.Settings.MinimizeToTray)
+                    {
+                        _mainWindow.Hide();
+                    }
+                }
+            }
+
+            base.OnFrameworkInitializationCompleted();
+
             ConfigModel.Instance.Initialize();
             Logger.Debug("Configuration initialized");
 
@@ -118,7 +139,7 @@ namespace InfoPanel
                 var profile = new Profile()
                 {
                     Name = "Profile 1",
-                    Active = true,
+                    Active = false,
                 };
 
                 ConfigModel.Instance.AddProfile(profile);
@@ -181,25 +202,6 @@ namespace InfoPanel
             {
                 Log.Warning(ex, "Panel startup failed");
             }
-
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                _mainWindow = new Views.MainWindow();
-                desktop.MainWindow = _mainWindow;
-                desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
-
-                // Handle start-minimized
-                if (ConfigModel.Instance.Settings.StartMinimized)
-                {
-                    _mainWindow.WindowState = Avalonia.Controls.WindowState.Minimized;
-                    if (ConfigModel.Instance.Settings.MinimizeToTray)
-                    {
-                        _mainWindow.Hide();
-                    }
-                }
-            }
-
-            base.OnFrameworkInitializationCompleted();
         }
 
         private void CurrentDomain_UnhandledException(object? sender, UnhandledExceptionEventArgs e)

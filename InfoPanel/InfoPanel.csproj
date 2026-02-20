@@ -100,6 +100,15 @@
 		<Compile Include="Views\Pages\LogsPage.axaml.cs" />
 		<Compile Include="Views\Pages\AboutPage.axaml.cs" />
 		<Compile Include="ViewModels\MainWindowViewModel.cs" />
+		<Compile Include="ViewModels\HomePageViewModel.cs" />
+		<Compile Include="ViewModels\ProfilesPageViewModel.cs" />
+		<Compile Include="ViewModels\SettingsPageViewModel.cs" />
+		<Compile Include="ViewModels\LogsPageViewModel.cs" />
+		<Compile Include="ViewModels\AboutPageViewModel.cs" />
+		<Compile Include="ViewModels\UpdatesPageViewModel.cs" />
+		<Compile Include="ViewModels\PluginsPageViewModel.cs" />
+		<Compile Include="ViewModels\UsbPanelsPageViewModel.cs" />
+		<Compile Include="ViewModels\DesignPageViewModel.cs" />
 		<!-- Phase 2: Display system -->
 		<Compile Include="Views\DisplayWindow.axaml.cs" />
 		<Compile Include="Views\Controls\SkiaCanvas.cs" />

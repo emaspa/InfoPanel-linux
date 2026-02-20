@@ -1,14 +1,73 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="InfoPanel.Views.Pages.AboutPage">
-    <StackPanel Margin="20" VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="About InfoPanel"
-                   FontSize="28" FontWeight="Bold"
-                   HorizontalAlignment="Center" />
-        <TextBlock x:Name="VersionText"
-                   Text="Version info loading..."
-                   FontSize="16" Opacity="0.7"
-                   Margin="0,10,0,0"
-                   HorizontalAlignment="Center" />
-    </StackPanel>
+             xmlns:vm="using:InfoPanel.ViewModels"
+             x:Class="InfoPanel.Views.Pages.AboutPage"
+             x:DataType="vm:AboutPageViewModel">
+    <ScrollViewer Padding="20">
+        <StackPanel Spacing="24" MaxWidth="800">
+            <!-- Version Header -->
+            <StackPanel Spacing="4">
+                <TextBlock Text="About InfoPanel" FontSize="28" FontWeight="Bold" />
+                <TextBlock Text="{Binding Version}" FontSize="14" Opacity="0.7" />
+                <TextBlock Text="Linux Port" FontSize="14" Opacity="0.5" />
+            </StackPanel>
+
+            <!-- Links -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Links" FontSize="20" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding InfoLinks}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:InfoLink">
+                            <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
+                                <Grid ColumnDefinitions="*,Auto">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" />
+                                        <TextBlock Text="{Binding Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="{Binding ButtonText}"
+                                            Command="{Binding $parent[ItemsControl].((vm:AboutPageViewModel)DataContext).OpenUrlCommand}"
+                                            CommandParameter="{Binding NavigateUri}"
+                                            VerticalAlignment="Center" Margin="8,0,0,0" />
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Contributors -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Contributors" FontSize="20" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding Contributors}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:Contributor">
+                            <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+
+            <!-- Third-Party Licenses -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Third-Party Licenses" FontSize="20" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding ThirdPartyLicenses}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ThirdPartyLicense">
+                            <Border Background="#0D808080" CornerRadius="4" Padding="10" Margin="0,1">
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="13" />
+                                    <TextBlock Text="{Binding License}" Opacity="0.6" FontSize="11" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

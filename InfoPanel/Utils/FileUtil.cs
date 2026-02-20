@@ -16,6 +16,10 @@ namespace InfoPanel.Utils
 
         public static string GetExternalPluginFolder()
         {
+            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+            {
+                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel", "plugins");
+            }
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "InfoPanel", "plugins");
         }
 

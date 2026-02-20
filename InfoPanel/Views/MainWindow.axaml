@@ -38,9 +38,12 @@
                              SelectionChanged="OnFooterSelectionChanged">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:NavigationItem">
-                                <TextBlock Text="{Binding Label}"
-                                           Padding="12,8"
-                                           FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="4,6">
+                                    <TextBlock Text="{Binding Icon}" FontSize="16" Width="20"
+                                               TextAlignment="Center" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Label}" FontSize="13"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
@@ -56,9 +59,12 @@
                              SelectionChanged="OnTopSelectionChanged">
                         <ListBox.ItemTemplate>
                             <DataTemplate x:DataType="vm:NavigationItem">
-                                <TextBlock Text="{Binding Label}"
-                                           Padding="12,8"
-                                           FontSize="13" />
+                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="4,6">
+                                    <TextBlock Text="{Binding Icon}" FontSize="16" Width="20"
+                                               TextAlignment="Center" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Label}" FontSize="13"
+                                               VerticalAlignment="Center" />
+                                </StackPanel>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

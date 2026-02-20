@@ -22,8 +22,9 @@ namespace InfoPanel.ViewModels
         About
     }
 
-    public class NavigationItem(string label, NavigationPage page)
+    public class NavigationItem(string icon, string label, NavigationPage page)
     {
+        public string Icon { get; } = icon;
         public string Label { get; } = label;
         public NavigationPage Page { get; } = page;
     }
@@ -46,19 +47,19 @@ namespace InfoPanel.ViewModels
 
         public NavigationItem[] TopMenuItems { get; } =
         [
-            new("Home", NavigationPage.Home),
-            new("Profiles", NavigationPage.Profiles),
-            new("Design", NavigationPage.Design),
+            new("\u2302", "Home", NavigationPage.Home),
+            new("\u2630", "Profiles", NavigationPage.Profiles),
+            new("\u270E", "Design", NavigationPage.Design),
         ];
 
         public NavigationItem[] FooterMenuItems { get; } =
         [
-            new("Updates", NavigationPage.Updates),
-            new("Plugins", NavigationPage.Plugins),
-            new("USB Panels", NavigationPage.UsbPanels),
-            new("Settings", NavigationPage.Settings),
-            new("Logs", NavigationPage.Logs),
-            new("About", NavigationPage.About),
+            new("\u2191", "Updates", NavigationPage.Updates),
+            new("\u2699", "Plugins", NavigationPage.Plugins),
+            new("\u2B14", "USB Panels", NavigationPage.UsbPanels),
+            new("\u2638", "Settings", NavigationPage.Settings),
+            new("\u2263", "Logs", NavigationPage.Logs),
+            new("\u24D8", "About", NavigationPage.About),
         ];
 
         public MainWindowViewModel()

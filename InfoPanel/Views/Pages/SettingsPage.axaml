@@ -1,13 +1,88 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="InfoPanel.Views.Pages.SettingsPage">
-    <StackPanel Margin="20" VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="Settings"
-                   FontSize="28" FontWeight="Bold"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="Settings coming soon."
-                   FontSize="18" Opacity="0.7"
-                   Margin="0,10,0,0"
-                   HorizontalAlignment="Center" />
-    </StackPanel>
+             xmlns:vm="using:InfoPanel.ViewModels"
+             x:Class="InfoPanel.Views.Pages.SettingsPage"
+             x:DataType="vm:SettingsPageViewModel">
+    <ScrollViewer Padding="20">
+        <StackPanel Spacing="24" MaxWidth="600">
+            <TextBlock Text="Settings" FontSize="28" FontWeight="Bold" />
+
+            <!-- General -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="General" FontSize="18" FontWeight="SemiBold" />
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="10">
+                        <CheckBox Content="Start Minimized" IsChecked="{Binding Settings.StartMinimized}" />
+                        <CheckBox Content="Minimize to Tray" IsChecked="{Binding Settings.MinimizeToTray}" />
+                        <CheckBox Content="Auto Start" IsChecked="{Binding Settings.AutoStart}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Auto Start Delay (s):" VerticalAlignment="Center" />
+                            <NumericUpDown Value="{Binding Settings.AutoStartDelay}" Minimum="0" Maximum="60" Width="100" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Display -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Display" FontSize="18" FontWeight="SemiBold" />
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Target Frame Rate:" VerticalAlignment="Center" />
+                            <NumericUpDown Value="{Binding Settings.TargetFrameRate}" Minimum="1" Maximum="60" Width="100" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Graph Update Rate (ms):" VerticalAlignment="Center" />
+                            <NumericUpDown Value="{Binding Settings.TargetGraphUpdateRate}" Minimum="100" Maximum="10000" Increment="100" Width="120" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Hardware Monitoring -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Hardware Monitoring" FontSize="18" FontWeight="SemiBold" />
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <CheckBox Content="Enable LibreHardwareMonitor" IsChecked="{Binding Settings.LibreHardwareMonitor}" />
+                </Border>
+            </StackPanel>
+
+            <!-- Web Server -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Web Server" FontSize="18" FontWeight="SemiBold" />
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="10">
+                        <CheckBox Content="Enable Web Server" IsChecked="{Binding Settings.WebServer}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Listen IP:" VerticalAlignment="Center" />
+                            <TextBox Text="{Binding Settings.WebServerListenIp}" Width="150" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Listen Port:" VerticalAlignment="Center" />
+                            <NumericUpDown Value="{Binding Settings.WebServerListenPort}" Minimum="1" Maximum="65535" Width="120" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Refresh Rate (ms):" VerticalAlignment="Center" />
+                            <NumericUpDown Value="{Binding Settings.WebServerRefreshRate}" Minimum="16" Maximum="5000" Width="120" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+            <!-- Design -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Design Grid" FontSize="18" FontWeight="SemiBold" />
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="10">
+                        <CheckBox Content="Show Grid Lines" IsChecked="{Binding Settings.ShowGridLines}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Grid Spacing:" VerticalAlignment="Center" />
+                            <NumericUpDown Value="{Binding Settings.GridLinesSpacing}" Minimum="5" Maximum="100" Width="100" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

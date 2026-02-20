@@ -1,13 +1,46 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="InfoPanel.Views.Pages.UpdatesPage">
-    <StackPanel Margin="20" VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="Updates"
-                   FontSize="28" FontWeight="Bold"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="Update checking coming soon."
-                   FontSize="18" Opacity="0.7"
-                   Margin="0,10,0,0"
-                   HorizontalAlignment="Center" />
-    </StackPanel>
+             xmlns:vm="using:InfoPanel.ViewModels"
+             x:Class="InfoPanel.Views.Pages.UpdatesPage"
+             x:DataType="vm:UpdatesPageViewModel">
+    <ScrollViewer Padding="20">
+        <StackPanel Spacing="20" MaxWidth="800">
+            <StackPanel Spacing="4">
+                <TextBlock Text="Release Notes" FontSize="28" FontWeight="Bold" />
+                <TextBlock Text="{Binding Version, StringFormat='Current version: {0}'}" FontSize="14" Opacity="0.7" />
+            </StackPanel>
+
+            <ItemsControl ItemsSource="{Binding UpdateVersions}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:UpdateVersion">
+                        <Expander IsExpanded="{Binding Expanded}" Margin="0,4" HorizontalAlignment="Stretch">
+                            <Expander.Header>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="{Binding Version}" FontWeight="Bold" FontSize="16" />
+                                    <TextBlock Text="{Binding Title}" Opacity="0.7" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Expander.Header>
+                            <ItemsControl ItemsSource="{Binding Items}" Margin="8,4">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:UpdateVersionItem">
+                                        <StackPanel Margin="0,6">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14" />
+                                            <ItemsControl ItemsSource="{Binding Description}" Margin="12,2,0,0">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="x:String">
+                                                        <TextBlock Text="{Binding StringFormat='- {0}'}" TextWrapping="Wrap"
+                                                                   Opacity="0.8" FontSize="13" Margin="0,1" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </Expander>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

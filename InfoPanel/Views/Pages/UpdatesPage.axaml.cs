@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using InfoPanel.ViewModels;
 
 namespace InfoPanel.Views.Pages
 {
@@ -7,6 +8,7 @@ namespace InfoPanel.Views.Pages
         public UpdatesPage()
         {
             InitializeComponent();
+            DataContext = new UpdatesPageViewModel();
         }
     }
 }

@@ -1,13 +1,85 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="InfoPanel.Views.Pages.ProfilesPage">
-    <StackPanel Margin="20" VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="Profiles"
-                   FontSize="28" FontWeight="Bold"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="Profile management coming soon."
-                   FontSize="18" Opacity="0.7"
-                   Margin="0,10,0,0"
-                   HorizontalAlignment="Center" />
-    </StackPanel>
+             xmlns:vm="using:InfoPanel.ViewModels"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Pages.ProfilesPage"
+             x:DataType="vm:ProfilesPageViewModel">
+    <Grid ColumnDefinitions="250,*" Margin="20">
+        <!-- Left: Profile List -->
+        <DockPanel>
+            <TextBlock DockPanel.Dock="Top" Text="Profiles" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8" />
+            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="0,8,0,0">
+                <Button Content="Add" Command="{Binding AddProfileCommand}" />
+                <Button Content="Duplicate" Command="{Binding DuplicateProfileCommand}" />
+                <Button Content="Delete" Command="{Binding DeleteProfileCommand}" />
+            </StackPanel>
+            <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="m:Profile">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                            <TextBlock Text="(Active)" Opacity="0.5" FontSize="11"
+                                       VerticalAlignment="Center"
+                                       IsVisible="{Binding Active}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Right: Profile Editor -->
+        <ScrollViewer Grid.Column="1" Margin="16,0,0,0">
+            <StackPanel Spacing="16" IsVisible="{Binding SelectedProfile, Converter={x:Static ObjectConverters.IsNotNull}}"
+                        DataContext="{Binding SelectedProfile}">
+                <TextBlock Text="Profile Settings" FontSize="20" FontWeight="SemiBold" />
+
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="10">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Name:" VerticalAlignment="Center" Width="100" />
+                            <TextBox Text="{Binding Name}" Width="200" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Width:" VerticalAlignment="Center" Width="100" />
+                            <NumericUpDown Value="{Binding Width}" Minimum="1" Maximum="10000" Width="120" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Height:" VerticalAlignment="Center" Width="100" />
+                            <NumericUpDown Value="{Binding Height}" Minimum="1" Maximum="10000" Width="120" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Background:" VerticalAlignment="Center" Width="100" />
+                            <TextBox Text="{Binding BackgroundColor}" Width="120" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Font:" VerticalAlignment="Center" Width="100" />
+                            <TextBox Text="{Binding Font}" Width="150" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Font Size:" VerticalAlignment="Center" Width="100" />
+                            <NumericUpDown Value="{Binding FontSize}" Minimum="1" Maximum="200" Width="100" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Text Color:" VerticalAlignment="Center" Width="100" />
+                            <TextBox Text="{Binding Color}" Width="120" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Display Options" FontWeight="SemiBold" />
+                        <CheckBox Content="Active (show overlay)" IsChecked="{Binding Active}" />
+                        <CheckBox Content="Topmost" IsChecked="{Binding Topmost}" />
+                        <CheckBox Content="Draggable" IsChecked="{Binding Drag}" />
+                        <CheckBox Content="Resizable" IsChecked="{Binding Resize}" />
+                        <CheckBox Content="Show FPS" IsChecked="{Binding ShowFps}" />
+                    </StackPanel>
+                </Border>
+
+                <Button Content="Save Profiles" Margin="0,4,0,0"
+                        Command="{Binding $parent[UserControl].((vm:ProfilesPageViewModel)DataContext).SaveProfilesCommand}" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>

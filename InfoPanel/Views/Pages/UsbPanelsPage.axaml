@@ -1,13 +1,169 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="InfoPanel.Views.Pages.UsbPanelsPage">
-    <StackPanel Margin="20" VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="USB Panels"
-                   FontSize="28" FontWeight="Bold"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="USB panel management coming soon."
-                   FontSize="18" Opacity="0.7"
-                   Margin="0,10,0,0"
-                   HorizontalAlignment="Center" />
-    </StackPanel>
+             xmlns:vm="using:InfoPanel.ViewModels"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Pages.UsbPanelsPage"
+             x:DataType="vm:UsbPanelsPageViewModel">
+    <ScrollViewer Padding="20">
+        <StackPanel Spacing="24" MaxWidth="800">
+            <TextBlock Text="USB Panels" FontSize="28" FontWeight="Bold" />
+
+            <!-- BeadaPanel -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="BeadaPanel" FontSize="18" FontWeight="SemiBold" />
+                <CheckBox Content="Enable BeadaPanel Multi-Device Mode"
+                          IsChecked="{Binding Settings.BeadaPanelMultiDeviceMode}" />
+                <ItemsControl ItemsSource="{Binding BeadaPanelDevices}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="m:BeadaPanelDevice">
+                            <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="{Binding RuntimeProperties.Name}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding DeviceId, StringFormat='ID: {0}'}" FontSize="11" Opacity="0.5" />
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <TextBlock Text="Rotation:" VerticalAlignment="Center" />
+                                            <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).RotationValues}"
+                                                      SelectedItem="{Binding Rotation}" Width="140" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Brightness:" VerticalAlignment="Center" />
+                                        <Slider Value="{Binding Brightness}" Minimum="0" Maximum="100" Width="150" />
+                                        <TextBlock Text="{Binding Brightness, StringFormat='{}{0}%'}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="Profile:" VerticalAlignment="Center" />
+                                        <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).Profiles}"
+                                                  SelectedValueBinding="{Binding Guid}"
+                                                  SelectedValue="{Binding ProfileGuid}"
+                                                  Width="200">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="m:Profile">
+                                                    <TextBlock Text="{Binding Name}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <!-- Runtime status -->
+                                    <StackPanel Orientation="Horizontal" Spacing="12" Opacity="0.6">
+                                        <TextBlock Text="{Binding RuntimeProperties.FrameRate, StringFormat='FPS: {0}'}" FontSize="11" />
+                                        <TextBlock Text="{Binding RuntimeProperties.ErrorMessage}" FontSize="11" Foreground="Red"
+                                                   IsVisible="{Binding RuntimeProperties.ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="No BeadaPanel devices configured." Opacity="0.5"
+                           IsVisible="{Binding !BeadaPanelDevices.Count}" />
+            </StackPanel>
+
+            <!-- Turing Smart Screen -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Turing Smart Screen" FontSize="18" FontWeight="SemiBold" />
+                <CheckBox Content="Enable Turing Panel Multi-Device Mode"
+                          IsChecked="{Binding Settings.TuringPanelMultiDeviceMode}" />
+                <ItemsControl ItemsSource="{Binding TuringPanelDevices}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="m:TuringPanelDevice">
+                            <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Model, StringFormat='Model: {0}'}" FontSize="11" Opacity="0.5" />
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <TextBlock Text="Rotation:" VerticalAlignment="Center" />
+                                            <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).RotationValues}"
+                                                      SelectedItem="{Binding Rotation}" Width="140" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Brightness:" VerticalAlignment="Center" />
+                                        <Slider Value="{Binding Brightness}" Minimum="0" Maximum="100" Width="150" />
+                                        <TextBlock Text="{Binding Brightness, StringFormat='{}{0}%'}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="Profile:" VerticalAlignment="Center" />
+                                        <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).Profiles}"
+                                                  SelectedValueBinding="{Binding Guid}"
+                                                  SelectedValue="{Binding ProfileGuid}"
+                                                  Width="200">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="m:Profile">
+                                                    <TextBlock Text="{Binding Name}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="12" Opacity="0.6">
+                                        <TextBlock Text="{Binding RuntimeProperties.FrameRate, StringFormat='FPS: {0}'}" FontSize="11" />
+                                        <TextBlock Text="{Binding RuntimeProperties.ErrorMessage}" FontSize="11" Foreground="Red"
+                                                   IsVisible="{Binding RuntimeProperties.ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="No Turing panel devices configured." Opacity="0.5"
+                           IsVisible="{Binding !TuringPanelDevices.Count}" />
+            </StackPanel>
+
+            <!-- Thermalright -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="Thermalright" FontSize="18" FontWeight="SemiBold" />
+                <CheckBox Content="Enable Thermalright Panel Multi-Device Mode"
+                          IsChecked="{Binding Settings.ThermalrightPanelMultiDeviceMode}" />
+                <ItemsControl ItemsSource="{Binding ThermalrightPanelDevices}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="m:ThermalrightPanelDevice">
+                            <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="{Binding RuntimeProperties.Name}" FontWeight="SemiBold" />
+                                    <TextBlock Text="{Binding Model, StringFormat='Model: {0}'}" FontSize="11" Opacity="0.5" />
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <TextBlock Text="Rotation:" VerticalAlignment="Center" />
+                                            <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).RotationValues}"
+                                                      SelectedItem="{Binding Rotation}" Width="140" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Brightness:" VerticalAlignment="Center" />
+                                        <Slider Value="{Binding Brightness}" Minimum="0" Maximum="100" Width="150" />
+                                        <TextBlock Text="{Binding Brightness, StringFormat='{}{0}%'}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="Profile:" VerticalAlignment="Center" />
+                                        <ComboBox ItemsSource="{Binding $parent[UserControl].((vm:UsbPanelsPageViewModel)DataContext).Profiles}"
+                                                  SelectedValueBinding="{Binding Guid}"
+                                                  SelectedValue="{Binding ProfileGuid}"
+                                                  Width="200">
+                                            <ComboBox.ItemTemplate>
+                                                <DataTemplate x:DataType="m:Profile">
+                                                    <TextBlock Text="{Binding Name}" />
+                                                </DataTemplate>
+                                            </ComboBox.ItemTemplate>
+                                        </ComboBox>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Spacing="12" Opacity="0.6">
+                                        <TextBlock Text="{Binding RuntimeProperties.FrameRate, StringFormat='FPS: {0}'}" FontSize="11" />
+                                        <TextBlock Text="{Binding RuntimeProperties.ErrorMessage}" FontSize="11" Foreground="Red"
+                                                   IsVisible="{Binding RuntimeProperties.ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="No Thermalright panel devices configured." Opacity="0.5"
+                           IsVisible="{Binding !ThermalrightPanelDevices.Count}" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>

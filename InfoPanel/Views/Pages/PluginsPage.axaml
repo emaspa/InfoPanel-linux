@@ -1,13 +1,99 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="InfoPanel.Views.Pages.PluginsPage">
-    <StackPanel Margin="20" VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="Plugins"
-                   FontSize="28" FontWeight="Bold"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="Plugin management coming soon."
-                   FontSize="18" Opacity="0.7"
-                   Margin="0,10,0,0"
-                   HorizontalAlignment="Center" />
-    </StackPanel>
+             xmlns:vm="using:InfoPanel.ViewModels"
+             x:Class="InfoPanel.Views.Pages.PluginsPage"
+             x:DataType="vm:PluginsPageViewModel">
+    <DockPanel Margin="20">
+        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,12">
+            <TextBlock Text="Plugins" FontSize="28" FontWeight="Bold" />
+            <TextBlock Text="{Binding PluginFolder, StringFormat='Plugin folder: {0}'}" FontSize="12" Opacity="0.5" />
+
+            <!-- Restart Banner -->
+            <Border Background="#33FFA500" CornerRadius="6" Padding="10" Margin="0,8,0,0"
+                    IsVisible="{Binding ShowRestartBanner}">
+                <TextBlock Text="A new plugin was added. Restart InfoPanel to load it."
+                           FontWeight="SemiBold" />
+            </Border>
+        </StackPanel>
+
+        <ScrollViewer>
+            <StackPanel Spacing="20" MaxWidth="800">
+                <!-- Bundled Plugins -->
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Bundled Plugins" FontSize="18" FontWeight="SemiBold" />
+                    <ItemsControl ItemsSource="{Binding BundledPlugins}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PluginViewModel">
+                                <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
+                                    <StackPanel Spacing="6">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" />
+                                                <TextBlock Text="{Binding Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,2,0,0">
+                                                    <TextBlock Text="{Binding Author, StringFormat='Author: {0}'}" FontSize="11" Opacity="0.5" />
+                                                    <TextBlock Text="{Binding Version, StringFormat='v{0}'}" FontSize="11" Opacity="0.5" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <ToggleSwitch Grid.Column="1" IsChecked="{Binding Activated}"
+                                                          IsEnabled="{Binding ControlEnabled}"
+                                                          VerticalAlignment="Center" />
+                                        </Grid>
+                                        <!-- Modules -->
+                                        <ItemsControl ItemsSource="{Binding Plugins}" Margin="8,0,0,0">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:PluginModuleViewModel">
+                                                    <Border Background="#0D808080" CornerRadius="4" Padding="8" Margin="0,2">
+                                                        <Grid ColumnDefinitions="*,Auto">
+                                                            <StackPanel Spacing="2">
+                                                                <TextBlock Text="{Binding Name}" FontSize="12" />
+                                                                <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+                                                            </StackPanel>
+                                                            <Button Grid.Column="1" Content="Reload" Command="{Binding ReloadCommand}"
+                                                                    VerticalAlignment="Center" FontSize="11" Padding="6,2" />
+                                                        </Grid>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- External Plugins -->
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="External Plugins" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <Button Content="Add Plugin" Command="{Binding AddPluginFromZipCommand}" FontSize="12" Padding="8,2" />
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding ExternalPlugins}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PluginViewModel">
+                                <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Spacing="2">
+                                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" FontSize="14" />
+                                            <TextBlock Text="{Binding Description}" Opacity="0.7" FontSize="12" TextWrapping="Wrap" />
+                                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,2,0,0">
+                                                <TextBlock Text="{Binding Author, StringFormat='Author: {0}'}" FontSize="11" Opacity="0.5" />
+                                                <TextBlock Text="{Binding Version, StringFormat='v{0}'}" FontSize="11" Opacity="0.5" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <ToggleSwitch Grid.Column="1" IsChecked="{Binding Activated}"
+                                                      IsEnabled="{Binding ControlEnabled}"
+                                                      VerticalAlignment="Center" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="No external plugins installed." Opacity="0.5"
+                               IsVisible="{Binding !ExternalPlugins.Count}" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
 </UserControl>

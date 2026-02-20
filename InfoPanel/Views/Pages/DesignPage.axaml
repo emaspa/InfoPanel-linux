@@ -1,13 +1,86 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="InfoPanel.Views.Pages.DesignPage">
-    <StackPanel Margin="20" VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock Text="Design"
-                   FontSize="28" FontWeight="Bold"
-                   HorizontalAlignment="Center" />
-        <TextBlock Text="Design editor coming soon."
-                   FontSize="18" Opacity="0.7"
-                   Margin="0,10,0,0"
-                   HorizontalAlignment="Center" />
-    </StackPanel>
+             xmlns:vm="using:InfoPanel.ViewModels"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Pages.DesignPage"
+             x:DataType="vm:DesignPageViewModel">
+    <Grid ColumnDefinitions="300,*" Margin="8">
+        <!-- Left: Items List -->
+        <DockPanel>
+            <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="8,8,8,4">
+                <TextBlock Text="Display Items" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SelectedProfile.Name, StringFormat='Profile: {0}', FallbackValue='No profile selected'}"
+                           FontSize="12" Opacity="0.6" />
+            </StackPanel>
+
+            <!-- Toolbar -->
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="4" Margin="8,4">
+                <Button Content="+ Text" Command="{Binding AddTextItemCommand}" FontSize="11" Padding="6,2" />
+                <Button Content="+ Clock" Command="{Binding AddClockItemCommand}" FontSize="11" Padding="6,2" />
+                <Button Content="+ Calendar" Command="{Binding AddCalendarItemCommand}" FontSize="11" Padding="6,2" />
+                <Button Content="Del" Command="{Binding DeleteItemCommand}" FontSize="11" Padding="6,2" />
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="4" Margin="8,2,8,8">
+                <Button Content="Up" Command="{Binding MoveItemUpCommand}" FontSize="11" Padding="6,2" />
+                <Button Content="Down" Command="{Binding MoveItemDownCommand}" FontSize="11" Padding="6,2" />
+                <Button Content="Duplicate" Command="{Binding DuplicateItemCommand}" FontSize="11" Padding="6,2" />
+                <Button Content="Save" Command="{Binding SaveDisplayItemsCommand}" FontSize="11" Padding="6,2" />
+            </StackPanel>
+
+            <!-- Items list -->
+            <ListBox ItemsSource="{Binding DisplayItems}" SelectedItem="{Binding SelectedItem}" Margin="8,0">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="m:DisplayItem">
+                        <Grid ColumnDefinitions="Auto,*,Auto">
+                            <TextBlock Text="{Binding Kind}" FontSize="10" Opacity="0.5"
+                                       Width="45" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="2" Text="H" Opacity="0.4" FontSize="10"
+                                       VerticalAlignment="Center" IsVisible="{Binding Hidden}" />
+                        </Grid>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Right: Property Editor -->
+        <ScrollViewer Grid.Column="1" Margin="8,0,0,0">
+            <StackPanel Spacing="12"
+                        IsVisible="{Binding SelectedItem, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <TextBlock Text="Properties" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
+
+                <!-- Common properties -->
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Common" FontWeight="SemiBold" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Name:" VerticalAlignment="Center" Width="60" />
+                            <TextBox Text="{Binding SelectedItem.Name}" Width="200" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="X:" VerticalAlignment="Center" Width="60" />
+                            <NumericUpDown Value="{Binding SelectedItem.X}" Width="100" />
+                            <TextBlock Text="Y:" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            <NumericUpDown Value="{Binding SelectedItem.Y}" Width="100" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Rotation:" VerticalAlignment="Center" Width="60" />
+                            <NumericUpDown Value="{Binding SelectedItem.Rotation}" Minimum="0" Maximum="359" Width="100" />
+                        </StackPanel>
+                        <CheckBox Content="Hidden" IsChecked="{Binding SelectedItem.Hidden}" />
+                        <CheckBox Content="Locked" IsChecked="{Binding SelectedItem.IsLocked}" />
+                    </StackPanel>
+                </Border>
+
+                <Border Background="#0D808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="{Binding SelectedItem.Kind, StringFormat='Type: {0}'}" FontSize="12" Opacity="0.6" />
+                        <TextBlock Text="Use the overlay window to see live preview. Toggle profile Active to show/hide."
+                                   FontSize="11" Opacity="0.4" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </UserControl>
