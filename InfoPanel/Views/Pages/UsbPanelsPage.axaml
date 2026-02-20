@@ -11,14 +11,28 @@
             <!-- BeadaPanel -->
             <StackPanel Spacing="8">
                 <TextBlock Text="BeadaPanel" FontSize="18" FontWeight="SemiBold" />
-                <CheckBox Content="Enable BeadaPanel Multi-Device Mode"
-                          IsChecked="{Binding Settings.BeadaPanelMultiDeviceMode}" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <CheckBox Content="Enable BeadaPanel Multi-Device Mode"
+                              IsChecked="{Binding Settings.BeadaPanelMultiDeviceMode}" />
+                    <Button Content="Discover Devices"
+                            Command="{Binding DiscoverBeadaPanelDevicesCommand}"
+                            IsEnabled="{Binding !IsDiscoveringBeadaPanel}"
+                            IsVisible="{Binding Settings.BeadaPanelMultiDeviceMode}" />
+                </StackPanel>
+                <TextBlock Text="Scanning for BeadaPanel devices..." Opacity="0.6" FontStyle="Italic"
+                           IsVisible="{Binding IsDiscoveringBeadaPanel}" />
                 <ItemsControl ItemsSource="{Binding BeadaPanelDevices}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="m:BeadaPanelDevice" x:CompileBindings="False">
                             <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
                                 <StackPanel Spacing="6">
-                                    <TextBlock Text="{Binding RuntimeProperties.Name}" FontWeight="SemiBold" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{Binding RuntimeProperties.Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <Button Content="Remove"
+                                                Command="{Binding $parent[UserControl].DataContext.RemoveBeadaPanelDeviceCommand}"
+                                                CommandParameter="{Binding}"
+                                                FontSize="11" Padding="8,2" />
+                                    </StackPanel>
                                     <TextBlock Text="{Binding DeviceId, StringFormat='ID: {0}'}" FontSize="11" Opacity="0.5" />
                                     <StackPanel Orientation="Horizontal" Spacing="12">
                                         <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
@@ -57,21 +71,35 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Text="No BeadaPanel devices configured." Opacity="0.5"
+                <TextBlock Text="No BeadaPanel devices configured. Enable multi-device mode and click Discover Devices." Opacity="0.5"
                            IsVisible="{Binding !BeadaPanelDevices.Count}" />
             </StackPanel>
 
             <!-- Turing Smart Screen -->
             <StackPanel Spacing="8">
                 <TextBlock Text="Turing Smart Screen" FontSize="18" FontWeight="SemiBold" />
-                <CheckBox Content="Enable Turing Panel Multi-Device Mode"
-                          IsChecked="{Binding Settings.TuringPanelMultiDeviceMode}" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <CheckBox Content="Enable Turing Panel Multi-Device Mode"
+                              IsChecked="{Binding Settings.TuringPanelMultiDeviceMode}" />
+                    <Button Content="Discover Devices"
+                            Command="{Binding DiscoverTuringPanelDevicesCommand}"
+                            IsEnabled="{Binding !IsDiscoveringTuringPanel}"
+                            IsVisible="{Binding Settings.TuringPanelMultiDeviceMode}" />
+                </StackPanel>
+                <TextBlock Text="Scanning for Turing panel devices..." Opacity="0.6" FontStyle="Italic"
+                           IsVisible="{Binding IsDiscoveringTuringPanel}" />
                 <ItemsControl ItemsSource="{Binding TuringPanelDevices}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="m:TuringPanelDevice" x:CompileBindings="False">
                             <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
                                 <StackPanel Spacing="6">
-                                    <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <Button Content="Remove"
+                                                Command="{Binding $parent[UserControl].DataContext.RemoveTuringPanelDeviceCommand}"
+                                                CommandParameter="{Binding}"
+                                                FontSize="11" Padding="8,2" />
+                                    </StackPanel>
                                     <TextBlock Text="{Binding Model, StringFormat='Model: {0}'}" FontSize="11" Opacity="0.5" />
                                     <StackPanel Orientation="Horizontal" Spacing="12">
                                         <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
@@ -109,21 +137,35 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Text="No Turing panel devices configured." Opacity="0.5"
+                <TextBlock Text="No Turing panel devices configured. Enable multi-device mode and click Discover Devices." Opacity="0.5"
                            IsVisible="{Binding !TuringPanelDevices.Count}" />
             </StackPanel>
 
             <!-- Thermalright -->
             <StackPanel Spacing="8">
                 <TextBlock Text="Thermalright" FontSize="18" FontWeight="SemiBold" />
-                <CheckBox Content="Enable Thermalright Panel Multi-Device Mode"
-                          IsChecked="{Binding Settings.ThermalrightPanelMultiDeviceMode}" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <CheckBox Content="Enable Thermalright Panel Multi-Device Mode"
+                              IsChecked="{Binding Settings.ThermalrightPanelMultiDeviceMode}" />
+                    <Button Content="Discover Devices"
+                            Command="{Binding DiscoverThermalrightPanelDevicesCommand}"
+                            IsEnabled="{Binding !IsDiscoveringThermalrightPanel}"
+                            IsVisible="{Binding Settings.ThermalrightPanelMultiDeviceMode}" />
+                </StackPanel>
+                <TextBlock Text="Scanning for Thermalright panel devices..." Opacity="0.6" FontStyle="Italic"
+                           IsVisible="{Binding IsDiscoveringThermalrightPanel}" />
                 <ItemsControl ItemsSource="{Binding ThermalrightPanelDevices}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="m:ThermalrightPanelDevice" x:CompileBindings="False">
                             <Border Background="#1A808080" CornerRadius="6" Padding="12" Margin="0,2">
                                 <StackPanel Spacing="6">
-                                    <TextBlock Text="{Binding RuntimeProperties.Name}" FontWeight="SemiBold" />
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="{Binding RuntimeProperties.Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <Button Content="Remove"
+                                                Command="{Binding $parent[UserControl].DataContext.RemoveThermalrightPanelDeviceCommand}"
+                                                CommandParameter="{Binding}"
+                                                FontSize="11" Padding="8,2" />
+                                    </StackPanel>
                                     <TextBlock Text="{Binding Model, StringFormat='Model: {0}'}" FontSize="11" Opacity="0.5" />
                                     <StackPanel Orientation="Horizontal" Spacing="12">
                                         <CheckBox Content="Enabled" IsChecked="{Binding Enabled}" />
@@ -161,7 +203,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                <TextBlock Text="No Thermalright panel devices configured." Opacity="0.5"
+                <TextBlock Text="No Thermalright panel devices configured. Enable multi-device mode and click Discover Devices." Opacity="0.5"
                            IsVisible="{Binding !ThermalrightPanelDevices.Count}" />
             </StackPanel>
         </StackPanel>
