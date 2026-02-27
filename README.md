@@ -128,7 +128,6 @@ InfoPanel.Extras/             # Built-in plugins
 ## Credits
 
 - [InfoPanel](https://github.com/habibrehmansg/infopanel) by habibrehmansg - the original Windows application
-- [Lexonight1/thermalright-trcc-linux](https://github.com/Lexonight1/thermalright-trcc-linux) - Thermalright SCSI protocol reference
 
 ## License
 
