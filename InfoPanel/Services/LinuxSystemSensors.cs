@@ -38,11 +38,6 @@ public class LinuxSystemSensors
         "nfsd", "fuse.portal", "fuse.gvfsd-fuse"
     };
 
-    // Intel iGPU sysfs paths (cached on first poll)
-    private string? _intelGpuActFreqPath;
-    private string? _intelGpuCurFreqPath;
-    private bool _intelGpuSearched;
-
     private static readonly Regex DiskDeviceRegex = new(@"^(sd[a-z]+|nvme\d+n\d+|vd[a-z]+|mmcblk\d+)$", RegexOptions.Compiled);
 
     // P/Invoke for statvfs (filesystem statistics)
@@ -70,6 +65,7 @@ public class LinuxSystemSensors
         _prevTimestampMs = Stopwatch.GetTimestamp() / (Stopwatch.Frequency / 1000);
         NvmlMonitor.Instance.Initialize();
         RocmSmiMonitor.Instance.Initialize();
+        IntelGpuMonitor.Instance.Initialize();
     }
 
     public void Poll()
@@ -87,7 +83,7 @@ public class LinuxSystemSensors
         try { PollRapl(deltaMs); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: RAPL poll error"); }
         try { PollFilesystems(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: Filesystem poll error"); }
         try { PollCpuFreq(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: cpufreq poll error"); }
-        try { PollIntelGpu(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: Intel GPU poll error"); }
+        try { IntelGpuMonitor.Instance.Poll(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: Intel GPU poll error"); }
         try { PollUptime(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: Uptime poll error"); }
         try { PollProcessCount(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: Process count poll error"); }
         try { PollNetworkInfo(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: Network info poll error"); }
@@ -541,57 +537,6 @@ public class LinuxSystemSensors
         }
     }
 
-    private void PollIntelGpu()
-    {
-        if (!_intelGpuSearched)
-        {
-            _intelGpuSearched = true;
-            // Look for Intel iGPU in /sys/class/drm/card*/
-            try
-            {
-                if (Directory.Exists("/sys/class/drm"))
-                {
-                    foreach (var cardDir in Directory.GetDirectories("/sys/class/drm", "card[0-9]*"))
-                    {
-                        // Skip render-only and connector nodes (card0-HDMI-1, etc.)
-                        if (Path.GetFileName(cardDir).Contains('-')) continue;
-
-                        var vendorFile = Path.Combine(cardDir, "device", "vendor");
-                        var vendor = ReadFile(vendorFile);
-                        if (vendor != "0x8086") continue; // Intel vendor ID
-
-                        var actFreq = Path.Combine(cardDir, "gt_act_freq_mhz");
-                        var curFreq = Path.Combine(cardDir, "gt_cur_freq_mhz");
-
-                        if (File.Exists(actFreq)) _intelGpuActFreqPath = actFreq;
-                        if (File.Exists(curFreq)) _intelGpuCurFreqPath = curFreq;
-
-                        // Also check for min/max
-                        break;
-                    }
-                }
-            }
-            catch { }
-        }
-
-        if (_intelGpuActFreqPath != null)
-        {
-            var content = ReadFile(_intelGpuActFreqPath);
-            if (content != null && double.TryParse(content, NumberStyles.Any, CultureInfo.InvariantCulture, out var freq))
-            {
-                UpdateSensor("system/igpu/frequency", freq, "MHz");
-            }
-        }
-        else if (_intelGpuCurFreqPath != null)
-        {
-            var content = ReadFile(_intelGpuCurFreqPath);
-            if (content != null && double.TryParse(content, NumberStyles.Any, CultureInfo.InvariantCulture, out var freq))
-            {
-                UpdateSensor("system/igpu/frequency", freq, "MHz");
-            }
-        }
-    }
-
     private void PollUptime()
     {
         if (!File.Exists("/proc/uptime")) return;
@@ -992,18 +937,8 @@ public class LinuxSystemSensors
             });
         }
 
-        // Intel iGPU
-        if (HwmonMonitor.SENSORHASH.ContainsKey("system/igpu/frequency"))
-        {
-            result.Add(new HwmonSensorInfo
-            {
-                SensorId = "system/igpu/frequency",
-                DeviceName = "Intel iGPU",
-                Category = "Frequency",
-                Label = "GPU Frequency",
-                Unit = "MHz"
-            });
-        }
+        // Intel GPU (PMU-based)
+        result.AddRange(IntelGpuMonitor.Instance.GetSensorInfoList());
 
         // Uptime
         foreach (var (suffix, label, unit) in new[]
