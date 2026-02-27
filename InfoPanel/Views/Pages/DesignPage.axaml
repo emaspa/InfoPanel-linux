@@ -7,7 +7,7 @@
              x:Class="InfoPanel.Views.Pages.DesignPage"
              x:DataType="vm:DesignPageViewModel">
 
-    <Grid ColumnDefinitions="*,320,320" Margin="8">
+    <Grid ColumnDefinitions="*,*,320" Margin="8">
 
         <!-- LEFT: Sensor Browser -->
         <DockPanel>

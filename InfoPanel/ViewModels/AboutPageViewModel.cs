@@ -87,7 +87,6 @@ namespace InfoPanel.ViewModels
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "LibUsbDotNet", License = "LGPL v2 / GPL v2 (dual licensed). Copyright (c) LibUsbDotNet Contributors.", ProjectUrl = "https://github.com/LibUsbDotNet/LibUsbDotNet" });
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "Microsoft.Extensions.*", License = "MIT License. Copyright (c) Microsoft Corporation.", ProjectUrl = "https://github.com/dotnet/runtime" });
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "SecureStore", License = "MIT License. Copyright (c) 2016 Dmitry Lokshin.", ProjectUrl = "https://github.com/dscoduc/SecureStore" });
-            ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "Sentry", License = "MIT License. Copyright (c) 2021 Sentry.", ProjectUrl = "https://github.com/getsentry/sentry-dotnet" });
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "Serilog", License = "Apache License 2.0. Copyright (c) Serilog Contributors.", ProjectUrl = "https://github.com/serilog/serilog" });
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "SkiaSharp", License = "MIT License. Copyright (c) 2015-2016 Xamarin, Inc., Microsoft Corporation.", ProjectUrl = "https://github.com/mono/SkiaSharp" });
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "Svg.Skia", License = "MIT License. Copyright (c) Wieslaw Soltes.", ProjectUrl = "https://github.com/wieslawsoltes/Svg.Skia" });

@@ -6,14 +6,12 @@ using InfoPanel.Monitors;
 using InfoPanel.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Sentry;
 using Serilog;
 using Serilog.Events;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
@@ -81,17 +79,6 @@ namespace InfoPanel
                     return IntPtr.Zero;
                 });
             }
-
-            SentrySdk.Init(o =>
-            {
-                o.Dsn = "https://5ca30f9d2faba70d50918db10cee0d26@o4508414465146880.ingest.us.sentry.io/4508414467833856";
-                o.Debug = true;
-                o.AutoSessionTracking = true;
-                o.SendDefaultPii = true;
-                o.AttachStacktrace = true;
-                o.Environment = "production";
-                o.Release = Assembly.GetExecutingAssembly().GetName().Version?.ToString();
-            });
 
             Logger.Information("InfoPanel starting up");
 
@@ -214,9 +201,7 @@ namespace InfoPanel
         private void CurrentDomain_UnhandledException(object? sender, UnhandledExceptionEventArgs e)
         {
             var exception = e.ExceptionObject as Exception ?? new Exception($"Non-exception thrown: {e.ExceptionObject}");
-            SentrySdk.CaptureException(exception);
             Logger.Fatal(exception, "CurrentDomain_UnhandledException occurred. IsTerminating: {IsTerminating}", e.IsTerminating);
-            SentrySdk.FlushAsync(TimeSpan.FromSeconds(5)).Wait();
         }
 
         private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
@@ -225,13 +210,11 @@ namespace InfoPanel
             {
                 foreach (var innerEx in agg.InnerExceptions)
                 {
-                    SentrySdk.CaptureException(innerEx);
                     Logger.Error(innerEx, "Unobserved task exception in aggregate");
                 }
             }
             else
             {
-                SentrySdk.CaptureException(e.Exception);
                 Logger.Error(e.Exception, "Unobserved task exception");
             }
             e.SetObserved();
