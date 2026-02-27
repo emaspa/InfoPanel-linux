@@ -104,6 +104,15 @@ public class HwmonMonitor
         {
             Log.Error(ex, "HwmonMonitor poll error");
         }
+
+        try
+        {
+            LinuxSystemSensors.Instance.Poll();
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "LinuxSystemSensors poll error");
+        }
     }
 
     private static void ReadSensorFiles(string hwmonDir, string hwmonId, string deviceName,
@@ -202,6 +211,9 @@ public class HwmonMonitor
                 });
             }
         }
+
+        // Add Linux system sensors (CPU, Memory, Disk, Network, Load, Power, RAPL)
+        result.AddRange(LinuxSystemSensors.Instance.GetSensorInfoList());
 
         return result;
     }
