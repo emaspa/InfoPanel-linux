@@ -31,6 +31,7 @@ public class LinuxSystemSensors
     {
         _prevTimestampMs = Stopwatch.GetTimestamp() / (Stopwatch.Frequency / 1000);
         NvmlMonitor.Instance.Initialize();
+        RocmSmiMonitor.Instance.Initialize();
     }
 
     public void Poll()
@@ -47,6 +48,7 @@ public class LinuxSystemSensors
         try { PollPowerSupply(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: Power supply poll error"); }
         try { PollRapl(deltaMs); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: RAPL poll error"); }
         try { NvmlMonitor.Instance.Poll(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: NVML poll error"); }
+        try { RocmSmiMonitor.Instance.Poll(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: ROCm SMI poll error"); }
 
         _prevTimestampMs = nowMs;
     }
@@ -629,6 +631,9 @@ public class LinuxSystemSensors
 
         // NVIDIA GPU
         result.AddRange(NvmlMonitor.Instance.GetSensorInfoList());
+
+        // AMD GPU
+        result.AddRange(RocmSmiMonitor.Instance.GetSensorInfoList());
 
         // RAPL
         foreach (var (sensorId, reading) in HwmonMonitor.SENSORHASH)
