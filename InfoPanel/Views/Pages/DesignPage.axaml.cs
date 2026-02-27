@@ -1,6 +1,7 @@
 using Avalonia.Controls;
 using InfoPanel.Models;
 using InfoPanel.ViewModels;
+using InfoPanel.ViewModels.Components;
 using InfoPanel.Views.Components;
 using System;
 
@@ -81,6 +82,14 @@ namespace InfoPanel.Views.Pages
             panel.Children.Add(new TextProperties { DataContext = item });
             panel.Children.Add(new DateTimeProperties { DataContext = item });
             return panel;
+        }
+
+        private void SensorTreeView_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        {
+            if (sender is TreeView treeView && treeView.SelectedItem is TreeItem item && item.Children.Count > 0)
+            {
+                item.IsExpanded = !item.IsExpanded;
+            }
         }
     }
 }

@@ -24,7 +24,13 @@
                                             SelectedSensor="{Binding PluginSensors.SelectedItem}"
                                             SensorSourceType="Plugin" />
                         <TreeView ItemsSource="{Binding PluginSensors.SensorTree}"
-                                  SelectedItem="{Binding PluginSensors.SelectedItem}">
+                                  SelectedItem="{Binding PluginSensors.SelectedItem}"
+                                  SelectionChanged="SensorTreeView_SelectionChanged">
+                            <TreeView.Styles>
+                                <Style Selector="TreeViewItem">
+                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                </Style>
+                            </TreeView.Styles>
                             <TreeView.ItemTemplate>
                                 <TreeDataTemplate x:DataType="vmcomp:TreeItem"
                                                   ItemsSource="{Binding Children}">
@@ -46,7 +52,13 @@
                                             SelectedSensor="{Binding HwmonSensors.SelectedItem}"
                                             SensorSourceType="Hwmon" />
                         <TreeView ItemsSource="{Binding HwmonSensors.SensorTree}"
-                                  SelectedItem="{Binding HwmonSensors.SelectedItem}">
+                                  SelectedItem="{Binding HwmonSensors.SelectedItem}"
+                                  SelectionChanged="SensorTreeView_SelectionChanged">
+                            <TreeView.Styles>
+                                <Style Selector="TreeViewItem">
+                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                </Style>
+                            </TreeView.Styles>
                             <TreeView.ItemTemplate>
                                 <TreeDataTemplate x:DataType="vmcomp:TreeItem"
                                                   ItemsSource="{Binding Children}">

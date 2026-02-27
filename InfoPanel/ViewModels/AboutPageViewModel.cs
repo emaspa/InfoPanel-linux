@@ -15,6 +15,24 @@ namespace InfoPanel.ViewModels
         public ObservableCollection<InfoLink> InfoLinks { get; } = [];
         public ObservableCollection<ThirdPartyLicense> ThirdPartyLicenses { get; } = [];
         public ObservableCollection<Contributor> Contributors { get; } = [];
+        public string ReleaseNotes { get; } = """
+            1.4.0 - Initial Linux Release
+
+            Ported from the original Windows InfoPanel to Linux using Avalonia UI.
+
+            Supported features:
+            - Hardware monitoring via hwmon/sysfs (CPU, memory, disk, network, power)
+            - Intel iGPU monitoring (frequency via sysfs, utilization via PMU perf events)
+            - NVIDIA GPU monitoring via NVML (nvidia-smi)
+            - AMD GPU monitoring via ROCm SMI
+            - Filesystem, CPU frequency, uptime, process count, load average sensors
+            - Block I/O and network throughput sensors
+            - USB panel support (Turing, BeadaPanel, Thermalright) via libusb
+            - Full design editor with sensor browser, property editors, and profiles
+            - Plugin system for extensible sensor sources
+            - SkiaSharp rendering for display items (text, gauges, charts, images)
+            - Built-in web server for remote access
+            """;
 
         public AboutPageViewModel()
         {
