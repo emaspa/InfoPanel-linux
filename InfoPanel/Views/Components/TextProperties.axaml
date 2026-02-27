@@ -1,0 +1,70 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Components.TextProperties"
+             x:DataType="m:TextDisplayItem">
+    <Border Background="#1A808080" CornerRadius="6" Padding="12">
+        <StackPanel Spacing="8">
+            <TextBlock Text="Text Properties" FontWeight="SemiBold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Text:" VerticalAlignment="Center" Width="80" />
+                <TextBox Text="{Binding Name}" Width="200" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Font:" VerticalAlignment="Center" Width="80" />
+                <ComboBox x:Name="FontComboBox" Width="200"
+                          SelectedItem="{Binding Font}"
+                          ItemsSource="{Binding #FontComboBox.Tag}"
+                          Tag="{x:Null}" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Size:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding FontSize}" Minimum="1" Maximum="500" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Color:" VerticalAlignment="Center" Width="80" />
+                <ColorPicker Color="{Binding Color, Converter={StaticResource ColorStringToColorConverter}}"
+                             IsAlphaVisible="True" />
+            </StackPanel>
+
+            <WrapPanel Orientation="Horizontal">
+                <CheckBox Content="Bold" IsChecked="{Binding Bold}" Margin="0,0,12,0" />
+                <CheckBox Content="Italic" IsChecked="{Binding Italic}" Margin="0,0,12,0" />
+                <CheckBox Content="Underline" IsChecked="{Binding Underline}" Margin="0,0,12,0" />
+                <CheckBox Content="Strikeout" IsChecked="{Binding Strikeout}" />
+            </WrapPanel>
+
+            <WrapPanel Orientation="Horizontal">
+                <CheckBox Content="Right Align" IsChecked="{Binding RightAlign}" Margin="0,0,12,0" />
+                <CheckBox Content="Center" IsChecked="{Binding CenterAlign}" Margin="0,0,12,0" />
+                <CheckBox Content="Uppercase" IsChecked="{Binding Uppercase}" />
+            </WrapPanel>
+
+            <WrapPanel Orientation="Horizontal">
+                <CheckBox Content="Wrap" IsChecked="{Binding Wrap}" Margin="0,0,12,0" />
+                <CheckBox Content="Ellipsis" IsChecked="{Binding Ellipsis}" Margin="0,0,12,0" />
+                <CheckBox Content="Marquee" IsChecked="{Binding Marquee}" />
+            </WrapPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Width:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Width}" Minimum="0" Width="100" />
+            </StackPanel>
+
+            <StackPanel IsVisible="{Binding Marquee}" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Speed:" VerticalAlignment="Center" Width="80" />
+                    <NumericUpDown Value="{Binding MarqueeSpeed}" Minimum="1" Maximum="200" Width="100" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Spacing:" VerticalAlignment="Center" Width="80" />
+                    <NumericUpDown Value="{Binding MarqueeSpacing}" Minimum="0" Maximum="500" Width="100" />
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

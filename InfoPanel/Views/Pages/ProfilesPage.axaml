@@ -4,23 +4,30 @@
              xmlns:m="using:InfoPanel.Models"
              x:Class="InfoPanel.Views.Pages.ProfilesPage"
              x:DataType="vm:ProfilesPageViewModel">
-    <Grid ColumnDefinitions="250,*" Margin="20">
+    <Grid ColumnDefinitions="280,*" Margin="16">
         <!-- Left: Profile List -->
         <DockPanel>
             <TextBlock DockPanel.Dock="Top" Text="Profiles" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,8" />
-            <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="0,8,0,0">
-                <Button Content="Add" Command="{Binding AddProfileCommand}" />
-                <Button Content="Duplicate" Command="{Binding DuplicateProfileCommand}" />
-                <Button Content="Delete" Command="{Binding DeleteProfileCommand}" />
+
+            <StackPanel DockPanel.Dock="Bottom" Spacing="4" Margin="0,8,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button Content="Add" Command="{Binding AddProfileCommand}" Padding="10,4" />
+                    <Button Content="Duplicate" Command="{Binding DuplicateProfileCommand}" Padding="10,4" />
+                    <Button Content="Delete" Command="{Binding DeleteProfileCommand}" Padding="10,4" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="4">
+                    <Button Content="Import" Command="{Binding ImportProfileCommand}" Padding="10,4" />
+                    <Button Content="Save All" Command="{Binding SaveProfilesCommand}" Padding="10,4" />
+                </StackPanel>
             </StackPanel>
+
             <ListBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}">
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="m:Profile">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                             <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
                             <TextBlock Text="(Active)" Opacity="0.5" FontSize="11"
-                                       VerticalAlignment="Center"
-                                       IsVisible="{Binding Active}" />
+                                       VerticalAlignment="Center" IsVisible="{Binding Active}" />
                         </StackPanel>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
@@ -29,12 +36,15 @@
 
         <!-- Right: Profile Editor -->
         <ScrollViewer Grid.Column="1" Margin="16,0,0,0">
-            <StackPanel Spacing="16" IsVisible="{Binding SelectedProfile, Converter={x:Static ObjectConverters.IsNotNull}}"
-                        DataContext="{Binding SelectedProfile}">
+            <StackPanel Spacing="16"
+                        IsVisible="{Binding SelectedProfile, Converter={x:Static ObjectConverters.IsNotNull}}">
+
                 <TextBlock Text="Profile Settings" FontSize="20" FontWeight="SemiBold" />
 
+                <!-- General Settings -->
                 <Border Background="#1A808080" CornerRadius="6" Padding="12">
-                    <StackPanel Spacing="10">
+                    <StackPanel Spacing="10" DataContext="{Binding SelectedProfile}">
+                        <TextBlock Text="General" FontWeight="SemiBold" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="Name:" VerticalAlignment="Center" Width="100" />
                             <TextBox Text="{Binding Name}" Width="200" />
@@ -47,39 +57,75 @@
                             <TextBlock Text="Height:" VerticalAlignment="Center" Width="100" />
                             <NumericUpDown Value="{Binding Height}" Minimum="1" Maximum="10000" Width="120" />
                         </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Colors & Fonts -->
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="10" DataContext="{Binding SelectedProfile}">
+                        <TextBlock Text="Colors &amp; Fonts" FontWeight="SemiBold" />
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="Background:" VerticalAlignment="Center" Width="100" />
-                            <TextBox Text="{Binding BackgroundColor}" Width="120" />
+                            <ColorPicker Color="{Binding BackgroundColor, Converter={StaticResource ColorStringToColorConverter}}"
+                                         IsAlphaVisible="True" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Text Color:" VerticalAlignment="Center" Width="100" />
+                            <ColorPicker Color="{Binding Color, Converter={StaticResource ColorStringToColorConverter}}"
+                                         IsAlphaVisible="True" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="Font:" VerticalAlignment="Center" Width="100" />
-                            <TextBox Text="{Binding Font}" Width="150" />
+                            <ComboBox x:Name="FontComboBox" Width="200"
+                                      SelectedItem="{Binding Font}" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="Font Size:" VerticalAlignment="Center" Width="100" />
                             <NumericUpDown Value="{Binding FontSize}" Minimum="1" Maximum="200" Width="100" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Text Color:" VerticalAlignment="Center" Width="100" />
-                            <TextBox Text="{Binding Color}" Width="120" />
+                            <TextBlock Text="Font Scale:" VerticalAlignment="Center" Width="100" />
+                            <NumericUpDown Value="{Binding FontScale}" Minimum="0.1" Maximum="10"
+                                           Increment="0.01" FormatString="0.00" Width="100" />
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
+                <!-- Window Position -->
                 <Border Background="#1A808080" CornerRadius="6" Padding="12">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Display Options" FontWeight="SemiBold" />
-                        <CheckBox Content="Active (show overlay)" IsChecked="{Binding Active}" />
-                        <CheckBox Content="Topmost" IsChecked="{Binding Topmost}" />
-                        <CheckBox Content="Draggable" IsChecked="{Binding Drag}" />
-                        <CheckBox Content="Resizable" IsChecked="{Binding Resize}" />
-                        <CheckBox Content="Show FPS" IsChecked="{Binding ShowFps}" />
+                    <StackPanel Spacing="10" DataContext="{Binding SelectedProfile}">
+                        <TextBlock Text="Window Position" FontWeight="SemiBold" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="X:" VerticalAlignment="Center" Width="100" />
+                            <NumericUpDown Value="{Binding WindowX}" Width="120" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="Y:" VerticalAlignment="Center" Width="100" />
+                            <NumericUpDown Value="{Binding WindowY}" Width="120" />
+                        </StackPanel>
+                        <Button Content="Reset Position" Command="{Binding $parent[UserControl].DataContext.ResetPositionCommand}"
+                                x:CompileBindings="False" Padding="10,4" />
                     </StackPanel>
                 </Border>
 
-                <Button Content="Save Profiles" Margin="0,4,0,0"
-                        Command="{Binding $parent[UserControl].DataContext.SaveProfilesCommand}"
-                        x:CompileBindings="False" />
+                <!-- Display Options -->
+                <Border Background="#1A808080" CornerRadius="6" Padding="12">
+                    <StackPanel Spacing="8" DataContext="{Binding SelectedProfile}">
+                        <TextBlock Text="Display Options" FontWeight="SemiBold" />
+                        <ToggleSwitch IsChecked="{Binding Active}" Content="Active (show overlay)" />
+                        <ToggleSwitch IsChecked="{Binding Topmost}" Content="Always on top" />
+                        <ToggleSwitch IsChecked="{Binding Drag}" Content="Draggable" />
+                        <ToggleSwitch IsChecked="{Binding Resize}" Content="Resizable" />
+                        <ToggleSwitch IsChecked="{Binding OpenGL}" Content="OpenGL Rendering" />
+                        <ToggleSwitch IsChecked="{Binding ShowFps}" Content="Show FPS" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Action Buttons -->
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Content="Save Profiles" Command="{Binding SaveProfilesCommand}" Padding="12,6" />
+                    <Button Content="Revert" Command="{Binding RevertCommand}" Padding="12,6" />
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
     </Grid>

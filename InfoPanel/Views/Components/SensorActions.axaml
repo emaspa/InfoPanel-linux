@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="InfoPanel.Views.Components.SensorActions">
+    <Border Background="#1A808080" CornerRadius="6" Padding="8" Margin="0,4">
+        <StackPanel Spacing="4">
+            <TextBlock Text="Add Sensor As:" FontWeight="SemiBold" FontSize="12" />
+            <WrapPanel Orientation="Horizontal">
+                <Button Content="Text" Click="AddAsText_Click" Margin="2" Padding="8,3" FontSize="11" />
+                <Button Content="Bar" Click="AddAsBar_Click" Margin="2" Padding="8,3" FontSize="11" />
+                <Button Content="Donut" Click="AddAsDonut_Click" Margin="2" Padding="8,3" FontSize="11" />
+                <Button Content="Graph" Click="AddAsGraph_Click" Margin="2" Padding="8,3" FontSize="11" />
+                <Button Content="Gauge" Click="AddAsGauge_Click" Margin="2" Padding="8,3" FontSize="11" />
+                <Button Content="Image" Click="AddAsSensorImage_Click" Margin="2" Padding="8,3" FontSize="11" />
+            </WrapPanel>
+            <Button Content="Replace Selected" Click="ReplaceSensor_Click"
+                    FontSize="11" Padding="8,3" Margin="2,4,2,0" />
+        </StackPanel>
+    </Border>
+</UserControl>

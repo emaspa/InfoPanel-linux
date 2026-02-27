@@ -1,0 +1,117 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Components.ShapeProperties"
+             x:DataType="m:ShapeDisplayItem">
+    <Border Background="#1A808080" CornerRadius="6" Padding="12">
+        <StackPanel Spacing="8">
+            <TextBlock Text="Shape Properties" FontWeight="SemiBold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Name:" VerticalAlignment="Center" Width="80" />
+                <TextBox Text="{Binding Name}" Width="200" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Shape:" VerticalAlignment="Center" Width="80" />
+                <ComboBox SelectedIndex="{Binding Type}" Width="150">
+                    <ComboBoxItem Content="Rectangle" />
+                    <ComboBoxItem Content="Capsule" />
+                    <ComboBoxItem Content="Trapezoid" />
+                    <ComboBoxItem Content="Parallelogram" />
+                    <ComboBoxItem Content="Ellipse" />
+                    <ComboBoxItem Content="Triangle" />
+                    <ComboBoxItem Content="Pentagon" />
+                    <ComboBoxItem Content="Hexagon" />
+                    <ComboBoxItem Content="Octagon" />
+                    <ComboBoxItem Content="Star" />
+                    <ComboBoxItem Content="Plus" />
+                    <ComboBoxItem Content="Arrow" />
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Width:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Width}" Minimum="1" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Height:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Height}" Minimum="1" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Radius:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding CornerRadius}" Minimum="0" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Rotation:" VerticalAlignment="Center" Width="80" />
+                <Slider Value="{Binding Rotation}" Minimum="0" Maximum="359" Width="200" />
+                <TextBlock Text="{Binding Rotation, StringFormat='{}{0} deg'}" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <Separator />
+            <TextBlock Text="Frame" FontWeight="SemiBold" FontSize="12" />
+
+            <CheckBox Content="Show Frame" IsChecked="{Binding ShowFrame}" />
+            <StackPanel IsVisible="{Binding ShowFrame}" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Thickness:" VerticalAlignment="Center" Width="80" />
+                    <NumericUpDown Value="{Binding FrameThickness}" Minimum="1" Width="100" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Color:" VerticalAlignment="Center" Width="80" />
+                    <ColorPicker Color="{Binding FrameColor, Converter={StaticResource ColorStringToColorConverter}}"
+                                 IsAlphaVisible="True" />
+                </StackPanel>
+            </StackPanel>
+
+            <Separator />
+            <TextBlock Text="Fill" FontWeight="SemiBold" FontSize="12" />
+
+            <CheckBox Content="Show Fill" IsChecked="{Binding ShowFill}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowFill}">
+                <TextBlock Text="Fill Color:" VerticalAlignment="Center" Width="80" />
+                <ColorPicker Color="{Binding FillColor, Converter={StaticResource ColorStringToColorConverter}}"
+                             IsAlphaVisible="True" />
+            </StackPanel>
+
+            <Separator />
+            <TextBlock Text="Gradient" FontWeight="SemiBold" FontSize="12" />
+
+            <CheckBox Content="Show Gradient" IsChecked="{Binding ShowGradient}" />
+            <StackPanel IsVisible="{Binding ShowGradient}" Spacing="8">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Type:" VerticalAlignment="Center" Width="80" />
+                    <ComboBox SelectedIndex="{Binding GradientType}" Width="120">
+                        <ComboBoxItem Content="Linear" />
+                        <ComboBoxItem Content="Sweep" />
+                        <ComboBoxItem Content="Radial" />
+                        <ComboBoxItem Content="Diamond" />
+                        <ComboBoxItem Content="Reflected" />
+                        <ComboBoxItem Content="Spiral" />
+                    </ComboBox>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Angle:" VerticalAlignment="Center" Width="80" />
+                    <NumericUpDown Value="{Binding GradientAngle}" Minimum="0" Maximum="359" Width="100" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Speed:" VerticalAlignment="Center" Width="80" />
+                    <NumericUpDown Value="{Binding GradientAnimationSpeed}" Minimum="0" Width="100" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Color 1:" VerticalAlignment="Center" Width="80" />
+                    <ColorPicker Color="{Binding GradientColor, Converter={StaticResource ColorStringToColorConverter}}"
+                                 IsAlphaVisible="True" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Color 2:" VerticalAlignment="Center" Width="80" />
+                    <ColorPicker Color="{Binding GradientColor2, Converter={StaticResource ColorStringToColorConverter}}"
+                                 IsAlphaVisible="True" />
+                </StackPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -1,0 +1,21 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Components.GroupProperties"
+             x:DataType="m:GroupDisplayItem">
+    <Border Background="#1A808080" CornerRadius="6" Padding="12">
+        <StackPanel Spacing="8">
+            <TextBlock Text="Group Properties" FontWeight="SemiBold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Name:" VerticalAlignment="Center" Width="80" />
+                <TextBox Text="{Binding Name}" MaxLength="20" Width="200" />
+            </StackPanel>
+
+            <CheckBox Content="Locked" IsChecked="{Binding IsLocked}" />
+
+            <TextBlock Text="{Binding DisplayItemsCount, StringFormat='Items: {0}'}"
+                       FontSize="12" Opacity="0.6" />
+        </StackPanel>
+    </Border>
+</UserControl>

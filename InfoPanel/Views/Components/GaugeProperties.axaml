@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Components.GaugeProperties"
+             x:DataType="m:GaugeDisplayItem">
+    <Border Background="#1A808080" CornerRadius="6" Padding="12">
+        <StackPanel Spacing="8">
+            <TextBlock Text="Gauge Properties" FontWeight="SemiBold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Sensor:" VerticalAlignment="Center" Width="80" />
+                <TextBlock Text="{Binding SensorName}" VerticalAlignment="Center" Opacity="0.7" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Min Value:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding MinValue}" FormatString="0.0" Width="120" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Max Value:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding MaxValue}" FormatString="0.0" Width="120" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Width:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Width}" Minimum="0" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Height:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Height}" Minimum="0" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Scale:" VerticalAlignment="Center" Width="80" />
+                <Slider Value="{Binding Scale}" Minimum="1" Maximum="500" Width="200" />
+                <TextBlock Text="{Binding Scale, StringFormat='{}{0}%'}" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <Separator />
+            <TextBlock Text="Image Steps" FontWeight="SemiBold" FontSize="12" />
+
+            <ListBox ItemsSource="{Binding Images}" Height="150" x:Name="ImagesList">
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="m:ImageDisplayItem">
+                        <TextBlock Text="{Binding FilePath, FallbackValue='(no file)'}" FontSize="11" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <StackPanel Orientation="Horizontal" Spacing="4">
+                <Button Content="Add" Click="AddImage_Click" FontSize="11" Padding="8,2" />
+                <Button Content="Remove" Click="RemoveImage_Click" FontSize="11" Padding="8,2" />
+                <Button Content="Move Up" Click="MoveImageUp_Click" FontSize="11" Padding="8,2" />
+                <Button Content="Move Down" Click="MoveImageDown_Click" FontSize="11" Padding="8,2" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -103,6 +103,14 @@ namespace InfoPanel.Views
                 return;
             }
 
+            // Hide to tray instead of exiting when MinimizeToTray is enabled
+            if (ConfigModel.Instance.Settings.MinimizeToTray)
+            {
+                e.Cancel = true;
+                Hide();
+                return;
+            }
+
             e.Cancel = true;
             _isShuttingDown = true;
             base.OnClosing(e);

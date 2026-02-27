@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Components.GraphProperties"
+             x:DataType="m:GraphDisplayItem">
+    <Border Background="#1A808080" CornerRadius="6" Padding="12">
+        <StackPanel Spacing="8">
+            <TextBlock Text="Graph Properties" FontWeight="SemiBold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Sensor:" VerticalAlignment="Center" Width="80" />
+                <TextBlock Text="{Binding SensorName}" VerticalAlignment="Center" Opacity="0.7" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Type:" VerticalAlignment="Center" Width="80" />
+                <ComboBox SelectedIndex="{Binding Type}" Width="120">
+                    <ComboBoxItem Content="Line" />
+                    <ComboBoxItem Content="Histogram" />
+                </ComboBox>
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Width:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Width}" Minimum="1" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Height:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Height}" Minimum="1" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Thickness:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Thickness}" Minimum="1" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Step:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Step}" Minimum="1" Width="100" />
+            </StackPanel>
+
+            <CheckBox Content="Flip Horizontally" IsChecked="{Binding FlipX}" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Graph Color:" VerticalAlignment="Center" Width="80" />
+                <ColorPicker Color="{Binding Color, Converter={StaticResource ColorStringToColorConverter}}"
+                             IsAlphaVisible="True" />
+            </StackPanel>
+
+            <CheckBox Content="Fill" IsChecked="{Binding Fill}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Fill}">
+                <TextBlock Text="Fill Color:" VerticalAlignment="Center" Width="80" />
+                <ColorPicker Color="{Binding FillColor, Converter={StaticResource ColorStringToColorConverter}}"
+                             IsAlphaVisible="True" />
+            </StackPanel>
+
+            <Separator />
+
+            <CheckBox Content="Show Frame" IsChecked="{Binding Frame}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Frame}">
+                <TextBlock Text="Frame Color:" VerticalAlignment="Center" Width="80" />
+                <ColorPicker Color="{Binding FrameColor, Converter={StaticResource ColorStringToColorConverter}}"
+                             IsAlphaVisible="True" />
+            </StackPanel>
+
+            <CheckBox Content="Show Background" IsChecked="{Binding Background}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Background}">
+                <TextBlock Text="BG Color:" VerticalAlignment="Center" Width="80" />
+                <ColorPicker Color="{Binding BackgroundColor, Converter={StaticResource ColorStringToColorConverter}}"
+                             IsAlphaVisible="True" />
+            </StackPanel>
+
+            <Separator />
+            <TextBlock Text="Range" FontWeight="SemiBold" FontSize="12" />
+
+            <CheckBox Content="Auto Range" IsChecked="{Binding AutoValue}" />
+            <StackPanel Orientation="Horizontal" Spacing="8"
+                        IsEnabled="{Binding AutoValue, Converter={StaticResource InverseBooleanConverter}}">
+                <TextBlock Text="Min:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding MinValue}" Width="100" />
+                <TextBlock Text="Max:" VerticalAlignment="Center" Margin="8,0,0,0" />
+                <NumericUpDown Value="{Binding MaxValue}" Width="100" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

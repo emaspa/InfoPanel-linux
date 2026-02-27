@@ -272,6 +272,7 @@ namespace InfoPanel.Models
                 Enums.SensorType.HwInfo => SensorReader.ReadHwInfoSensor(Id, Instance, EntryId),
                 Enums.SensorType.Libre => SensorReader.ReadLibreSensor(LibreSensorId),
                 Enums.SensorType.Plugin => SensorReader.ReadPluginSensor(PluginSensorId),
+                Enums.SensorType.Hwmon => SensorReader.ReadHwmonSensor(LibreSensorId),
                 _ => null,
             };
         }

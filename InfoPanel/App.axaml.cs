@@ -216,6 +216,20 @@ namespace InfoPanel
                 Log.Warning(ex, "Plugin monitor initialization failed");
             }
 
+            // Start Linux hwmon sensor monitor
+            if (OperatingSystem.IsLinux())
+            {
+                try
+                {
+                    HwmonMonitor.Instance.Start(ConfigModel.Instance.Settings.TargetGraphUpdateRate);
+                    Logger.Information("HwmonMonitor started");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warning(ex, "HwmonMonitor initialization failed");
+                }
+            }
+
             try
             {
                 await StartPanels();
@@ -289,6 +303,7 @@ namespace InfoPanel
 
             try { await LibreMonitor.Instance.StopAsync(); } catch { }
             try { await PluginMonitor.Instance.StopAsync(); } catch { }
+            try { HwmonMonitor.Instance.Stop(); } catch { }
 
             _lockFile?.Dispose();
             _lockFile = null;

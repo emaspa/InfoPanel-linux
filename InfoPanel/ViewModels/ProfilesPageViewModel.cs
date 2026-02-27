@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using InfoPanel.Models;
 using System;
 using System.Collections.ObjectModel;
+using System.Threading.Tasks;
 
 namespace InfoPanel.ViewModels
 {
@@ -71,6 +72,58 @@ namespace InfoPanel.ViewModels
         private void SaveProfiles()
         {
             ConfigModel.Instance.SaveProfiles();
+        }
+
+        [RelayCommand]
+        private void ResetPosition()
+        {
+            if (SelectedProfile == null) return;
+            SelectedProfile.WindowX = 0;
+            SelectedProfile.WindowY = 0;
+        }
+
+        [RelayCommand]
+        private async Task ImportProfile()
+        {
+            try
+            {
+                var topLevel = Avalonia.Application.Current?.ApplicationLifetime is
+                    Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+                    ? desktop.MainWindow : null;
+
+                if (topLevel == null) return;
+
+                var files = await topLevel.StorageProvider.OpenFilePickerAsync(
+                    new Avalonia.Platform.Storage.FilePickerOpenOptions
+                    {
+                        Title = "Import Profile",
+                        AllowMultiple = false,
+                        FileTypeFilter =
+                        [
+                            new Avalonia.Platform.Storage.FilePickerFileType("InfoPanel Profile") { Patterns = ["*.infopanel"] },
+                            new Avalonia.Platform.Storage.FilePickerFileType("All files") { Patterns = ["*"] }
+                        ]
+                    });
+
+                if (files.Count > 0)
+                {
+                    SharedModel.Instance.ImportProfile(files[0].Path.LocalPath);
+                    ConfigModel.Instance.SaveProfiles();
+                    OnPropertyChanged(nameof(Profiles));
+                }
+            }
+            catch (Exception)
+            {
+                // Import failed - user will see no change
+            }
+        }
+
+        [RelayCommand]
+        private async Task Revert()
+        {
+            if (SelectedProfile == null) return;
+            // Reload display items for the current profile
+            await SharedModel.Instance.ReloadDisplayItems();
         }
     }
 }

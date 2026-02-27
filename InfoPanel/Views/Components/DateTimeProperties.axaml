@@ -1,0 +1,69 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="InfoPanel.Views.Components.DateTimeProperties">
+    <Border Background="#1A808080" CornerRadius="6" Padding="12">
+        <StackPanel Spacing="8">
+            <TextBlock Text="Date/Time Format" FontWeight="SemiBold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Format:" VerticalAlignment="Center" Width="80" />
+                <TextBox x:Name="FormatTextBox" Width="200" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Preview:" VerticalAlignment="Center" Width="80" />
+                <TextBlock x:Name="PreviewText" VerticalAlignment="Center" FontWeight="SemiBold" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Template:" VerticalAlignment="Center" Width="80" />
+                <ComboBox x:Name="TemplateCombo" Width="200"
+                          SelectionChanged="TemplateCombo_SelectionChanged">
+                    <ComboBoxItem Content="Custom" />
+                    <ComboBoxItem Content="hh:mm:ss tt" />
+                    <ComboBoxItem Content="HH:mm:ss" />
+                    <ComboBoxItem Content="hh:mm tt" />
+                    <ComboBoxItem Content="HH:mm" />
+                    <ComboBoxItem Content="dd/MM/yyyy" />
+                    <ComboBoxItem Content="MM/dd/yyyy" />
+                    <ComboBoxItem Content="yyyy-MM-dd" />
+                    <ComboBoxItem Content="dddd, MMMM dd" />
+                    <ComboBoxItem Content="ddd, MMM dd yyyy" />
+                    <ComboBoxItem Content="MMMM dd, yyyy" />
+                    <ComboBoxItem Content="dd MMM yyyy HH:mm" />
+                </ComboBox>
+            </StackPanel>
+
+            <!-- Date tokens -->
+            <Expander Header="Date Tokens" IsExpanded="False" x:Name="DateTokensExpander">
+                <WrapPanel Orientation="Horizontal">
+                    <Button Content="d" Click="InsertToken_Click" Tag="d" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="dd" Click="InsertToken_Click" Tag="dd" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="ddd" Click="InsertToken_Click" Tag="ddd" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="dddd" Click="InsertToken_Click" Tag="dddd" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="M" Click="InsertToken_Click" Tag="M" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="MM" Click="InsertToken_Click" Tag="MM" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="MMM" Click="InsertToken_Click" Tag="MMM" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="MMMM" Click="InsertToken_Click" Tag="MMMM" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="yy" Click="InsertToken_Click" Tag="yy" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="yyyy" Click="InsertToken_Click" Tag="yyyy" Margin="2" Padding="6,2" FontSize="11" />
+                </WrapPanel>
+            </Expander>
+
+            <!-- Time tokens -->
+            <Expander Header="Time Tokens" IsExpanded="False" x:Name="TimeTokensExpander">
+                <WrapPanel Orientation="Horizontal">
+                    <Button Content="h" Click="InsertToken_Click" Tag="h" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="hh" Click="InsertToken_Click" Tag="hh" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="H" Click="InsertToken_Click" Tag="H" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="HH" Click="InsertToken_Click" Tag="HH" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="m" Click="InsertToken_Click" Tag="m" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="mm" Click="InsertToken_Click" Tag="mm" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="s" Click="InsertToken_Click" Tag="s" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="ss" Click="InsertToken_Click" Tag="ss" Margin="2" Padding="6,2" FontSize="11" />
+                    <Button Content="tt" Click="InsertToken_Click" Tag="tt" Margin="2" Padding="6,2" FontSize="11" />
+                </WrapPanel>
+            </Expander>
+        </StackPanel>
+    </Border>
+</UserControl>

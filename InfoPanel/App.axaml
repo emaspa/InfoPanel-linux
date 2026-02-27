@@ -1,10 +1,20 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="using:InfoPanel.Views.Converters"
              x:Class="InfoPanel.App"
              RequestedThemeVariant="Dark">
     <Application.Styles>
         <FluentTheme />
+        <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml" />
     </Application.Styles>
+
+    <Application.Resources>
+        <conv:InverseBooleanConverter x:Key="InverseBooleanConverter" />
+        <conv:NullToBooleanConverter x:Key="NullToBooleanConverter" />
+        <conv:EnumEqualsConverter x:Key="EnumEqualsConverter" />
+        <conv:ColorStringToColorConverter x:Key="ColorStringToColorConverter" />
+        <conv:FontFamilyConverter x:Key="FontFamilyConverter" />
+    </Application.Resources>
 
     <TrayIcon.Icons>
         <TrayIcons>

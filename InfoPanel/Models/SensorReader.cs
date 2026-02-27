@@ -1,6 +1,7 @@
-﻿using InfoPanel.Extensions;
+using InfoPanel.Extensions;
 using InfoPanel.Monitors;
 using InfoPanel.Plugins;
+using InfoPanel.Services;
 using LibreHardwareMonitor.Hardware;
 using System;
 using System.Text;
@@ -43,6 +44,15 @@ namespace InfoPanel.Models
                 {
                     return new SensorReading(table.Value, table.DefaultFormat, table.ToString());
                 }
+            }
+            return null;
+        }
+
+        public static SensorReading? ReadHwmonSensor(string sensorId)
+        {
+            if (HwmonMonitor.SENSORHASH.TryGetValue(sensorId, out SensorReading reading))
+            {
+                return reading;
             }
             return null;
         }

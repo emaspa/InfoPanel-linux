@@ -2,84 +2,192 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:InfoPanel.ViewModels"
              xmlns:m="using:InfoPanel.Models"
+             xmlns:comp="using:InfoPanel.Views.Components"
+             xmlns:vmcomp="using:InfoPanel.ViewModels.Components"
              x:Class="InfoPanel.Views.Pages.DesignPage"
              x:DataType="vm:DesignPageViewModel">
-    <Grid ColumnDefinitions="300,*" Margin="8">
-        <!-- Left: Items List -->
+
+    <Grid ColumnDefinitions="280,*,320" Margin="8">
+
+        <!-- LEFT: Sensor Browser -->
         <DockPanel>
-            <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="8,8,8,4">
-                <TextBlock Text="Display Items" FontSize="18" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding SelectedProfile.Name, StringFormat='Profile: {0}', FallbackValue='No profile selected'}"
-                           FontSize="12" Opacity="0.6" />
-            </StackPanel>
+            <TextBlock DockPanel.Dock="Top" Text="Sensors" FontSize="16" FontWeight="SemiBold"
+                       Margin="8,4,8,4" />
+            <Button DockPanel.Dock="Top" Content="Refresh Sensors" Command="{Binding RefreshSensorsCommand}"
+                    FontSize="11" Padding="8,3" Margin="8,0,8,4" HorizontalAlignment="Left" />
+
+            <TabControl x:Name="SensorTabs" Margin="4,0">
+                <!-- Libre tab -->
+                <TabItem Header="Libre">
+                    <DockPanel>
+                        <comp:SensorActions DockPanel.Dock="Bottom"
+                                            SelectedSensor="{Binding LibreSensors.SelectedItem}"
+                                            SensorSourceType="Libre" />
+                        <TreeView ItemsSource="{Binding LibreSensors.SensorTree}"
+                                  SelectedItem="{Binding LibreSensors.SelectedItem}">
+                            <TreeView.ItemTemplate>
+                                <TreeDataTemplate x:DataType="vmcomp:TreeItem"
+                                                  ItemsSource="{Binding Children}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding Name}" />
+                                        <TextBlock Text="{Binding Value}" Opacity="0.5" FontSize="11"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </TreeDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </DockPanel>
+                </TabItem>
+
+                <!-- Plugin tab -->
+                <TabItem Header="Plugins">
+                    <DockPanel>
+                        <comp:SensorActions DockPanel.Dock="Bottom"
+                                            SelectedSensor="{Binding PluginSensors.SelectedItem}"
+                                            SensorSourceType="Plugin" />
+                        <TreeView ItemsSource="{Binding PluginSensors.SensorTree}"
+                                  SelectedItem="{Binding PluginSensors.SelectedItem}">
+                            <TreeView.ItemTemplate>
+                                <TreeDataTemplate x:DataType="vmcomp:TreeItem"
+                                                  ItemsSource="{Binding Children}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding Name}" />
+                                        <TextBlock Text="{Binding Value}" Opacity="0.5" FontSize="11"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </TreeDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </DockPanel>
+                </TabItem>
+
+                <!-- hwmon tab (Linux native) -->
+                <TabItem Header="hwmon">
+                    <DockPanel>
+                        <comp:SensorActions DockPanel.Dock="Bottom"
+                                            SelectedSensor="{Binding HwmonSensors.SelectedItem}"
+                                            SensorSourceType="Hwmon" />
+                        <TreeView ItemsSource="{Binding HwmonSensors.SensorTree}"
+                                  SelectedItem="{Binding HwmonSensors.SelectedItem}">
+                            <TreeView.ItemTemplate>
+                                <TreeDataTemplate x:DataType="vmcomp:TreeItem"
+                                                  ItemsSource="{Binding Children}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding Name}" />
+                                        <TextBlock Text="{Binding Value}" Opacity="0.5" FontSize="11"
+                                                   VerticalAlignment="Center" />
+                                    </StackPanel>
+                                </TreeDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </DockPanel>
+                </TabItem>
+            </TabControl>
+        </DockPanel>
+
+        <!-- MIDDLE: Profile + Items List -->
+        <DockPanel Grid.Column="1" Margin="8,0">
+
+            <!-- Profile selector bar -->
+            <Border DockPanel.Dock="Top" Background="#1A808080" CornerRadius="6" Padding="8" Margin="0,0,0,4">
+                <StackPanel Spacing="4">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Profile:" VerticalAlignment="Center" />
+                        <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}"
+                                  Width="200" x:Name="ProfileCombo">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="m:Profile">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <ToggleSwitch IsChecked="{Binding SelectedProfile.Active}" Content="Active"
+                                      FontSize="12" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding SelectedProfile, StringFormat='Size: {0}'}"
+                               FontSize="11" Opacity="0.5" x:Name="ProfileSizeText" />
+                </StackPanel>
+            </Border>
 
             <!-- Toolbar -->
-            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="4" Margin="8,4">
-                <Button Content="+ Text" Command="{Binding AddTextItemCommand}" FontSize="11" Padding="6,2" />
-                <Button Content="+ Clock" Command="{Binding AddClockItemCommand}" FontSize="11" Padding="6,2" />
-                <Button Content="+ Calendar" Command="{Binding AddCalendarItemCommand}" FontSize="11" Padding="6,2" />
-                <Button Content="Del" Command="{Binding DeleteItemCommand}" FontSize="11" Padding="6,2" />
-            </StackPanel>
-            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="4" Margin="8,2,8,8">
-                <Button Content="Up" Command="{Binding MoveItemUpCommand}" FontSize="11" Padding="6,2" />
-                <Button Content="Down" Command="{Binding MoveItemDownCommand}" FontSize="11" Padding="6,2" />
-                <Button Content="Duplicate" Command="{Binding DuplicateItemCommand}" FontSize="11" Padding="6,2" />
-                <Button Content="Save" Command="{Binding SaveDisplayItemsCommand}" FontSize="11" Padding="6,2" />
-            </StackPanel>
+            <Border DockPanel.Dock="Top" Margin="0,0,0,4">
+                <StackPanel Spacing="2">
+                    <WrapPanel Orientation="Horizontal">
+                        <Button Content="+ Text" Command="{Binding AddTextItemCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="+ Clock" Command="{Binding AddClockItemCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="+ Calendar" Command="{Binding AddCalendarItemCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="+ Image" Command="{Binding AddImageItemCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="+ Shape" Command="{Binding AddShapeItemCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="+ Group" Command="{Binding AddGroupItemCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                    </WrapPanel>
+                    <WrapPanel Orientation="Horizontal">
+                        <Button Content="Del" Command="{Binding DeleteItemCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="Up" Command="{Binding MoveItemUpCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="Down" Command="{Binding MoveItemDownCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="Top" Command="{Binding PushToTopCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="Bottom" Command="{Binding PushToBottomCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="Dup" Command="{Binding DuplicateItemCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="Save" Command="{Binding SaveDisplayItemsCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                        <Button Content="Reload" Command="{Binding ReloadItemsCommand}" FontSize="11" Padding="6,2" Margin="1" />
+                    </WrapPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Search box -->
+            <TextBox DockPanel.Dock="Top" Watermark="Search items..."
+                     Text="{Binding SearchFilter}" Margin="0,0,0,4" />
 
             <!-- Items list -->
-            <ListBox ItemsSource="{Binding DisplayItems}" SelectedItem="{Binding SelectedItem}" Margin="8,0">
+            <ListBox ItemsSource="{Binding FilteredDisplayItems}" SelectedItem="{Binding SelectedItem}">
                 <ListBox.ItemTemplate>
                     <DataTemplate x:DataType="m:DisplayItem">
-                        <Grid ColumnDefinitions="Auto,*,Auto">
-                            <TextBlock Text="{Binding Kind}" FontSize="10" Opacity="0.5"
-                                       Width="45" VerticalAlignment="Center" />
+                        <Grid ColumnDefinitions="50,*,Auto,Auto,Auto">
+                            <TextBlock Text="{Binding Kind}" FontSize="10" Opacity="0.4"
+                                       VerticalAlignment="Center" />
                             <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
                                        TextTrimming="CharacterEllipsis" />
-                            <TextBlock Grid.Column="2" Text="H" Opacity="0.4" FontSize="10"
-                                       VerticalAlignment="Center" IsVisible="{Binding Hidden}" />
+                            <TextBlock Grid.Column="2"
+                                       Text="{Binding X, StringFormat='({0},'}" FontSize="10"
+                                       Opacity="0.4" VerticalAlignment="Center" Margin="4,0,0,0" />
+                            <TextBlock Grid.Column="3"
+                                       Text="{Binding Y, StringFormat='{}{0})'}" FontSize="10"
+                                       Opacity="0.4" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="4" Margin="4,0,0,0">
+                                <TextBlock Text="H" Opacity="0.3" FontSize="10"
+                                           VerticalAlignment="Center" IsVisible="{Binding Hidden}" />
+                                <TextBlock Text="L" Opacity="0.3" FontSize="10"
+                                           VerticalAlignment="Center" IsVisible="{Binding IsLocked}" />
+                            </StackPanel>
                         </Grid>
                     </DataTemplate>
                 </ListBox.ItemTemplate>
             </ListBox>
         </DockPanel>
 
-        <!-- Right: Property Editor -->
-        <ScrollViewer Grid.Column="1" Margin="8,0,0,0">
-            <StackPanel Spacing="12"
-                        IsVisible="{Binding SelectedItem, Converter={x:Static ObjectConverters.IsNotNull}}">
-                <TextBlock Text="Properties" FontSize="18" FontWeight="SemiBold" Margin="0,8,0,0" />
-
-                <!-- Common properties -->
-                <Border Background="#1A808080" CornerRadius="6" Padding="12">
-                    <StackPanel Spacing="8">
-                        <TextBlock Text="Common" FontWeight="SemiBold" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Name:" VerticalAlignment="Center" Width="60" />
-                            <TextBox Text="{Binding SelectedItem.Name}" Width="200" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="X:" VerticalAlignment="Center" Width="60" />
-                            <NumericUpDown Value="{Binding SelectedItem.X}" Width="100" />
-                            <TextBlock Text="Y:" VerticalAlignment="Center" Margin="8,0,0,0" />
-                            <NumericUpDown Value="{Binding SelectedItem.Y}" Width="100" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <TextBlock Text="Rotation:" VerticalAlignment="Center" Width="60" />
-                            <NumericUpDown Value="{Binding SelectedItem.Rotation}" Minimum="0" Maximum="359" Width="100" />
-                        </StackPanel>
-                        <CheckBox Content="Hidden" IsChecked="{Binding SelectedItem.Hidden}" />
-                        <CheckBox Content="Locked" IsChecked="{Binding SelectedItem.IsLocked}" />
-                    </StackPanel>
-                </Border>
-
-                <Border Background="#0D808080" CornerRadius="6" Padding="12">
+        <!-- RIGHT: Property Editor -->
+        <ScrollViewer Grid.Column="2">
+            <StackPanel Spacing="8" Margin="0,4,4,4">
+                <!-- Quick Guide when nothing selected -->
+                <Border Background="#0D808080" CornerRadius="6" Padding="12"
+                        IsVisible="{Binding SelectedItem, Converter={x:Static ObjectConverters.IsNull}}">
                     <StackPanel Spacing="4">
-                        <TextBlock Text="{Binding SelectedItem.Kind, StringFormat='Type: {0}'}" FontSize="12" Opacity="0.6" />
-                        <TextBlock Text="Use the overlay window to see live preview. Toggle profile Active to show/hide."
-                                   FontSize="11" Opacity="0.4" TextWrapping="Wrap" />
+                        <TextBlock Text="Quick Guide" FontWeight="SemiBold" FontSize="14" />
+                        <TextBlock Text="Select a sensor from the left panel and use the action buttons to add items." TextWrapping="Wrap" FontSize="12" Opacity="0.6" />
+                        <TextBlock Text="Or use the toolbar buttons to add non-sensor items (Text, Clock, Calendar, Image, Shape, Group)." TextWrapping="Wrap" FontSize="12" Opacity="0.6" />
+                        <TextBlock Text="Select an item in the list to edit its properties here." TextWrapping="Wrap" FontSize="12" Opacity="0.6" />
                     </StackPanel>
                 </Border>
+
+                <!-- Property editors (visible when item selected) -->
+                <StackPanel Spacing="8"
+                            IsVisible="{Binding SelectedItem, Converter={x:Static ObjectConverters.IsNotNull}}">
+
+                    <!-- Common Properties for all items -->
+                    <comp:CommonProperties DataContext="{Binding SelectedItem}" />
+
+                    <!-- Type-specific editors dynamically loaded in code-behind -->
+                    <ContentControl x:Name="TypeSpecificEditor" />
+                </StackPanel>
             </StackPanel>
         </ScrollViewer>
     </Grid>

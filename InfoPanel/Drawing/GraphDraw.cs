@@ -103,14 +103,20 @@ namespace InfoPanel.Drawing
                     GraphDataCache2.TryGetValue(key, out Queue<double>? queue);
                     if (queue != null)
                     {
-                        LibreMonitor.SENSORHASH.TryGetValue(key, out ISensor? value);
-                        lock (queue)
+                        if (LibreMonitor.SENSORHASH.TryGetValue(key, out ISensor? value))
                         {
-                            queue.Enqueue(value?.Value ?? 0);
-
-                            if (queue.Count > 4096)
+                            lock (queue)
                             {
-                                queue.Dequeue();
+                                queue.Enqueue(value?.Value ?? 0);
+                                if (queue.Count > 4096) queue.Dequeue();
+                            }
+                        }
+                        else if (InfoPanel.Services.HwmonMonitor.SENSORHASH.TryGetValue(key, out Models.SensorReading hwmonReading))
+                        {
+                            lock (queue)
+                            {
+                                queue.Enqueue(hwmonReading.ValueNow);
+                                if (queue.Count > 4096) queue.Dequeue();
                             }
                         }
                     }
@@ -147,7 +153,7 @@ namespace InfoPanel.Drawing
 
                 Queue<double> queue;
 
-                if (chartDisplayItem.SensorType == Enums.SensorType.Libre)
+                if (chartDisplayItem.SensorType == Enums.SensorType.Libre || chartDisplayItem.SensorType == Enums.SensorType.Hwmon)
                 {
                     queue = GetGraphDataQueue(chartDisplayItem.LibreSensorId);
                 }

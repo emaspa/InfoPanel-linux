@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Components.ImageProperties"
+             x:DataType="m:ImageDisplayItem">
+    <Border Background="#1A808080" CornerRadius="6" Padding="12">
+        <StackPanel Spacing="8">
+            <TextBlock Text="Image Properties" FontWeight="SemiBold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Type:" VerticalAlignment="Center" Width="80" />
+                <ComboBox SelectedIndex="{Binding Type}" Width="120">
+                    <ComboBoxItem Content="File" />
+                    <ComboBoxItem Content="URL" />
+                    <ComboBoxItem Content="RTSP" />
+                </ComboBox>
+            </StackPanel>
+
+            <!-- File path -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Path:" VerticalAlignment="Center" Width="80" />
+                <TextBox Text="{Binding FilePath}" Width="200" />
+                <Button Content="Browse" Click="BrowseFile_Click" />
+            </StackPanel>
+
+            <!-- URL -->
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="URL:" VerticalAlignment="Center" Width="80" />
+                <TextBox Text="{Binding HttpUrl}" Width="300" />
+            </StackPanel>
+
+            <Separator />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Width:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Width}" Minimum="0" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Height:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Height}" Minimum="0" Width="100" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Scale:" VerticalAlignment="Center" Width="80" />
+                <Slider Value="{Binding Scale}" Minimum="1" Maximum="500" Width="200" />
+                <TextBlock Text="{Binding Scale, StringFormat='{}{0}%'}" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Volume:" VerticalAlignment="Center" Width="80" />
+                <Slider Value="{Binding Volume}" Minimum="0" Maximum="100" Width="200" />
+                <TextBlock Text="{Binding Volume, StringFormat='{}{0}%'}" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <CheckBox Content="Fill Layer" IsChecked="{Binding Layer}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding Layer}">
+                <TextBlock Text="Layer Color:" VerticalAlignment="Center" Width="80" />
+                <ColorPicker Color="{Binding LayerColor, Converter={StaticResource ColorStringToColorConverter}}"
+                             IsAlphaVisible="True" />
+            </StackPanel>
+
+            <CheckBox Content="Enable Caching" IsChecked="{Binding Cache}" />
+            <CheckBox Content="Show Panel" IsChecked="{Binding ShowPanel}" />
+        </StackPanel>
+    </Border>
+</UserControl>

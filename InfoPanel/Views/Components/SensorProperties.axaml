@@ -1,0 +1,79 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:m="using:InfoPanel.Models"
+             x:Class="InfoPanel.Views.Components.SensorProperties"
+             x:DataType="m:SensorDisplayItem">
+    <Border Background="#1A808080" CornerRadius="6" Padding="12">
+        <StackPanel Spacing="8">
+            <TextBlock Text="Sensor Properties" FontWeight="SemiBold" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Sensor:" VerticalAlignment="Center" Width="80" />
+                <TextBlock Text="{Binding SensorName}" VerticalAlignment="Center" Opacity="0.7" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Value Type:" VerticalAlignment="Center" Width="80" />
+                <ComboBox SelectedIndex="{Binding ValueType}" Width="120">
+                    <ComboBoxItem Content="Now" />
+                    <ComboBoxItem Content="Min" />
+                    <ComboBoxItem Content="Max" />
+                    <ComboBoxItem Content="Average" />
+                </ComboBox>
+            </StackPanel>
+
+            <WrapPanel Orientation="Horizontal">
+                <CheckBox Content="Show Name" IsChecked="{Binding ShowName}" Margin="0,0,12,0" />
+                <CheckBox Content="Show Unit" IsChecked="{Binding ShowUnit}" />
+            </WrapPanel>
+
+            <Separator />
+            <TextBlock Text="Value Modifiers" FontWeight="SemiBold" FontSize="12" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Multiply:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding MultiplicationModifier}" FormatString="0.00"
+                               Increment="0.1" Width="120" />
+                <CheckBox Content="Divide" IsChecked="{Binding DivisionToggle}" VerticalAlignment="Center" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Add:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding AdditionModifier}" FormatString="0.00"
+                               Increment="1" Width="120" />
+            </StackPanel>
+
+            <Separator />
+            <TextBlock Text="Precision" FontWeight="SemiBold" FontSize="12" />
+
+            <CheckBox Content="Override Precision" IsChecked="{Binding OverridePrecision}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding OverridePrecision}">
+                <TextBlock Text="Digits:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Precision}" Minimum="0" Maximum="3" Width="80" />
+            </StackPanel>
+
+            <CheckBox Content="Override Unit" IsChecked="{Binding OverrideUnit}" />
+            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding OverrideUnit}">
+                <TextBlock Text="Unit:" VerticalAlignment="Center" Width="80" />
+                <TextBox Text="{Binding Unit}" Width="80" />
+            </StackPanel>
+
+            <Separator />
+            <TextBlock Text="Thresholds" FontWeight="SemiBold" FontSize="12" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Level 1:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Threshold1}" FormatString="0.0" Increment="1" Width="100" />
+                <ColorPicker Color="{Binding Threshold1Color, Converter={StaticResource ColorStringToColorConverter}}"
+                             IsAlphaVisible="False" />
+            </StackPanel>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Level 2:" VerticalAlignment="Center" Width="80" />
+                <NumericUpDown Value="{Binding Threshold2}" FormatString="0.0" Increment="1" Width="100" />
+                <ColorPicker Color="{Binding Threshold2Color, Converter={StaticResource ColorStringToColorConverter}}"
+                             IsAlphaVisible="False" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</UserControl>

@@ -1,5 +1,7 @@
 using Avalonia.Controls;
 using InfoPanel.ViewModels;
+using SkiaSharp;
+using System.Linq;
 
 namespace InfoPanel.Views.Pages
 {
@@ -9,6 +11,7 @@ namespace InfoPanel.Views.Pages
         {
             InitializeComponent();
             DataContext = new ProfilesPageViewModel();
+            FontComboBox.ItemsSource = SKFontManager.Default.GetFontFamilies().OrderBy(f => f).ToList();
         }
     }
 }

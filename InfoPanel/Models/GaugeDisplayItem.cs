@@ -217,6 +217,7 @@ namespace InfoPanel.Models
                 SensorType.HwInfo => SensorReader.ReadHwInfoSensor(Id, Instance, EntryId),
                 SensorType.Libre => SensorReader.ReadLibreSensor(LibreSensorId),
                 SensorType.Plugin => SensorReader.ReadPluginSensor(PluginSensorId),
+                SensorType.Hwmon => SensorReader.ReadHwmonSensor(LibreSensorId),
                 _ => null,
             };
         }
