@@ -55,6 +55,12 @@ public class LinuxSystemSensors
         public ulong f_fsid;
         public ulong f_flag;
         public ulong f_namemax;
+        private int __f_spare0;
+        private int __f_spare1;
+        private int __f_spare2;
+        private int __f_spare3;
+        private int __f_spare4;
+        private int __f_spare5;
     }
 
     [DllImport("libc", EntryPoint = "statvfs", SetLastError = true)]
@@ -472,11 +478,15 @@ public class LinuxSystemSensors
     {
         if (!File.Exists("/proc/mounts")) return;
 
-        var lines = File.ReadAllLines("/proc/mounts");
+        string[] lines;
+        try { lines = File.ReadAllLines("/proc/mounts"); }
+        catch { return; }
+
         var seen = new HashSet<string>(); // avoid duplicate mount points
 
         foreach (var line in lines)
         {
+            if (string.IsNullOrWhiteSpace(line)) continue;
             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
             if (parts.Length < 3) continue;
 
