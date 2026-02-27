@@ -17,8 +17,8 @@
                     FontSize="11" Padding="8,3" Margin="8,0,8,4" HorizontalAlignment="Left" />
 
             <TabControl x:Name="SensorTabs" Margin="4,0">
-                <!-- Libre tab -->
-                <TabItem Header="Libre">
+                <!-- Libre tab (Windows only) -->
+                <TabItem x:Name="LibreTab" Header="Libre">
                     <DockPanel>
                         <comp:SensorActions DockPanel.Dock="Bottom"
                                             SelectedSensor="{Binding LibreSensors.SelectedItem}"

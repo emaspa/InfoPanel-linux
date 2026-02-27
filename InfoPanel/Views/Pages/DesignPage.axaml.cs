@@ -24,13 +24,19 @@ namespace InfoPanel.Views.Pages
                 }
             };
 
-            // Auto-refresh sensors and default to hwmon tab on Linux
+            // Auto-refresh sensors and configure tabs per platform
             Loaded += (_, _) =>
             {
                 _vm.RefreshSensorsCommand.Execute(null);
 
                 if (OperatingSystem.IsLinux())
                 {
+                    // Hide Libre tab — LibreHardwareMonitor is Windows-only
+                    var libreTab = this.FindControl<TabItem>("LibreTab");
+                    if (libreTab != null)
+                        libreTab.IsVisible = false;
+
+                    // Default to hwmon tab
                     var tabControl = this.FindControl<TabControl>("SensorTabs");
                     if (tabControl != null)
                         tabControl.SelectedIndex = 2; // hwmon tab
