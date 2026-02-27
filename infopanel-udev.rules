@@ -1,6 +1,12 @@
-# InfoPanel USB panel udev rules
+# InfoPanel udev rules and system setup
 # Install: sudo cp infopanel-udev.rules /etc/udev/rules.d/99-infopanel.rules
 # Reload: sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# Intel iGPU monitoring:
+#   Frequency sensors work out of the box via sysfs.
+#   For full monitoring (utilization, per-engine usage), perf events are needed:
+#     sudo sysctl kernel.perf_event_paranoid=-1           # temporary
+#     echo 'kernel.perf_event_paranoid=-1' | sudo tee /etc/sysctl.d/99-infopanel-perf.conf  # permanent
 
 # BeadaPanel (NXElec)
 SUBSYSTEM=="usb", ATTR{idVendor}=="4e58", ATTR{idProduct}=="1001", MODE="0666", GROUP="plugdev"

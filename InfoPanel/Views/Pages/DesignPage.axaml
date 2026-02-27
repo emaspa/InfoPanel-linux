@@ -39,8 +39,8 @@
                     </DockPanel>
                 </TabItem>
 
-                <!-- hwmon tab (Linux native) -->
-                <TabItem Header="hwmon">
+                <!-- Sensors tab (Linux native) -->
+                <TabItem Header="Sensors">
                     <DockPanel>
                         <comp:SensorActions DockPanel.Dock="Bottom"
                                             SelectedSensor="{Binding HwmonSensors.SelectedItem}"
