@@ -28,20 +28,6 @@
                 </Border>
                 <Border Background="#1A808080" CornerRadius="8" Padding="16" Margin="0,0,8,8" MinWidth="160">
                     <StackPanel Spacing="4">
-                        <TextBlock Text="Libre Monitor" FontWeight="SemiBold" Opacity="0.7" />
-                        <TextBlock FontSize="16" FontWeight="Bold">
-                            <TextBlock.Text>
-                                <Binding Path="IsLibreMonitorEnabled">
-                                    <Binding.Converter>
-                                        <x:Static Member="vm:BoolToStatusConverter.Instance" />
-                                    </Binding.Converter>
-                                </Binding>
-                            </TextBlock.Text>
-                        </TextBlock>
-                    </StackPanel>
-                </Border>
-                <Border Background="#1A808080" CornerRadius="8" Padding="16" Margin="0,0,8,8" MinWidth="160">
-                    <StackPanel Spacing="4">
                         <TextBlock Text="Web Server" FontWeight="SemiBold" Opacity="0.7" />
                         <TextBlock FontSize="16" FontWeight="Bold">
                             <TextBlock.Text>

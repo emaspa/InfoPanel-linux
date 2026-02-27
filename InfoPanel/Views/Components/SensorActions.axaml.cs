@@ -51,7 +51,7 @@ public partial class SensorActions : UserControl
         var item = new SensorDisplayItem(info.Value.name, profile)
         {
             SensorType = SensorSourceType,
-            LibreSensorId = (SensorSourceType == SensorType.Libre || SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
+            LibreSensorId = (SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
             PluginSensorId = SensorSourceType == SensorType.Plugin ? info.Value.id : ""
         };
         SharedModel.Instance.AddDisplayItem(item);
@@ -67,7 +67,7 @@ public partial class SensorActions : UserControl
         var item = new BarDisplayItem(info.Value.name, profile)
         {
             SensorType = SensorSourceType,
-            LibreSensorId = (SensorSourceType == SensorType.Libre || SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
+            LibreSensorId = (SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
             PluginSensorId = SensorSourceType == SensorType.Plugin ? info.Value.id : ""
         };
         SharedModel.Instance.AddDisplayItem(item);
@@ -83,7 +83,7 @@ public partial class SensorActions : UserControl
         var item = new DonutDisplayItem(info.Value.name, profile)
         {
             SensorType = SensorSourceType,
-            LibreSensorId = (SensorSourceType == SensorType.Libre || SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
+            LibreSensorId = (SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
             PluginSensorId = SensorSourceType == SensorType.Plugin ? info.Value.id : ""
         };
         SharedModel.Instance.AddDisplayItem(item);
@@ -99,7 +99,7 @@ public partial class SensorActions : UserControl
         var item = new GraphDisplayItem(info.Value.name, profile, GraphDisplayItem.GraphType.LINE)
         {
             SensorType = SensorSourceType,
-            LibreSensorId = (SensorSourceType == SensorType.Libre || SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
+            LibreSensorId = (SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
             PluginSensorId = SensorSourceType == SensorType.Plugin ? info.Value.id : ""
         };
         SharedModel.Instance.AddDisplayItem(item);
@@ -115,7 +115,7 @@ public partial class SensorActions : UserControl
         var item = new GaugeDisplayItem(info.Value.name, profile)
         {
             SensorType = SensorSourceType,
-            LibreSensorId = (SensorSourceType == SensorType.Libre || SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
+            LibreSensorId = (SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
             PluginSensorId = SensorSourceType == SensorType.Plugin ? info.Value.id : ""
         };
         SharedModel.Instance.AddDisplayItem(item);
@@ -132,7 +132,7 @@ public partial class SensorActions : UserControl
         {
             SensorType = SensorSourceType,
             SensorName = info.Value.name,
-            LibreSensorId = (SensorSourceType == SensorType.Libre || SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
+            LibreSensorId = (SensorSourceType == SensorType.Hwmon) ? info.Value.id : "",
             PluginSensorId = SensorSourceType == SensorType.Plugin ? info.Value.id : ""
         };
         item.SetProfile(profile);
@@ -153,7 +153,7 @@ public partial class SensorActions : UserControl
         {
             sensorItem.SensorName = info.Value.name;
             sensorItem.SensorType = SensorSourceType;
-            if (SensorSourceType == SensorType.Libre || SensorSourceType == SensorType.Hwmon)
+            if (SensorSourceType == SensorType.Hwmon)
                 sensorItem.LibreSensorId = info.Value.id;
             else if (SensorSourceType == SensorType.Plugin)
                 sensorItem.PluginSensorId = info.Value.id;
@@ -162,7 +162,7 @@ public partial class SensorActions : UserControl
         {
             chartItem.SensorName = info.Value.name;
             chartItem.SensorType = SensorSourceType;
-            if (SensorSourceType == SensorType.Libre || SensorSourceType == SensorType.Hwmon)
+            if (SensorSourceType == SensorType.Hwmon)
                 chartItem.LibreSensorId = info.Value.id;
             else if (SensorSourceType == SensorType.Plugin)
                 chartItem.PluginSensorId = info.Value.id;
@@ -171,7 +171,7 @@ public partial class SensorActions : UserControl
         {
             gaugeItem.SensorName = info.Value.name;
             gaugeItem.SensorType = SensorSourceType;
-            if (SensorSourceType == SensorType.Libre || SensorSourceType == SensorType.Hwmon)
+            if (SensorSourceType == SensorType.Hwmon)
                 gaugeItem.LibreSensorId = info.Value.id;
             else if (SensorSourceType == SensorType.Plugin)
                 gaugeItem.PluginSensorId = info.Value.id;

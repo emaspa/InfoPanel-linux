@@ -18,7 +18,7 @@ namespace InfoPanel.Models
             }
         }
 
-        private SensorType _sensorIdType = SensorType.HwInfo;
+        private SensorType _sensorIdType = SensorType.Hwmon;
         public SensorType SensorType
         {
             get { return _sensorIdType; }
@@ -264,29 +264,10 @@ namespace InfoPanel.Models
             SensorName = name;
         }
 
-        public ChartDisplayItem(string name, Profile profile, string libreSensorId) : base(name, profile)
-        {
-            SensorName = name;
-            SensorType = SensorType.Libre;
-            LibreSensorId = libreSensorId;
-        }
-
-        public ChartDisplayItem(string name, Profile profile, UInt32 id, UInt32 instance, UInt32 entryId) : base(name, profile)
-        {
-            SensorName = name;
-            SensorType = SensorType.HwInfo;
-            Id = id;
-            Instance = instance;
-            EntryId = entryId;
-            
-        }
-
         public SensorReading? GetValue()
         {
             return SensorType switch
             {
-                SensorType.HwInfo => SensorReader.ReadHwInfoSensor(Id, Instance, EntryId),
-                SensorType.Libre => SensorReader.ReadLibreSensor(LibreSensorId),
                 SensorType.Plugin => SensorReader.ReadPluginSensor(PluginSensorId),
                 SensorType.Hwmon => SensorReader.ReadHwmonSensor(LibreSensorId),
                 _ => null,
@@ -410,16 +391,6 @@ namespace InfoPanel.Models
             Type = type;
         }
 
-        public GraphDisplayItem(string name, Profile profile, GraphType type, string libreSensorId) : base(name, profile, libreSensorId)
-        {
-            Type = type;
-        }
-
-        public GraphDisplayItem(string name, Profile profile, GraphType type, UInt32 id, UInt32 instance, UInt32 entryId) : base(name, profile, id, instance, entryId)
-        {
-            Type = type;
-        }
-
         public override object Clone()
         {
             var clone = (GraphDisplayItem)MemberwiseClone(); 
@@ -476,12 +447,6 @@ namespace InfoPanel.Models
         }
 
         public BarDisplayItem(string name, Profile profile) : base(name, profile)
-        { }
-
-        public BarDisplayItem(string name, Profile profile, string libreSensorId) : base(name, profile, libreSensorId)
-        { }
-
-        public BarDisplayItem(string name, Profile profile, UInt32 id, UInt32 instance, UInt32 entryId) : base(name, profile, id, instance, entryId)
         { }
 
         public override object Clone()
@@ -557,20 +522,6 @@ namespace InfoPanel.Models
             Frame = false;
             BackgroundColor = "#FFDCDCDC";
             Width = 100; Height = 100;
-        }
-
-        public DonutDisplayItem(string name, Profile profile, string libreSensorId) : base(name, profile, libreSensorId)
-        {
-            Frame = false;
-            BackgroundColor = "#FFDCDCDC";
-            Width = 100; Height = 100;
-        }
-
-        public DonutDisplayItem(string name, Profile profile, UInt32 id, UInt32 instance, UInt32 entryId) : base(name, profile, id, instance, entryId)
-        {
-            Frame = false;
-            BackgroundColor = "#FFDCDCDC";
-            Width = 100; Height = 100; 
         }
 
         public override object Clone()

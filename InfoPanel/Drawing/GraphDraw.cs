@@ -1,7 +1,6 @@
 ﻿using InfoPanel.Models;
 using InfoPanel.Monitors;
 using InfoPanel.Plugins;
-using LibreHardwareMonitor.Hardware;
 using Microsoft.Extensions.Caching.Memory;
 using SkiaSharp;
 using System;
@@ -18,7 +17,6 @@ namespace InfoPanel.Drawing
         {
             ExpirationScanFrequency = TimeSpan.FromSeconds(5)
         });
-        private static readonly ConcurrentDictionary<(UInt32, UInt32, UInt32), Queue<double>> GraphDataCache = [];
         private static readonly ConcurrentDictionary<string, Queue<double>> GraphDataCache2 = [];
         private static readonly ConcurrentDictionary<string, Queue<double>> GraphDataCache3 = [];
         private static readonly Stopwatch Stopwatch = new();
@@ -26,21 +24,6 @@ namespace InfoPanel.Drawing
         static GraphDraw()
         {
             Stopwatch.Start();
-        }
-
-        private static Queue<double> GetGraphDataQueue(UInt32 id, UInt32 instance, UInt32 entryId)
-        {
-            var key = (id, instance, entryId);
-
-            GraphDataCache.TryGetValue(key, out Queue<double>? result);
-
-            if (result == null)
-            {
-                result = new Queue<double>();
-                GraphDataCache.TryAdd(key, result);
-            }
-
-            return result;
         }
 
         private static Queue<double> GetGraphDataQueue(string libreSensorId)
@@ -79,39 +62,12 @@ namespace InfoPanel.Drawing
 
             if (elapsedMilliseconds > ConfigModel.Instance.Settings.TargetGraphUpdateRate)
             {
-                foreach (var key in GraphDataCache.Keys)
-                {
-                    GraphDataCache.TryGetValue(key, out Queue<double>? queue);
-                    if (queue != null)
-                    {
-                        HWHash.SENSORHASH.TryGetValue(key, out HWHash.HWINFO_HASH value);
-
-                        lock (queue)
-                        {
-                            queue.Enqueue(value.ValueNow);
-
-                            if (queue.Count > 4096)
-                            {
-                                queue.Dequeue();
-                            }
-                        }
-                    }
-                }
-
                 foreach (var key in GraphDataCache2.Keys)
                 {
                     GraphDataCache2.TryGetValue(key, out Queue<double>? queue);
                     if (queue != null)
                     {
-                        if (LibreMonitor.SENSORHASH.TryGetValue(key, out ISensor? value))
-                        {
-                            lock (queue)
-                            {
-                                queue.Enqueue(value?.Value ?? 0);
-                                if (queue.Count > 4096) queue.Dequeue();
-                            }
-                        }
-                        else if (InfoPanel.Services.HwmonMonitor.SENSORHASH.TryGetValue(key, out Models.SensorReading hwmonReading))
+                        if (InfoPanel.Services.HwmonMonitor.SENSORHASH.TryGetValue(key, out Models.SensorReading hwmonReading))
                         {
                             lock (queue)
                             {
@@ -153,7 +109,7 @@ namespace InfoPanel.Drawing
 
                 Queue<double> queue;
 
-                if (chartDisplayItem.SensorType == Enums.SensorType.Libre || chartDisplayItem.SensorType == Enums.SensorType.Hwmon)
+                if (chartDisplayItem.SensorType == Enums.SensorType.Hwmon)
                 {
                     queue = GetGraphDataQueue(chartDisplayItem.LibreSensorId);
                 }
@@ -163,7 +119,7 @@ namespace InfoPanel.Drawing
                 }
                 else
                 {
-                    queue = GetGraphDataQueue(chartDisplayItem.Id, chartDisplayItem.Instance, chartDisplayItem.EntryId);
+                    queue = GetGraphDataQueue(chartDisplayItem.LibreSensorId);
                 }
 
                 if (queue.Count == 0)

@@ -55,8 +55,7 @@ namespace InfoPanel.ViewModels
                     ] },
                     new UpdateVersionItem { Title = "Performance & Reliability", Description = [
                         "New high-performance graphics engine for smoother animations.",
-                        "Auto-start delay option and better plugin support.",
-                        "Updated LibreHardwareMonitor to resolve WinRing0 compatibility issues."
+                        "Auto-start delay option and better plugin support."
                     ] }
                 ]
             });
@@ -70,7 +69,7 @@ namespace InfoPanel.ViewModels
                         "Introduced new plugin support, enabling developers to create custom sensors.",
                         "Includes bundled InfoPanel plugins for features beyond HwInfo & Libre."
                     ] },
-                    new UpdateVersionItem { Title = "Sensor Updates", Description = [
+                    new UpdateVersionItem { Title = "Display Updates", Description = [
                         "Added width option to text items for length limitation and auto-wrapping.",
                         "Added support for static and animated WebP formats in images.",
                         "Introduced cache option for images to enhance performance."
@@ -83,10 +82,6 @@ namespace InfoPanel.ViewModels
                 Version = "v1.2.8",
                 Title = "Performance & Feature Updates",
                 Items = [
-                    new UpdateVersionItem { Title = "Libre Sensors", Description = [
-                        "Introduced a new built-in method to query PC sensors, powered by LibreHardwareMonitor.",
-                        "Fully compatible with HWiNFO sensors and can be used interchangeably."
-                    ] },
                     new UpdateVersionItem { Title = "Enhanced USB LCD Support", Description = [
                         "Added support for Turing (Turzx) 8.8\" LCD.",
                         "Improved LCD stability and performance."

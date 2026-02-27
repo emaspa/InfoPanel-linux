@@ -31,15 +31,10 @@ namespace InfoPanel.Views.Pages
 
                 if (OperatingSystem.IsLinux())
                 {
-                    // Hide Libre tab — LibreHardwareMonitor is Windows-only
-                    var libreTab = this.FindControl<TabItem>("LibreTab");
-                    if (libreTab != null)
-                        libreTab.IsVisible = false;
-
                     // Default to hwmon tab
                     var tabControl = this.FindControl<TabControl>("SensorTabs");
                     if (tabControl != null)
-                        tabControl.SelectedIndex = 2; // hwmon tab
+                        tabControl.SelectedIndex = 1; // hwmon tab
                 }
             };
         }

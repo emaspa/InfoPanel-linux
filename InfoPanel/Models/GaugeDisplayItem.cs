@@ -21,7 +21,7 @@ namespace InfoPanel.Models
             }
         }
 
-        private SensorType _sensorType = SensorType.HwInfo;
+        private SensorType _sensorType = SensorType.Hwmon;
         public SensorType SensorType
         {
             get { return _sensorType; }
@@ -194,28 +194,10 @@ namespace InfoPanel.Models
             SensorName = name;
         }
 
-        public GaugeDisplayItem(string name, Profile profile, string libreSensorId) : base(name, profile)
-        {
-            SensorName = name;
-            SensorType = SensorType.Libre;
-            LibreSensorId = libreSensorId;
-        }
-
-        public GaugeDisplayItem(string name, Profile profile, UInt32 id, UInt32 instance, UInt32 entryId) : base(name, profile)
-        {
-            SensorName = name;
-            SensorType = SensorType.HwInfo;
-            Id = id;
-            Instance = instance;
-            EntryId = entryId;
-        }
-
         public SensorReading? GetValue()
         {
             return SensorType switch
             {
-                SensorType.HwInfo => SensorReader.ReadHwInfoSensor(Id, Instance, EntryId),
-                SensorType.Libre => SensorReader.ReadLibreSensor(LibreSensorId),
                 SensorType.Plugin => SensorReader.ReadPluginSensor(PluginSensorId),
                 SensorType.Hwmon => SensorReader.ReadHwmonSensor(LibreSensorId),
                 _ => null,

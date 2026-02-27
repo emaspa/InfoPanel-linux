@@ -31,17 +31,6 @@ namespace InfoPanel
 
         public static SharedModel Instance { get { return lazy.Value; } }
 
-        private bool _hwInfoAvailable = false;
-
-        public bool HwInfoAvailable
-        {
-            get { return _hwInfoAvailable; }
-            set
-            {
-                SetProperty(ref _hwInfoAvailable, value);
-            }
-        }
-
         private int _webserverFrameRate = 0;
         public int WebserverFrameRate
         {
@@ -860,8 +849,10 @@ namespace InfoPanel
                                 }
 
                                 var libreSensorId = SensorMapping.FindMatchingIdentifier(key) ?? "unknown";
-                                GraphDisplayItem graphDisplayItem = new(LBL, profile, graphType.Value, libreSensorId)
+                                GraphDisplayItem graphDisplayItem = new(LBL, profile, graphType.Value)
                                 {
+                                    SensorType = Enums.SensorType.Hwmon,
+                                    LibreSensorId = libreSensorId,
                                     SensorName = key,
                                     Width = WID,
                                     Height = HEI,
@@ -897,8 +888,10 @@ namespace InfoPanel
                         {
                             //var libreSensorId = SensorMapping.SensorPanel.GetStringValue(key, "unknown");
                             var libreSensorId = SensorMapping.FindMatchingIdentifier(key) ?? "unknown";
-                            GaugeDisplayItem gaugeDisplayItem = new(LBL, profile, libreSensorId)
+                            GaugeDisplayItem gaugeDisplayItem = new(LBL, profile)
                             {
+                                SensorType = Enums.SensorType.Hwmon,
+                                LibreSensorId = libreSensorId,
                                 SensorName = key,
                                 MinValue = MINVAL,
                                 MaxValue = MAXVAL,
@@ -1069,8 +1062,10 @@ namespace InfoPanel
                                             }
                                         }
 
-                                        SensorDisplayItem sensorDisplayItem = new(LBL, profile, libreSensorId)
+                                        SensorDisplayItem sensorDisplayItem = new(LBL, profile)
                                         {
+                                            SensorType = Enums.SensorType.Hwmon,
+                                            LibreSensorId = libreSensorId,
                                             SensorName = key,
                                             Font = FNTNAM,
                                             FontSize = TXTSIZ,
@@ -1140,8 +1135,10 @@ namespace InfoPanel
                                             }
                                         }
 
-                                        BarDisplayItem barDisplayItem = new(LBL, profile, libreSensorId)
+                                        BarDisplayItem barDisplayItem = new(LBL, profile)
                                         {
+                                            SensorType = Enums.SensorType.Hwmon,
+                                            LibreSensorId = libreSensorId,
                                             SensorName = key,
                                             Width = BARWID,
                                             Height = BARHEI,
@@ -1278,54 +1275,8 @@ namespace InfoPanel
                         var profilePath = Path.Combine(profileFolder, profile.Guid + ".xml");
                         displayItemsEntry.ExtractToFile(profilePath);
 
-                        //smart import
-                        var displayItems = LoadDisplayItemsFromFile(profile);
-                        foreach (DisplayItem displayItem in displayItems)
-                        {
-                            if (displayItem is SensorDisplayItem sensorDisplayItem && sensorDisplayItem.SensorType == Enums.SensorType.HwInfo)
-                            {
-                                if (!HWHash.SENSORHASH.TryGetValue((sensorDisplayItem.Id, sensorDisplayItem.Instance, sensorDisplayItem.EntryId), out _))
-                                {
-                                    var hash = HWHash.GetOrderedList().Find(hash => hash.NameDefault.Equals(sensorDisplayItem.SensorName));
-                                    if (hash.NameDefault != null)
-                                    {
-                                        sensorDisplayItem.Id = hash.ParentID;
-                                        sensorDisplayItem.Instance = hash.ParentInstance;
-                                        sensorDisplayItem.EntryId = hash.SensorID;
-                                        Logger.Information("Smart imported {SensorName}", hash.NameDefault);
-                                    }
-                                }
-                            }
-                            else if (displayItem is ChartDisplayItem chartDisplayItem && chartDisplayItem.SensorType == Enums.SensorType.HwInfo)
-                            {
-                                if (!HWHash.SENSORHASH.TryGetValue((chartDisplayItem.Id, chartDisplayItem.Instance, chartDisplayItem.EntryId), out _))
-                                {
-                                    var hash = HWHash.GetOrderedList().Find(hash => hash.NameDefault.Equals(chartDisplayItem.SensorName));
-                                    if (hash.NameDefault != null)
-                                    {
-                                        chartDisplayItem.Id = hash.ParentID;
-                                        chartDisplayItem.Instance = hash.ParentInstance;
-                                        chartDisplayItem.EntryId = hash.SensorID;
-                                        Logger.Information("Smart imported {SensorName}", hash.NameDefault);
-                                    }
-                                }
-                            }
-                            else if (displayItem is GaugeDisplayItem gaugeDisplayItem && gaugeDisplayItem.SensorType == Enums.SensorType.HwInfo)
-                            {
-                                if (!HWHash.SENSORHASH.TryGetValue((gaugeDisplayItem.Id, gaugeDisplayItem.Instance, gaugeDisplayItem.EntryId), out _))
-                                {
-                                    var hash = HWHash.GetOrderedList().Find(hash => hash.NameDefault.Equals(gaugeDisplayItem.SensorName));
-                                    if (hash.NameDefault != null)
-                                    {
-                                        gaugeDisplayItem.Id = hash.ParentID;
-                                        gaugeDisplayItem.Instance = hash.ParentInstance;
-                                        gaugeDisplayItem.EntryId = hash.SensorID;
-                                        Logger.Information("Smart imported {SensorName}", hash.NameDefault);
-                                    }
-                                }
-                            }
-                        }
                         //save it back
+                        var displayItems = LoadDisplayItemsFromFile(profile);
                         SaveDisplayItems(profile, displayItems);
 
                         //extract assets

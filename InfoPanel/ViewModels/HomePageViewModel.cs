@@ -1,6 +1,5 @@
 using Avalonia.Data.Converters;
 using CommunityToolkit.Mvvm.ComponentModel;
-using InfoPanel.Monitors;
 using System;
 using System.Globalization;
 using System.IO;
@@ -12,8 +11,7 @@ namespace InfoPanel.ViewModels
     {
         public string Version { get; }
         public int ProfileCount => ConfigModel.Instance.Profiles.Count;
-        public int PluginCount => PluginMonitor.Instance.Plugins.Count;
-        public bool IsLibreMonitorEnabled => ConfigModel.Instance.Settings.LibreHardwareMonitor;
+        public int PluginCount => Monitors.PluginMonitor.Instance.Plugins.Count;
         public bool IsWebServerEnabled => ConfigModel.Instance.Settings.WebServer;
 
         public HomePageViewModel()

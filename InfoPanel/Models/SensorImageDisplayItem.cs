@@ -16,7 +16,7 @@ namespace InfoPanel.Models
             }
         }
 
-        private SensorType _sensorIdType = SensorType.HwInfo;
+        private SensorType _sensorIdType = SensorType.Hwmon;
         public SensorType SensorType
         {
             get { return _sensorIdType; }
@@ -113,28 +113,11 @@ namespace InfoPanel.Models
         {
             SensorName = name;
         }
-        public SensorImageDisplayItem(string name, Profile profile, uint id, uint instance, uint entryId) : base(name, profile)
-        {
-            SensorName = name;
-            SensorType = SensorType.HwInfo;
-            Id = id;
-            Instance = instance;
-            EntryId = entryId;
-        }
-
-        public SensorImageDisplayItem(string name, Profile profile, string libreSensorId) : base(name, profile)
-        {
-            SensorName = name;
-            SensorType = SensorType.Libre;
-            LibreSensorId = libreSensorId;
-        }
 
         public SensorReading? GetValue()
         {
             return SensorType switch
             {
-                SensorType.HwInfo => SensorReader.ReadHwInfoSensor(Id, Instance, EntryId),
-                SensorType.Libre => SensorReader.ReadLibreSensor(LibreSensorId),
                 SensorType.Plugin => SensorReader.ReadPluginSensor(PluginSensorId),
                 SensorType.Hwmon => SensorReader.ReadHwmonSensor(LibreSensorId),
                 _ => null,

@@ -40,7 +40,6 @@ namespace InfoPanel.ViewModels
 
         public ObservableCollection<DisplayItem> FilteredDisplayItems { get; } = [];
 
-        public LibreSensorsViewModel LibreSensors { get; } = new();
         public PluginSensorsViewModel PluginSensors { get; } = new();
         public HwmonSensorsViewModel HwmonSensors { get; } = new();
 
@@ -90,9 +89,6 @@ namespace InfoPanel.ViewModels
         [RelayCommand]
         private void RefreshSensors()
         {
-            try { LibreSensors.Refresh(); }
-            catch (System.IO.FileNotFoundException) { /* LibreHardwareMonitorLib not available on this platform */ }
-
             try { PluginSensors.Refresh(); }
             catch (System.IO.FileNotFoundException) { /* Plugin loader not available */ }
 

@@ -43,9 +43,6 @@ namespace InfoPanel.Models
         [ObservableProperty]
         private string _gridLinesColor = "#1A808080";
 
-        [ObservableProperty]
-        private bool _libreHardwareMonitor = true;
-
         private readonly ObservableCollection<BeadaPanelDevice> _beadaPanelDevices = [];
 
         public ObservableCollection<BeadaPanelDevice> BeadaPanelDevices

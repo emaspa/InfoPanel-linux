@@ -76,7 +76,6 @@ namespace InfoPanel.ViewModels
                 NavigateUri = "https://www.buymeacoffee.com/urfath3r"
             });
 
-            ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "LibreHardwareMonitor", License = "Mozilla Public License Version 2.0", ProjectUrl = "https://github.com/LibreHardwareMonitor/LibreHardwareMonitor" });
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "TuringSmartScreenLib", License = "MIT License. Copyright (c) 2021 machi_pon.", ProjectUrl = "https://github.com/usausa/turing-smart-screen" });
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "Avalonia", License = "MIT License. Copyright (c) Avalonia Team.", ProjectUrl = "https://github.com/AvaloniaUI/Avalonia" });
             ThirdPartyLicenses.Add(new ThirdPartyLicense { Name = "AutoMapper", License = "MIT License. Copyright (c) 2010 Jimmy Bogard.", ProjectUrl = "https://github.com/AutoMapper/AutoMapper" });

@@ -178,35 +178,6 @@ namespace InfoPanel
                 SharedModel.Instance.SaveDisplayItems();
             }
 
-            if (OperatingSystem.IsWindows())
-            {
-                try
-                {
-                    HWHash.SetDelay(300);
-                    HWHash.Launch();
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "HWHash initialization failed");
-                }
-            }
-            else
-            {
-                Logger.Information("Skipping HWiNFO shared memory monitor (Windows-only)");
-            }
-
-            if (ConfigModel.Instance.Settings.LibreHardwareMonitor)
-            {
-                try
-                {
-                    await LibreMonitor.Instance.StartAsync();
-                }
-                catch (Exception ex)
-                {
-                    Log.Warning(ex, "LibreHardwareMonitor initialization failed - library may not be available on this platform");
-                }
-            }
-
             try
             {
                 await PluginMonitor.Instance.StartAsync();
@@ -301,7 +272,6 @@ namespace InfoPanel
             DisplayWindowManager.Instance.CloseAll();
             await StopPanels();
 
-            try { await LibreMonitor.Instance.StopAsync(); } catch { }
             try { await PluginMonitor.Instance.StopAsync(); } catch { }
             try { HwmonMonitor.Instance.Stop(); } catch { }
 

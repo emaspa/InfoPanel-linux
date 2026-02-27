@@ -40,14 +40,6 @@
                 </Border>
             </StackPanel>
 
-            <!-- Hardware Monitoring -->
-            <StackPanel Spacing="8">
-                <TextBlock Text="Hardware Monitoring" FontSize="18" FontWeight="SemiBold" />
-                <Border Background="#1A808080" CornerRadius="6" Padding="12">
-                    <CheckBox Content="Enable LibreHardwareMonitor" IsChecked="{Binding Settings.LibreHardwareMonitor}" />
-                </Border>
-            </StackPanel>
-
             <!-- Web Server -->
             <StackPanel Spacing="8">
                 <TextBlock Text="Web Server" FontSize="18" FontWeight="SemiBold" />

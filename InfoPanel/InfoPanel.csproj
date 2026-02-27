@@ -95,8 +95,7 @@
 		<PackageReference Include="Flurl.Http" Version="4.0.2" />
 		<PackageReference Include="HidSharp" Version="2.6.4" />
 		<PackageReference Include="ini-parser-netstandard" Version="2.5.3" />
-		<PackageReference Include="LibreHardwareMonitorLib" Version="0.9.5-pre572" />
-		<PackageReference Include="LibUsbDotNet" Version="2.2.75" />
+<PackageReference Include="LibUsbDotNet" Version="2.2.75" />
 		<PackageReference Include="Microsoft.Extensions.Caching.Memory" Version="9.0.10" />
 		<PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
 		<PackageReference Include="SecureStore" Version="1.2.2" />

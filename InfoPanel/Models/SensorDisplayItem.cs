@@ -4,7 +4,7 @@ using System;
 namespace InfoPanel.Models
 {
     [Serializable]
-    public partial class SensorDisplayItem : TextDisplayItem, ISensorItem, IPluginSensorItem
+    public partial class SensorDisplayItem : TextDisplayItem, ISensorItem
     {
         private string _sensorName = string.Empty;
         public string SensorName
@@ -16,7 +16,7 @@ namespace InfoPanel.Models
             }
         }
 
-        private Enums.SensorType _sensorType = Enums.SensorType.HwInfo;
+        private Enums.SensorType _sensorType = Enums.SensorType.Hwmon;
         public Enums.SensorType SensorType
         {
             get { return _sensorType; }
@@ -249,28 +249,10 @@ namespace InfoPanel.Models
             SensorName = name;
         }
 
-        public SensorDisplayItem(string name, Profile profile, string libreSensorId) : base(name, profile)
-        {
-            SensorName = name;
-            SensorType = Enums.SensorType.Libre;
-            LibreSensorId = libreSensorId;
-        }
-
-        public SensorDisplayItem(string name, Profile profile, uint id, uint instance, uint entryId) : base(name, profile)
-        {
-            SensorName = name;
-            SensorType = Enums.SensorType.HwInfo;
-            Id = id;
-            Instance = instance;
-            EntryId = entryId;
-        }
-
         public SensorReading? GetValue()
         {
             return SensorType switch
             {
-                Enums.SensorType.HwInfo => SensorReader.ReadHwInfoSensor(Id, Instance, EntryId),
-                Enums.SensorType.Libre => SensorReader.ReadLibreSensor(LibreSensorId),
                 Enums.SensorType.Plugin => SensorReader.ReadPluginSensor(PluginSensorId),
                 Enums.SensorType.Hwmon => SensorReader.ReadHwmonSensor(LibreSensorId),
                 _ => null,

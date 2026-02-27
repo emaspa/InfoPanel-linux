@@ -96,21 +96,6 @@
         "resolved": "2.5.3",
         "contentHash": "Ht3UqRCqizBPbB5pvQ/yCNZIChY6Cy5nLn7TKIlJzWnf4pbqGKqDO+AY6MDTD+fXgEzzMb64Qzl4/Hy7vEqfLA=="
       },
-      "LibreHardwareMonitorLib": {
-        "type": "Direct",
-        "requested": "[0.9.5-pre572, )",
-        "resolved": "0.9.5-pre572",
-        "contentHash": "Slo1YTAytPV73wrg8KKBDhl5Vu0mtld+4g9MwRE97s5BF9lY0PkJJgLEOknffOWjzK6CXXZwzNRMvnCIGbljMQ==",
-        "dependencies": {
-          "DiskInfoToolkit": "1.1.0",
-          "HidSharp": "2.6.4",
-          "Mono.Posix.NETStandard": "1.0.0",
-          "RAMSPDToolkit-NDD": "1.4.2",
-          "System.IO.Ports": "10.0.0",
-          "System.Management": "10.0.0",
-          "System.Threading.AccessControl": "10.0.0"
-        }
-      },
       "LibUsbDotNet": {
         "type": "Direct",
         "requested": "[2.2.75, )",
@@ -354,19 +339,6 @@
           "Avalonia": "11.3.12",
           "Avalonia.FreeDesktop": "11.3.12",
           "Avalonia.Skia": "11.3.12"
-        }
-      },
-      "BlackSharp.Core": {
-        "type": "Transitive",
-        "resolved": "1.0.5",
-        "contentHash": "obxKSV8zIikTe+oxtbviWlPIQD51I5PM5Uli0Ar/AQY1BNPDUgNY/t0DQYMiokMxMuOTVS4AoeMsI242uN+jxA=="
-      },
-      "DiskInfoToolkit": {
-        "type": "Transitive",
-        "resolved": "1.1.0",
-        "contentHash": "34WiGMXPQ49+X0mlg3Yj1Sx0clmr5SRnzuvJxS3TrhYTAJUuj8yss1fLrF/LyR5xE92EJPdcb0dASo03T9bNgw==",
-        "dependencies": {
-          "BlackSharp.Core": "1.0.5"
         }
       },
       "ExCSS": {
@@ -689,24 +661,10 @@
           "System.Security.Principal.Windows": "5.0.0"
         }
       },
-      "Mono.Posix.NETStandard": {
-        "type": "Transitive",
-        "resolved": "1.0.0",
-        "contentHash": "vSN/L1uaVwKsiLa95bYu2SGkF0iY3xMblTfxc8alSziPuVfJpj3geVqHGAA75J7cZkMuKpFVikz82Lo6y6LLdA=="
-      },
       "Newtonsoft.Json": {
         "type": "Transitive",
         "resolved": "13.0.3",
         "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
-      },
-      "RAMSPDToolkit-NDD": {
-        "type": "Transitive",
-        "resolved": "1.4.2",
-        "contentHash": "pqIwn/HqXFnW4FVKybq6gZh3YK14OOLGWkgZzDdewjAInCOu86EO2L+FCQo8j1/v1sKwv+vgX5pnehxyrlJYJw==",
-        "dependencies": {
-          "BlackSharp.Core": "1.0.4",
-          "System.Management": "10.0.0"
-        }
       },
       "runtime.android-arm.runtime.native.System.IO.Ports": {
         "type": "Transitive",
@@ -866,11 +824,6 @@
           "Svg.Custom": "3.2.1"
         }
       },
-      "System.CodeDom": {
-        "type": "Transitive",
-        "resolved": "10.0.0",
-        "contentHash": "QWERdKi/tQAx+MbrPxTGcpchqMANnVXNiv2r2tILBBB38E74buD+fABSUhozZ1G9kjbadFB0m+HPFMkhJPeFvA=="
-      },
       "System.Diagnostics.DiagnosticSource": {
         "type": "Transitive",
         "resolved": "9.0.10",
@@ -885,14 +838,6 @@
         "type": "Transitive",
         "resolved": "9.0.10",
         "contentHash": "lwI0mhHcCxMtNSxB5ate9Gc9petWovRBUprtjz2yiIDDZPGBIaUiqNzQHJzjPuzTnvNbEMilpAXjDguKsU/2Fg=="
-      },
-      "System.Management": {
-        "type": "Transitive",
-        "resolved": "10.0.0",
-        "contentHash": "LE3rDZoPzulou78Tsq+3ALhUs4vatQ03v2QWbYVIenVPneUH/+LTUmHyyl098OxIFLQI6sNkZs8YHbUnT/sm3A==",
-        "dependencies": {
-          "System.CodeDom": "10.0.0"
-        }
       },
       "System.Security.AccessControl": {
         "type": "Transitive",
@@ -921,11 +866,6 @@
           "System.IO.Pipelines": "9.0.10",
           "System.Text.Encodings.Web": "9.0.10"
         }
-      },
-      "System.Threading.AccessControl": {
-        "type": "Transitive",
-        "resolved": "10.0.0",
-        "contentHash": "L8jXLmvlgDOvjmaN5H35Ca6eLyYs5e2ambDwUsyLoyodzo20+LAZmFXAvEaEGeKwWOdwMIwQji2r20tAnjKPaw=="
       },
       "System.ValueTuple": {
         "type": "Transitive",

@@ -1,7 +1,6 @@
 ﻿using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using InfoPanel.Models;
-using InfoPanel.Monitors;
 using InfoPanel.Services;
 using InfoPanel.TuringPanel;
 using InfoPanel.ThermalrightPanel;
@@ -184,15 +183,6 @@ namespace InfoPanel
             if (e.PropertyName == nameof(Settings.AutoStart))
             {
                 ValidateStartup();
-            }
-            else if (e.PropertyName == nameof(Settings.LibreHardwareMonitor))
-            {
-                await LibreMonitor.Instance.StopAsync();
-
-                if (Settings.LibreHardwareMonitor)
-                {
-                    await LibreMonitor.Instance.StartAsync();
-                }
             }
             else if (e.PropertyName == nameof(Settings.TuringPanelMultiDeviceMode))
             {
@@ -405,7 +395,6 @@ namespace InfoPanel
                             Settings.GridLinesColor = settings.GridLinesColor;
                             Settings.GridLinesSpacing = settings.GridLinesSpacing;
 
-                            Settings.LibreHardwareMonitor = settings.LibreHardwareMonitor;
                             Settings.WebServer = settings.WebServer;
                             Settings.WebServerListenIp = settings.WebServerListenIp;
                             Settings.WebServerListenPort = settings.WebServerListenPort;

@@ -17,28 +17,6 @@
                     FontSize="11" Padding="8,3" Margin="8,0,8,4" HorizontalAlignment="Left" />
 
             <TabControl x:Name="SensorTabs" Margin="4,0">
-                <!-- Libre tab (Windows only) -->
-                <TabItem x:Name="LibreTab" Header="Libre">
-                    <DockPanel>
-                        <comp:SensorActions DockPanel.Dock="Bottom"
-                                            SelectedSensor="{Binding LibreSensors.SelectedItem}"
-                                            SensorSourceType="Libre" />
-                        <TreeView ItemsSource="{Binding LibreSensors.SensorTree}"
-                                  SelectedItem="{Binding LibreSensors.SelectedItem}">
-                            <TreeView.ItemTemplate>
-                                <TreeDataTemplate x:DataType="vmcomp:TreeItem"
-                                                  ItemsSource="{Binding Children}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <TextBlock Text="{Binding Name}" />
-                                        <TextBlock Text="{Binding Value}" Opacity="0.5" FontSize="11"
-                                                   VerticalAlignment="Center" />
-                                    </StackPanel>
-                                </TreeDataTemplate>
-                            </TreeView.ItemTemplate>
-                        </TreeView>
-                    </DockPanel>
-                </TabItem>
-
                 <!-- Plugin tab -->
                 <TabItem Header="Plugins">
                     <DockPanel>
