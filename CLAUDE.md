@@ -14,8 +14,8 @@ dotnet build InfoPanel.sln -c Debug
 # Build Release
 dotnet build InfoPanel.sln -c Release
 
-# Publish for deployment (Windows x64)
-dotnet publish InfoPanel/InfoPanel.csproj -c Release -r win-x64 --self-contained -p:PublishProfile=FolderProfile -p:Platform=x64
+# Publish for deployment (Linux x64)
+dotnet publish InfoPanel/InfoPanel.csproj -c Release -r linux-x64 --self-contained
 
 # Run the main application
 dotnet run --project InfoPanel/InfoPanel.csproj
@@ -26,15 +26,15 @@ dotnet run --project InfoPanel.Plugins.Simulator/InfoPanel.Plugins.Simulator.csp
 
 ## Architecture Overview
 
-InfoPanel is a WPF desktop application built on .NET 8.0 that displays hardware monitoring data on desktop overlays and USB LCD panels. The codebase follows MVVM architecture with a modular plugin system.
+InfoPanel is a Linux desktop application built on .NET 8.0 with Avalonia UI that displays hardware monitoring data on desktop overlays and USB LCD panels. Ported from the original Windows WPF app. The codebase follows MVVM architecture with a modular plugin system.
 
 ### Core Projects
 
-- **InfoPanel** - Main WPF application
-  - Entry: `App.xaml.cs` ’ `Startup.cs` ’ `MainWindow.xaml`
+- **InfoPanel** - Main Avalonia UI application
+  - Entry: `Program.cs` â†’ `App.axaml.cs` â†’ `MainWindow.axaml`
   - MVVM structure: ViewModels handle logic, Views handle UI
   - Background services run display updates and hardware communication
-  - Drawing abstraction supports multiple graphics backends (SkiaSharp, DirectX)
+  - SkiaSharp-based rendering
 
 - **InfoPanel.Plugins** - Plugin interface definitions
   - `IPlugin` - Base plugin interface
@@ -55,29 +55,38 @@ InfoPanel is a WPF desktop application built on .NET 8.0 that displays hardware 
 
 Located in `InfoPanel/Services/`:
 - `PanelDrawTask` - Renders visualizations at high frame rates
-- `BeadaPanelTask/TuringPanelTask` - USB panel communication
+- `BeadaPanelTask/TuringPanelTask/ThermalrightPanelTask` - USB panel communication
 - `WebServerTask` - HTTP API and web interface
-- Hardware monitors - Collect sensor data from HWiNFO/LibreHardwareMonitor
+- `LinuxSystemSensors` - Collects sensor data from sysfs/hwmon
+
+Located in `InfoPanel/Monitors/`:
+- `HwmonMonitor` - Linux hwmon/sysfs sensor polling
+- `PluginMonitor` - Plugin lifecycle and sensor updates
+
+Located in `InfoPanel/Services/` (GPU monitors):
+- `IntelGpuMonitor` - Intel iGPU via sysfs frequency + PMU perf events
+- `RocmSmiMonitor` - AMD GPU via ROCm SMI
 
 ### Display System
 
-The drawing system (`InfoPanel/Drawing/`) has multiple implementations:
+The drawing system (`InfoPanel/Drawing/`):
 - `SkiaGraphics` - Primary renderer using SkiaSharp
-- `AcceleratedGraphics` - Hardware-accelerated DirectX rendering
 - `PanelDraw` - Orchestrates rendering of display items
 
 Display items (`InfoPanel/Models/`) represent visualizations:
 - `SensorDisplayItem` - Text-based sensor values
-- `GaugeDisplayItem` - Circular gauge visualizations  
+- `GaugeDisplayItem` - Circular gauge visualizations
 - `ChartDisplayItem` - Graphs, bars, and donut charts
 - `ImageDisplayItem` - Static and animated images
 
 ### USB Panel Support
 
-USB panel communication is in `InfoPanel/TuringPanel/` and `InfoPanel/BeadaPanel/`:
-- Uses WinUSB API for BeadaPanel devices
-- Serial/USB communication for TuringPanel devices
+USB panel communication uses libusb via LibUsbDotNet:
+- `InfoPanel/TuringPanel/` - Turing Smart Screen panels
+- `InfoPanel/BeadaPanel/` - BeadaPanel (NXElec) devices
+- `InfoPanel/ThermalrightPanel/` - Thermalright / ChiZhu panels
 - Model-specific configurations in database classes
+- Requires udev rules for non-root access (see `infopanel-udev.rules`)
 
 ### Plugin Development
 
@@ -91,18 +100,25 @@ See `PLUGINS.md` for detailed plugin development guide.
 
 ## Key Technologies
 
-- **WPF** with **WPF-UI 3.1.1** for modern Windows 11 styling
+- **Avalonia UI** for cross-platform desktop UI
 - **CommunityToolkit.MVVM** for MVVM implementation
-- **SkiaSharp** for cross-platform graphics rendering
+- **SkiaSharp** for graphics rendering
 - **Serilog** for structured logging (see `LoggingGuidelines.md`)
-- **LibreHardwareMonitor** for hardware sensor access
+- **LibUsbDotNet** / **HidSharp** for USB panel communication
 - **ASP.NET Core** for built-in web server
-- **Sentry** for error tracking
 
 ## Development Notes
 
-- The solution uses .NET 8.0 with Windows Desktop runtime
+- The solution uses .NET 8.0
 - Warning level 6 and nullable reference types are enabled
 - No unit test projects currently exist
 - Plugins are loaded from the `plugins` directory at runtime
-- Configuration is stored in `%APPDATA%/InfoPanel/`
+- Configuration is stored in `~/.local/share/InfoPanel/`
+- Single instance enforced via file lock at `~/.local/share/InfoPanel/.lock`
+- WM_CLASS is set to `infopanel` (matching `infopanel.desktop` for dock icon)
+- .NET `Directory.GetDirectories` does NOT support `[0-9]` character class patterns â€” use `*` instead
+
+## Git Workflow
+
+- Branch `all-changes` tracks `linux/main`
+- Push with: `git push linux HEAD:main`
