@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=InfoPanel
+Comment=Display hardware monitoring data on desktop overlays and USB LCD panels
+Exec=InfoPanel
+Icon=infopanel
+Type=Application
+Categories=Utility;System;Monitor;
+StartupWMClass=infopanel
+Terminal=false

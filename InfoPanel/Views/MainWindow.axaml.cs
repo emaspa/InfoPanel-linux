@@ -85,9 +85,11 @@ namespace InfoPanel.Views
 
         public void RestoreWindow()
         {
+            ShowInTaskbar = true;
             Show();
             WindowState = WindowState.Normal;
             Activate();
+            InvalidateVisual();
         }
 
         public void NavigateToPage(NavigationPage page)

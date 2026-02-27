@@ -14,7 +14,7 @@ public abstract partial class DisplayItem : ObservableObject, ICloneable
     public Guid Guid { get; set; } = Guid.NewGuid();
 
     [XmlIgnore]
-    public Profile Profile { get; private set; }
+    public Profile Profile { get; private set; } = null!;
 
     [XmlIgnore]
     public Guid ProfileGuid => Profile.Guid;

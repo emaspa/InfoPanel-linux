@@ -19,6 +19,7 @@
     <TrayIcon.Icons>
         <TrayIcons>
             <TrayIcon ToolTipText="InfoPanel"
+                      Icon="avares://InfoPanel/Resources/Images/favicon.ico"
                       Clicked="TrayIcon_Clicked">
                 <TrayIcon.Menu>
                     <NativeMenu>

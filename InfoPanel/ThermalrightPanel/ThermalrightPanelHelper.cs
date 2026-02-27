@@ -75,7 +75,7 @@ namespace InfoPanel.ThermalrightPanel
                         {
                             DeviceId = deviceId,
                             DeviceLocation = deviceLocation,
-                            DevicePath = deviceReg.DevicePath,
+                            DevicePath = deviceReg.DevicePath ?? string.Empty,
                             VendorId = vendorId,
                             ProductId = productId,
                             Model = modelInfo?.Model ?? ThermalrightPanelModel.Unknown,

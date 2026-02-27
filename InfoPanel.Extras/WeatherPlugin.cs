@@ -136,7 +136,7 @@ namespace InfoPanel.Extras
                     _rain.Value = result.Rain.LastHour;
                     _snow.Value = result.Snow.LastHour;
                 }
-            }catch(Exception e) { }
+            }catch { }
         }
     }
 }

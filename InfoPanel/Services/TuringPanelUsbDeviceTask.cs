@@ -111,7 +111,12 @@ namespace InfoPanel.Services
             return data.ToArray();
         }
 
-        private async Task<UsbRegistry?> FindTargetDeviceAsync()
+        private Task<UsbRegistry?> FindTargetDeviceAsync()
+        {
+            return Task.FromResult(FindTargetDevice());
+        }
+
+        private UsbRegistry? FindTargetDevice()
         {
             if(_device.ModelInfo == null)
             {

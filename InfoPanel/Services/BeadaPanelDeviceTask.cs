@@ -142,8 +142,8 @@ namespace InfoPanel.Services
 
                 if (writeThroughMode)
                 {
-                    _panelWidth = panelInfo.ModelInfo.Width;
-                    _panelHeight = panelInfo.ModelInfo.Height;
+                    _panelWidth = panelInfo.ModelInfo!.Width;
+                    _panelHeight = panelInfo.ModelInfo!.Height;
                 }
                 else
                 {

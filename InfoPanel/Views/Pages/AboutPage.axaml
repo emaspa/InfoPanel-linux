@@ -12,14 +12,6 @@
                 <TextBlock Text="Linux Port" FontSize="14" Opacity="0.5" />
             </StackPanel>
 
-            <!-- Release Notes -->
-            <StackPanel Spacing="8">
-                <TextBlock Text="Release Notes" FontSize="20" FontWeight="SemiBold" />
-                <Border Background="#1A808080" CornerRadius="6" Padding="16">
-                    <TextBlock Text="{Binding ReleaseNotes}" FontSize="13" LineHeight="22" TextWrapping="Wrap" />
-                </Border>
-            </StackPanel>
-
             <!-- Links -->
             <StackPanel Spacing="8">
                 <TextBlock Text="Links" FontSize="20" FontWeight="SemiBold" />

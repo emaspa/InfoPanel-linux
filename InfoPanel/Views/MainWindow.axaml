@@ -4,6 +4,7 @@
         x:Class="InfoPanel.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="{Binding Title}"
+        Icon="avares://InfoPanel/Resources/Images/logo.png"
         MinWidth="800"
         MinHeight="600"
         WindowStartupLocation="CenterScreen">

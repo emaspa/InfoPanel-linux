@@ -499,7 +499,7 @@ namespace InfoPanel.Models
         }
 
         private int _rotation = 90;
-        public int Rotation
+        public new int Rotation
         {
             get { return _rotation; }
             set

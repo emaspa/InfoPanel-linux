@@ -112,29 +112,32 @@ namespace InfoPanel
             _host.Start();
             Logger.Debug("Application host started");
 
-            // Create and show the main window FIRST so the UI is responsive
-            // while background services start up
+            base.OnFrameworkInitializationCompleted();
+
+            ConfigModel.Instance.Initialize();
+            Logger.Debug("Configuration initialized");
+
+            // Create main window AFTER config is initialized so settings are loaded
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
                 _mainWindow = new Views.MainWindow();
                 desktop.MainWindow = _mainWindow;
                 desktop.ShutdownMode = Avalonia.Controls.ShutdownMode.OnExplicitShutdown;
 
-                // Handle start-minimized
+                // Handle start-minimized: must defer until content is rendered,
+                // otherwise the window is empty/transparent when restored.
                 if (ConfigModel.Instance.Settings.StartMinimized)
                 {
-                    _mainWindow.WindowState = Avalonia.Controls.WindowState.Minimized;
-                    if (ConfigModel.Instance.Settings.MinimizeToTray)
+                    var startupMinimize = true;
+                    _mainWindow.Opened += async (_, _) =>
                     {
-                        _mainWindow.Hide();
-                    }
+                        if (!startupMinimize) return;
+                        startupMinimize = false;
+                        await Task.Delay(150);
+                        _mainWindow.WindowState = Avalonia.Controls.WindowState.Minimized;
+                    };
                 }
             }
-
-            base.OnFrameworkInitializationCompleted();
-
-            ConfigModel.Instance.Initialize();
-            Logger.Debug("Configuration initialized");
 
             if (ConfigModel.Instance.Profiles.Count == 0)
             {
@@ -252,22 +255,22 @@ namespace InfoPanel
 
         public static async Task CleanShutDown()
         {
-            DisplayWindowManager.Instance.CloseAll();
-            await StopPanels();
+            // Force exit after 3 seconds if graceful shutdown hangs
+            _ = Task.Delay(TimeSpan.FromSeconds(3)).ContinueWith(_ => Environment.Exit(0));
 
-            try { await PluginMonitor.Instance.StopAsync(); } catch { }
+            try { DisplayWindowManager.Instance.CloseAll(); } catch { }
+
+            try { await StopPanels().WaitAsync(TimeSpan.FromSeconds(2)); } catch { }
+            try { await PluginMonitor.Instance.StopAsync().WaitAsync(TimeSpan.FromSeconds(1)); } catch { }
             try { HwmonMonitor.Instance.Stop(); } catch { }
+            try { IntelGpuMonitor.Instance.Shutdown(); } catch { }
 
             _lockFile?.Dispose();
             _lockFile = null;
 
-            if (Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Invoke(() =>
-                {
-                    desktop.Shutdown();
-                });
-            }
+            try { await _host.StopAsync(TimeSpan.FromSeconds(1)); } catch { }
+
+            Environment.Exit(0);
         }
 
         public void ShowDisplayWindow(Profile profile)

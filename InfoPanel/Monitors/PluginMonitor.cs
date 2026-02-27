@@ -66,7 +66,7 @@ namespace InfoPanel.Monitors
                     File.Delete(file);
                 }
             }
-            catch (Exception e) { }
+            catch { }
         }
 
         private static bool UnzipPluginArchive(string filePath)
