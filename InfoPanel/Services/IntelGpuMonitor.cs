@@ -47,19 +47,29 @@ public class IntelGpuMonitor
             // Find Intel GPU card in DRM
             if (!FindIntelGpu()) return;
 
-            // Read PMU type
-            if (!ReadPmuType()) return;
-
-            // Open perf events
-            OpenPerfEvents();
-
-            if (_fdActualFreq >= 0 || _engineFds.Count > 0)
+            // Try PMU-based monitoring (requires permissions)
+            if (ReadPmuType())
             {
-                _available = true;
-                // Do initial read to prime delta state
-                PrimeDeltaState();
-                Log.Information("Intel GPU monitor initialized: {Name}, {EngineCount} engines", _gpuName, _engineFds.Count);
+                OpenPerfEvents();
+
+                if (_fdActualFreq >= 0 || _engineFds.Count > 0)
+                {
+                    PrimeDeltaState();
+                    Log.Information("Intel GPU monitor initialized with PMU: {Name}, {EngineCount} engines", _gpuName, _engineFds.Count);
+                }
+                else
+                {
+                    Log.Debug("Intel GPU: PMU type found but no perf events opened (permissions?)");
+                }
             }
+
+            // Available if we have PMU events OR sysfs frequency files
+            _available = _fdActualFreq >= 0 || _engineFds.Count > 0
+                || File.Exists(Path.Combine(_cardPath, "gt_act_freq_mhz"))
+                || File.Exists(Path.Combine(_cardPath, "gt_cur_freq_mhz"));
+
+            if (_available)
+                Log.Information("Intel GPU monitor initialized: {Name}", _gpuName);
         }
         catch (Exception ex)
         {
@@ -235,22 +245,17 @@ public class IntelGpuMonitor
 
         try
         {
-            // Actual frequency
+            // PMU-based sensors (require perf_event_open permissions)
             if (_fdActualFreq >= 0 && ReadPerfCounter(_fdActualFreq, out var actualFreqRaw))
             {
-                // The counter is cumulative MHz*ns, divide by elapsed time to get average MHz
-                // Actually for frequency events, perf returns the accumulated value
-                // We just read the instantaneous value
                 UpdateSensor("system/igpu/frequency", actualFreqRaw, "MHz");
             }
 
-            // Requested frequency
             if (_fdRequestedFreq >= 0 && ReadPerfCounter(_fdRequestedFreq, out var reqFreqRaw))
             {
                 UpdateSensor("system/igpu/req_frequency", reqFreqRaw, "MHz");
             }
 
-            // RC6 residency (idle percentage)
             if (_fdRc6Residency >= 0 && ReadPerfCounter(_fdRc6Residency, out var rc6Ns))
             {
                 var deltaRc6 = rc6Ns - _prevRc6Ns;
@@ -259,13 +264,11 @@ public class IntelGpuMonitor
                     var rc6Percent = Math.Round(deltaRc6 * 100.0 / deltaNs, 1);
                     rc6Percent = Math.Clamp(rc6Percent, 0, 100);
                     UpdateSensor("system/igpu/rc6_percent", rc6Percent, "%");
-                    // GPU active = 100 - RC6
                     UpdateSensor("system/igpu/utilization", Math.Round(100 - rc6Percent, 1), "%");
                 }
                 _prevRc6Ns = rc6Ns;
             }
 
-            // Per-engine busy
             foreach (var (name, fd) in _engineFds)
             {
                 if (ReadPerfCounter(fd, out var busyNs))
@@ -284,7 +287,7 @@ public class IntelGpuMonitor
                 }
             }
 
-            // Sysfs frequency limits
+            // Sysfs frequency (always works without special permissions)
             PollSysfsFrequency();
         }
         catch (Exception ex)
