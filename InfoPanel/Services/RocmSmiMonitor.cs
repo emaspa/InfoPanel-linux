@@ -81,7 +81,7 @@ public class RocmSmiMonitor
             var drmPath = "/sys/class/drm";
             if (!Directory.Exists(drmPath)) return;
 
-            foreach (var cardDir in Directory.GetDirectories(drmPath, "card[0-9]*"))
+            foreach (var cardDir in Directory.GetDirectories(drmPath, "card*"))
             {
                 var vendorFile = Path.Combine(cardDir, "device", "vendor");
                 var vendor = ReadFile(vendorFile);
