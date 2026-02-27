@@ -8,7 +8,7 @@
 Unofficial Linux port of <a href="https://github.com/habibrehmansg/infopanel">InfoPanel</a>, a desktop visualization tool that displays hardware monitoring data on desktop overlays and USB LCD panels (BeadaPanel, Turing Smart Screen, Thermalright).
 </p>
 
-> **Status:** Work in progress. The app builds and runs on Linux. Desktop overlays, USB panel discovery, and device communication are functional. Some UI pages are stubs awaiting full implementation.
+> **Status:** Work in progress. The app builds and runs on Linux. Desktop overlays, USB panel discovery, device communication, sensor monitoring, and the Design/Profiles UI are functional.
 
 ## What is InfoPanel?
 
@@ -26,7 +26,7 @@ This fork ports InfoPanel to Linux, replacing all Windows-specific dependencies 
 | **Serial port discovery** | WMI (`Win32_SerialPort`) | Linux sysfs (`/sys/bus/usb-serial/devices/`, `/sys/class/tty/`) |
 | **SCSI panel I/O** | `kernel32.dll` P/Invoke (`CreateFile`, `DeviceIoControl`) | `libc` P/Invoke (`open`, `ioctl` with `SG_IO`) |
 | **HID panels** | HidSharp (cross-platform) | HidSharp (no changes needed) |
-| **Hardware monitoring** | HWiNFO SHM, LibreHardwareMonitor | Not yet ported (plugin system is functional) |
+| **Hardware monitoring** | HWiNFO SHM, LibreHardwareMonitor | Linux hwmon (sysfs `/sys/class/hwmon`, `/sys/class/thermal`), plugin system |
 | **Desktop overlay** | WPF transparent window | Avalonia transparent window with SkiaSharp canvas |
 | **Installer** | Microsoft Store / MSI | Manual build (see below), udev rules provided |
 
@@ -35,6 +35,12 @@ This fork ports InfoPanel to Linux, replacing all Windows-specific dependencies 
 - App builds and launches on Linux (.NET 8.0 + Avalonia)
 - Main window with sidebar navigation (Home, Profiles, Design, USB Panels, Plugins, Settings, Logs, Updates, About)
 - Desktop overlay windows with SkiaSharp rendering
+- **Hardware monitoring** via Linux hwmon (sysfs) — CPU temps, fan speeds, voltages, power, etc.
+- **Design page** with 3-panel layout: sensor browser, display items list, and type-specific property editors
+- **Sensor browser** with hwmon and plugin tabs, plus action buttons to add sensor-bound items
+- **11 property editors** for all display item types (Text, Sensor, DateTime, Image, Bar, Graph, Donut, Shape, Gauge, Group, Common)
+- **Profiles page** with color pickers, font picker, import/export, window position controls
+- **Minimize-to-tray** support with system tray icon
 - BeadaPanel USB device discovery and communication (via LibUsbDotNet)
 - Turing Smart Screen serial device discovery (via sysfs) and communication
 - Turing Smart Screen USB device discovery and communication
@@ -46,10 +52,9 @@ This fork ports InfoPanel to Linux, replacing all Windows-specific dependencies 
 
 ### What doesn't work yet
 
-- Hardware monitoring data sources (HWiNFO is Windows-only; LibreHardwareMonitor needs a Linux alternative)
-- Full UI for profile editing, sensor binding, drag-and-drop layout
 - DirectX-accelerated rendering (Linux uses SkiaSharp software rendering)
 - Auto-update system
+- Drag-and-drop layout editing in the design view
 
 ## Building
 
@@ -102,11 +107,16 @@ This grants access to all supported panel families: BeadaPanel, Turing Smart Scr
 
 ```
 InfoPanel/                    # Main application
-  Services/                   # Background tasks for panel communication
+  Services/                   # Background tasks (panel comms, HwmonMonitor)
   TuringPanel/                # Turing Smart Screen protocol + discovery
   ThermalrightPanel/          # Thermalright protocol + discovery
   BeadaPanel/                 # BeadaPanel protocol + discovery
   Views/                      # Avalonia UI (AXAML)
+    Components/               # Property editors and sensor actions
+    Converters/               # Value converters (color, font, bool, enum)
+    Pages/                    # Main pages (Design, Profiles, Settings, etc.)
+  ViewModels/                 # MVVM view models
+    Components/               # Sensor tree view models
   Models/                     # Data models and configuration
   Drawing/                    # SkiaSharp rendering
   packaging/                  # udev rules
