@@ -52,7 +52,10 @@ namespace InfoPanel
                 });
 
                 desktop.MainWindow = new MainWindow();
-                desktop.MainWindow.Show();
+                if (!_host.Settings.StartMinimized)
+                {
+                    desktop.MainWindow.Show();
+                }
 
                 // Show overlay windows for active profiles
                 foreach (var profile in _host.Profiles.Where(p => p.Active))

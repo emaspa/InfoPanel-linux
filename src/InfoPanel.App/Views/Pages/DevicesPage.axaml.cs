@@ -72,6 +72,7 @@ namespace InfoPanel.Views.Pages
                     remove: () => { settings.ThermalrightPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
                     setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                AddThermalrightAdvanced(device);
             }
 
             AddFamilyHeader("Turing Smart Screen", settings.TuringPanelMultiDeviceMode,
@@ -111,6 +112,78 @@ namespace InfoPanel.Views.Pages
                     rotation: device.Rotation,
                     setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
             }
+        }
+
+        private void AddThermalrightAdvanced(ThermalrightPanelDevice device)
+        {
+            var expander = new Expander
+            {
+                Header = "Panel options",
+                Margin = new Thickness(24, -8, 0, 0),
+                FontSize = 12,
+            };
+
+            var panel = new StackPanel { Spacing = 8, Margin = new Thickness(0, 8, 0, 0) };
+
+            var brightnessRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
+            brightnessRow.Children.Add(new TextBlock { Text = "Brightness", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
+            var brightness = new Slider { Minimum = 5, Maximum = 100, Value = device.Brightness, Width = 200 };
+            brightness.ValueChanged += (_, _) => { device.Brightness = (int)brightness.Value; _app?.Host.SaveSettings(); };
+            brightnessRow.Children.Add(brightness);
+            panel.Children.Add(brightnessRow);
+
+            var fpsRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
+            fpsRow.Children.Add(new TextBlock { Text = "Target FPS", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
+            var fps = new NumericUpDown { Minimum = 1, Maximum = 60, Value = device.TargetFrameRate, Increment = 1, FormatString = "0" };
+            fps.ValueChanged += (_, _) => { device.TargetFrameRate = (int)(fps.Value ?? 15); _app?.Host.SaveSettings(); };
+            fpsRow.Children.Add(fps);
+            panel.Children.Add(fpsRow);
+
+            if (device.IsJpegQualityConfigurable)
+            {
+                var qualityRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
+                qualityRow.Children.Add(new TextBlock { Text = "JPEG quality", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
+                var quality = new NumericUpDown { Minimum = 50, Maximum = 100, Value = device.JpegQuality, Increment = 5, FormatString = "0" };
+                quality.ValueChanged += (_, _) => { device.JpegQuality = (int)(quality.Value ?? 95); _app?.Host.SaveSettings(); };
+                qualityRow.Children.Add(quality);
+                panel.Children.Add(qualityRow);
+            }
+
+            if (device.HasFlickerFix)
+            {
+                var flicker = new ToggleSwitch
+                {
+                    OnContent = "Flicker fix (crop to 462 rows)",
+                    OffContent = "Flicker fix (crop to 462 rows)",
+                    IsChecked = device.FlickerFix,
+                };
+                flicker.IsCheckedChanged += (_, _) => { device.FlickerFix = flicker.IsChecked == true; _app?.Host.SaveSettings(); };
+                panel.Children.Add(flicker);
+            }
+
+            if (device.HasDisplayMask)
+            {
+                var maskRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
+                maskRow.Children.Add(new TextBlock { Text = "Display mask", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
+                var mask = new ComboBox
+                {
+                    ItemsSource = new[] { "None", "Rounded left", "Rounded all" },
+                    SelectedIndex = (int)device.DisplayMask,
+                };
+                mask.SelectionChanged += (_, _) =>
+                {
+                    if (mask.SelectedIndex >= 0)
+                    {
+                        device.DisplayMask = (ThermalrightDisplayMask)mask.SelectedIndex;
+                        _app?.Host.SaveSettings();
+                    }
+                };
+                maskRow.Children.Add(mask);
+                panel.Children.Add(maskRow);
+            }
+
+            expander.Content = panel;
+            DeviceRows.Children.Add(expander);
         }
 
         private void AddFamilyHeader(string title, bool multiMode, Action<bool> setMultiMode)

@@ -179,6 +179,17 @@ namespace InfoPanel.Designer
         {
             _root.Children.Add(Header("Text"));
 
+            var fonts = SkiaSharp.SKFontManager.Default.FontFamilies.OrderBy(f => f).ToList();
+            var fontPicker = new ComboBox { ItemsSource = fonts, SelectedItem = text.Font, MaxDropDownHeight = 400 };
+            fontPicker.SelectionChanged += (_, _) =>
+            {
+                if (!_rebuilding && fontPicker.SelectedItem is string font && font != text.Font)
+                {
+                    Commit(session, text, nameof(text.Font), v => text.Font = v, text.Font, font);
+                }
+            };
+            _root.Children.Add(Field("Font", fontPicker));
+
             _root.Children.Add(Field("Font size", IntEditor(text.FontSize, v => Commit(session, text, nameof(text.FontSize), s => text.FontSize = s, text.FontSize, v))));
 
             var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };

@@ -112,6 +112,52 @@ namespace InfoPanel.Views.Pages
             DisplayItemStore.Instance.Save(clone);
         }
 
+        private async void Import_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_app == null) return;
+
+            var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+            if (storage == null) return;
+
+            var files = await storage.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+            {
+                Title = "Import profile",
+                AllowMultiple = false,
+                FileTypeFilter =
+                [
+                    new Avalonia.Platform.Storage.FilePickerFileType("InfoPanel profile") { Patterns = ["*.infopanel"] }
+                ]
+            });
+
+            if (files.Count == 0 || files[0].Path is not { IsFile: true } uri) return;
+
+            if (Persistence.ProfileTransfer.Import(uri.LocalPath) is Models.Profile imported)
+            {
+                _app.Host.Profiles.Add(imported);
+                _app.Host.SaveProfiles();
+            }
+        }
+
+        private async void Export_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_app == null || (sender as Button)?.Tag is not ProfileCardViewModel card) return;
+
+            var storage = TopLevel.GetTopLevel(this)?.StorageProvider;
+            if (storage == null) return;
+
+            var folders = await storage.OpenFolderPickerAsync(new Avalonia.Platform.Storage.FolderPickerOpenOptions
+            {
+                Title = "Export profile to folder",
+                AllowMultiple = false
+            });
+
+            if (folders.Count == 0 || folders[0].Path is not { IsFile: true } uri) return;
+
+            // make sure the latest edits are on disk before zipping
+            DisplayItemStore.Instance.Save(card.Profile);
+            Persistence.ProfileTransfer.Export(card.Profile, uri.LocalPath);
+        }
+
         private void Delete_Click(object? sender, RoutedEventArgs e)
         {
             if (_app == null || (sender as Button)?.Tag is not ProfileCardViewModel card) return;
