@@ -975,10 +975,26 @@ namespace InfoPanel.Services
 
                     if (reportedWidth > 0 && reportedWidth <= 4096 && reportedHeight > 0 && reportedHeight <= 4096)
                     {
-                        _panelWidth = reportedWidth;
-                        _panelHeight = reportedHeight;
-                        Logger.Information("ThermalrightPanelDevice {Device}: Device reports resolution {Width}x{Height}",
-                            _device, reportedWidth, reportedHeight);
+                        // The reported values are not reliable across firmware revisions (units
+                        // have been seen reporting 599 for the 480-row panel; TRCC ignores this
+                        // field entirely). Trust the model database when it disagrees.
+                        var expectedWidth = _device.ModelInfo?.RenderWidth ?? 0;
+                        var expectedHeight = _device.ModelInfo?.RenderHeight ?? 0;
+
+                        if (expectedWidth > 0 && (reportedWidth != expectedWidth || reportedHeight != expectedHeight))
+                        {
+                            Logger.Warning("ThermalrightPanelDevice {Device}: Device reports {RepW}x{RepH} but model database says {ExpW}x{ExpH} — using database values (TRCC also ignores this field)",
+                                _device, reportedWidth, reportedHeight, expectedWidth, expectedHeight);
+                            _panelWidth = expectedWidth;
+                            _panelHeight = expectedHeight;
+                        }
+                        else
+                        {
+                            _panelWidth = reportedWidth;
+                            _panelHeight = reportedHeight;
+                            Logger.Information("ThermalrightPanelDevice {Device}: Device reports resolution {Width}x{Height}",
+                                _device, reportedWidth, reportedHeight);
+                        }
                     }
                 }
             }
