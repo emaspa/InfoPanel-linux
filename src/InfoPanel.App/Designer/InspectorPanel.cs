@@ -282,6 +282,11 @@ namespace InfoPanel.Designer
             _root.Children.Add(Header("Text"));
 
             var fonts = SkiaSharp.SKFontManager.Default.FontFamilies.OrderBy(f => f).ToList();
+            if (!string.IsNullOrEmpty(text.Font) && !fonts.Contains(text.Font))
+            {
+                fonts.Insert(0, text.Font); // embedded fonts (e.g. Inter) aren't in SKFontManager
+            }
+
             var fontPicker = new ComboBox { ItemsSource = fonts, SelectedItem = text.Font, MaxDropDownHeight = 400 };
             fontPicker.SelectionChanged += (_, _) =>
             {

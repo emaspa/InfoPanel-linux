@@ -13,6 +13,30 @@ namespace InfoPanel.ViewModels
         [ObservableProperty]
         private Bitmap? _thumbnail;
 
+        /// <summary>Expander state lives here so card visual rebuilds can't collapse it.</summary>
+        [ObservableProperty]
+        private bool _isSettingsExpanded;
+
+        /// <summary>Font list including the profile's current font (embedded fonts like Inter aren't in SKFontManager).</summary>
+        public IReadOnlyList<string> FontChoices { get; } =
+            Utils.UiCatalog.FontFamilies.Contains(profile.Font)
+                ? Utils.UiCatalog.FontFamilies
+                : [profile.Font, .. Utils.UiCatalog.FontFamilies];
+
+        /// <summary>Guards against ComboBox writing null when its popup/state churns.</summary>
+        public string? FontSelection
+        {
+            get => Profile.Font;
+            set
+            {
+                if (!string.IsNullOrEmpty(value) && value != Profile.Font)
+                {
+                    Profile.Font = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public string Subtitle
         {
             get

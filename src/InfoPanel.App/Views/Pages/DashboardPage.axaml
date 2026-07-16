@@ -26,7 +26,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:ProfileCardViewModel">
-                        <Border Width="300" Margin="0,0,16,16"
+                        <Border Width="360" Margin="0,0,16,16"
                                 CornerRadius="8"
                                 Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
@@ -51,40 +51,66 @@
                                         <Button Content="Export" Click="Export_Click" Tag="{Binding}" />
                                     </StackPanel>
 
-                                    <Expander Header="Profile settings" FontSize="12">
+                                    <Expander Header="Profile settings" FontSize="12"
+                                              IsExpanded="{Binding IsSettingsExpanded, Mode=TwoWay}"
+                                              HorizontalAlignment="Stretch">
                                         <StackPanel Spacing="8" Margin="0,8,0,0">
-                                            <TextBox Text="{Binding Profile.Name, Mode=TwoWay}" PlaceholderText="Name" />
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <NumericUpDown Value="{Binding Profile.Width, Mode=TwoWay}" Minimum="1" Maximum="10000" Increment="1" FormatString="0" Width="120" />
-                                                <TextBlock Text="×" VerticalAlignment="Center" />
-                                                <NumericUpDown Value="{Binding Profile.Height, Mode=TwoWay}" Minimum="1" Maximum="10000" Increment="1" FormatString="0" Width="120" />
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="Name" FontSize="10" Opacity="0.7" />
+                                                <TextBox Text="{Binding Profile.Name, Mode=TwoWay}" />
                                             </StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="Background" VerticalAlignment="Center" Width="90" FontSize="11" />
-                                                <ColorPicker Color="{Binding Profile.BackgroundColor, Mode=TwoWay, Converter={x:Static utils:ColorHexConverter.Instance}}" Width="64" Height="26" />
-                                                <TextBlock Text="Text" VerticalAlignment="Center" FontSize="11" />
-                                                <ColorPicker Color="{Binding Profile.Color, Mode=TwoWay, Converter={x:Static utils:ColorHexConverter.Instance}}" Width="64" Height="26" />
+                                            <Grid ColumnDefinitions="*,8,*">
+                                                <StackPanel Grid.Column="0" Spacing="2">
+                                                    <TextBlock Text="Width" FontSize="10" Opacity="0.7" />
+                                                    <NumericUpDown Value="{Binding Profile.Width, Mode=TwoWay}" Minimum="1" Maximum="10000" Increment="1" FormatString="0" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Spacing="2">
+                                                    <TextBlock Text="Height" FontSize="10" Opacity="0.7" />
+                                                    <NumericUpDown Value="{Binding Profile.Height, Mode=TwoWay}" Minimum="1" Maximum="10000" Increment="1" FormatString="0" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,8,*">
+                                                <StackPanel Grid.Column="0" Spacing="2">
+                                                    <TextBlock Text="Background" FontSize="10" Opacity="0.7" />
+                                                    <ColorPicker Color="{Binding Profile.BackgroundColor, Mode=TwoWay, Converter={x:Static utils:ColorHexConverter.Instance}}" HorizontalAlignment="Stretch" Height="30" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Spacing="2">
+                                                    <TextBlock Text="Text color" FontSize="10" Opacity="0.7" />
+                                                    <ColorPicker Color="{Binding Profile.Color, Mode=TwoWay, Converter={x:Static utils:ColorHexConverter.Instance}}" HorizontalAlignment="Stretch" Height="30" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="Font" FontSize="10" Opacity="0.7" />
+                                                <ComboBox ItemsSource="{Binding FontChoices}" SelectedItem="{Binding FontSelection, Mode=TwoWay}" MaxDropDownHeight="360" HorizontalAlignment="Stretch" />
                                             </StackPanel>
-                                            <ComboBox ItemsSource="{x:Static utils:UiCatalog.FontFamilies}" SelectedItem="{Binding Profile.Font, Mode=TwoWay}" MaxDropDownHeight="360" />
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="Font size" VerticalAlignment="Center" FontSize="11" />
-                                                <NumericUpDown Value="{Binding Profile.FontSize, Mode=TwoWay}" Minimum="1" Maximum="200" Increment="1" FormatString="0" Width="110" />
-                                                <TextBlock Text="Scale" VerticalAlignment="Center" FontSize="11" />
-                                                <NumericUpDown Value="{Binding Profile.FontScale, Mode=TwoWay}" Minimum="0.1" Maximum="10" Increment="0.01" FormatString="0.00" Width="110" />
-                                            </StackPanel>
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="Overlay X/Y" VerticalAlignment="Center" FontSize="11" />
-                                                <NumericUpDown Value="{Binding Profile.WindowX, Mode=TwoWay}" Increment="1" FormatString="0" Width="110" />
-                                                <NumericUpDown Value="{Binding Profile.WindowY, Mode=TwoWay}" Increment="1" FormatString="0" Width="110" />
-                                                <Button Content="Reset" FontSize="11" Click="ResetPosition_Click" Tag="{Binding}" />
-                                            </StackPanel>
+                                            <Grid ColumnDefinitions="*,8,*">
+                                                <StackPanel Grid.Column="0" Spacing="2">
+                                                    <TextBlock Text="Font size" FontSize="10" Opacity="0.7" />
+                                                    <NumericUpDown Value="{Binding Profile.FontSize, Mode=TwoWay}" Minimum="1" Maximum="200" Increment="1" FormatString="0" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Spacing="2">
+                                                    <TextBlock Text="Font scale" FontSize="10" Opacity="0.7" />
+                                                    <NumericUpDown Value="{Binding Profile.FontScale, Mode=TwoWay}" Minimum="0.1" Maximum="10" Increment="0.01" FormatString="0.00" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <Grid ColumnDefinitions="*,8,*,8,Auto">
+                                                <StackPanel Grid.Column="0" Spacing="2">
+                                                    <TextBlock Text="Overlay X" FontSize="10" Opacity="0.7" />
+                                                    <NumericUpDown Value="{Binding Profile.WindowX, Mode=TwoWay}" Increment="1" FormatString="0" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2" Spacing="2">
+                                                    <TextBlock Text="Overlay Y" FontSize="10" Opacity="0.7" />
+                                                    <NumericUpDown Value="{Binding Profile.WindowY, Mode=TwoWay}" Increment="1" FormatString="0" />
+                                                </StackPanel>
+                                                <Button Grid.Column="4" Content="Reset" FontSize="11" VerticalAlignment="Bottom" Click="ResetPosition_Click" Tag="{Binding}" />
+                                            </Grid>
                                             <WrapPanel>
                                                 <CheckBox Content="Always on top" IsChecked="{Binding Profile.Topmost, Mode=TwoWay}" FontSize="12" Margin="0,0,8,0" />
                                                 <CheckBox Content="Draggable" IsChecked="{Binding Profile.Drag, Mode=TwoWay}" FontSize="12" Margin="0,0,8,0" />
                                                 <CheckBox Content="Resizable" IsChecked="{Binding Profile.Resize, Mode=TwoWay}" FontSize="12" Margin="0,0,8,0" />
                                                 <CheckBox Content="Show FPS" IsChecked="{Binding Profile.ShowFps, Mode=TwoWay}" FontSize="12" Margin="0,0,8,0" />
                                             </WrapPanel>
-                                            <Button Content="Save profile" FontSize="12" Click="SaveProfile_Click" Tag="{Binding}" />
+                                            <Button Content="Save profile" FontSize="12" Click="SaveProfile_Click" Tag="{Binding}" HorizontalAlignment="Stretch" />
                                         </StackPanel>
                                     </Expander>
                                 </StackPanel>
