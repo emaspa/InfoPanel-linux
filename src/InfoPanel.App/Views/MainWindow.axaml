@@ -16,11 +16,28 @@
                 BorderThickness="0,1,0,0"
                 Padding="12,4">
             <DockPanel>
+                <ToggleButton DockPanel.Dock="Right" x:Name="LogsToggle" Content="Logs" FontSize="12"
+                              Padding="8,2" Click="LogsToggle_Click" />
                 <TextBlock x:Name="StatusText"
                            VerticalAlignment="Center"
                            FontSize="12"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}"
                            Text="Starting…" />
+            </DockPanel>
+        </Border>
+
+        <!-- Logs drawer -->
+        <Border DockPanel.Dock="Bottom" x:Name="LogsDrawer" IsVisible="False" Height="220"
+                Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0">
+            <DockPanel>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="12,6">
+                    <TextBlock Text="Session log" FontWeight="SemiBold" VerticalAlignment="Center" />
+                    <Button Content="Clear" FontSize="12" Padding="8,2" Click="LogsClear_Click" />
+                    <Button Content="Open log folder" FontSize="12" Padding="8,2" Click="LogsFolder_Click" />
+                </StackPanel>
+                <ListBox x:Name="LogsList" FontFamily="monospace" FontSize="11" Margin="8,0,8,8" />
             </DockPanel>
         </Border>
 

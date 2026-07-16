@@ -14,6 +14,7 @@ namespace InfoPanel
             Log.Logger = new LoggerConfiguration()
                 .MinimumLevel.Is(verbose ? LogEventLevel.Debug : LogEventLevel.Information)
                 .WriteTo.Console()
+                .WriteTo.Sink(Utils.UiLogSink.Instance)
                 .WriteTo.File(
                     Path.Combine(Persistence.ConfigPersistence.BaseFolder, "logs", "infopanel-.log"),
                     rollingInterval: RollingInterval.Day,

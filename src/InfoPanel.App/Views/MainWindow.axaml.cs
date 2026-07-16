@@ -24,9 +24,16 @@ namespace InfoPanel.Views
             {
                 // Dev/testing hook: INFOPANEL_START_PAGE=designer opens that page directly
                 var startPage = Environment.GetEnvironmentVariable("INFOPANEL_START_PAGE");
-                NavView.SelectedItem = NavView.MenuItems.OfType<FANavigationViewItem>()
-                    .FirstOrDefault(item => (string?)item.Tag == startPage)
-                    ?? NavView.MenuItems.OfType<FANavigationViewItem>().First();
+                if (startPage == "settings")
+                {
+                    PageHost.Content = _pages["settings"]; // dev hook; footer item resolves lazily
+                }
+                else
+                {
+                    NavView.SelectedItem = NavView.MenuItems.OfType<FANavigationViewItem>()
+                        .FirstOrDefault(item => (string?)item.Tag == startPage)
+                        ?? NavView.MenuItems.OfType<FANavigationViewItem>().First();
+                }
 
                 _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
                 _statusTimer.Tick += (_, _) => UpdateStatus();
@@ -53,6 +60,46 @@ namespace InfoPanel.Views
                 + app?.Host.Settings.BeadaPanelDevices.Count(d => d.Enabled)
                 + app?.Host.Settings.TuringPanelDevices.Count(d => d.Enabled);
             StatusText.Text = $"{deviceCount} devices · {sensorCount} sensors";
+        }
+
+        private void LogsToggle_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            LogsDrawer.IsVisible = LogsToggle.IsChecked == true;
+            if (LogsDrawer.IsVisible)
+            {
+                LogsList.ItemsSource ??= Utils.UiLogSink.Instance.Lines;
+                ScrollLogsToEnd();
+                Utils.UiLogSink.Instance.Lines.CollectionChanged += Logs_CollectionChanged;
+            }
+            else
+            {
+                Utils.UiLogSink.Instance.Lines.CollectionChanged -= Logs_CollectionChanged;
+            }
+        }
+
+        private void Logs_CollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) => ScrollLogsToEnd();
+
+        private void ScrollLogsToEnd()
+        {
+            if (Utils.UiLogSink.Instance.Lines.Count > 0)
+            {
+                LogsList.ScrollIntoView(Utils.UiLogSink.Instance.Lines[^1]);
+            }
+        }
+
+        private void LogsClear_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => Utils.UiLogSink.Instance.Lines.Clear();
+
+        private void LogsFolder_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(
+                    "xdg-open", System.IO.Path.Combine(Persistence.ConfigPersistence.BaseFolder, "logs"))
+                { UseShellExecute = false });
+            }
+            catch
+            {
+            }
         }
 
         private void NavView_SelectionChanged(object? sender, FANavigationViewSelectionChangedEventArgs e)

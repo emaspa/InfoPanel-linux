@@ -5,6 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>InfoPanel</RootNamespace>
     <AssemblyName>infopanel</AssemblyName>
+    <Version>2.0.0</Version>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -35,6 +36,7 @@
     <ProjectReference Include="..\InfoPanel.Platform.Linux\InfoPanel.Platform.Linux.csproj" />
     <ProjectReference Include="..\InfoPanel.Rendering\InfoPanel.Rendering.csproj" />
     <ProjectReference Include="..\InfoPanel.Sensors\InfoPanel.Sensors.csproj" />
+    <ProjectReference Include="..\InfoPanel.Web\InfoPanel.Web.csproj" />
     <ProjectReference Include="..\InfoPanel.Sensors.Linux\InfoPanel.Sensors.Linux.csproj" />
   </ItemGroup>
 

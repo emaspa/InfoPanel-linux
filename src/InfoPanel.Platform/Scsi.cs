@@ -36,5 +36,7 @@ namespace InfoPanel.Platform
     public static class PlatformServices
     {
         public static IScsiTransportProvider? ScsiTransport { get; set; }
+
+        public static IAutostartService? Autostart { get; set; }
     }
 }

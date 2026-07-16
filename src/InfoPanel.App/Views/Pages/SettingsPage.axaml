@@ -1,9 +1,62 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="InfoPanel.Views.Pages.SettingsPage">
-    <StackPanel Margin="24" Spacing="8">
-        <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" />
-        <TextBlock Text="Coming in a later milestone."
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-    </StackPanel>
+
+    <ScrollViewer>
+        <StackPanel Margin="24" Spacing="20" MaxWidth="720" HorizontalAlignment="Left">
+            <TextBlock Text="Settings" FontSize="28" FontWeight="SemiBold" />
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="General" FontSize="18" FontWeight="SemiBold" />
+                <ToggleSwitch x:Name="AutoStartToggle" OnContent="Start at login" OffContent="Start at login" />
+                <DockPanel MaxWidth="300" HorizontalAlignment="Left">
+                    <TextBlock Text="Start delay (s)" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <NumericUpDown x:Name="AutoStartDelay" Minimum="0" Maximum="120" Increment="1" FormatString="0" />
+                </DockPanel>
+                <ToggleSwitch x:Name="StartMinimizedToggle" OnContent="Start minimized" OffContent="Start minimized" />
+                <ToggleSwitch x:Name="MinimizeToTrayToggle" OnContent="Close button minimizes to tray" OffContent="Close button minimizes to tray" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="Rendering" FontSize="18" FontWeight="SemiBold" />
+                <DockPanel MaxWidth="300" HorizontalAlignment="Left">
+                    <TextBlock Text="Target frame rate" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <NumericUpDown x:Name="FrameRate" Minimum="1" Maximum="60" Increment="1" FormatString="0" />
+                </DockPanel>
+                <DockPanel MaxWidth="300" HorizontalAlignment="Left">
+                    <TextBlock Text="Graph update (ms)" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <NumericUpDown x:Name="GraphRate" Minimum="100" Maximum="10000" Increment="100" FormatString="0" />
+                </DockPanel>
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="Web server" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="Serves live profile images to browsers on your network."
+                           FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <ToggleSwitch x:Name="WebServerToggle" OnContent="Enabled" OffContent="Disabled" />
+                <DockPanel MaxWidth="380" HorizontalAlignment="Left">
+                    <TextBlock Text="Listen address" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <TextBox x:Name="WebServerIp" Watermark="127.0.0.1" />
+                </DockPanel>
+                <DockPanel MaxWidth="300" HorizontalAlignment="Left">
+                    <TextBlock Text="Port" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <NumericUpDown x:Name="WebServerPort" Minimum="1" Maximum="65535" Increment="1" FormatString="0" />
+                </DockPanel>
+                <TextBlock x:Name="WebServerLink" FontSize="12" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="About" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock x:Name="VersionText" />
+                <TextBlock Text="InfoPanel for Linux — rebuilt on Avalonia. Based on InfoPanel by habibrehmansg."
+                           FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Content="Open data folder" Click="OpenDataFolder_Click" />
+                    <Button Content="Open log folder" Click="OpenLogFolder_Click" />
+                </StackPanel>
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+
 </UserControl>

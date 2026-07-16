@@ -206,6 +206,7 @@ namespace InfoPanel.Platform.Linux
         public static void Register()
         {
             PlatformServices.ScsiTransport = new SgIoScsiTransportProvider();
+            PlatformServices.Autostart = new XdgAutostartService();
         }
     }
 }

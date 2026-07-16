@@ -39,6 +39,49 @@ namespace InfoPanel
             DeviceRuntime.Settings = Settings;
             DeviceRuntime.GetProfile = guid => Profiles.FirstOrDefault(p => p.Guid == guid);
             DeviceRuntime.RequestSettingsSave = SaveSettings;
+            DeviceRuntime.GetProfiles = () => Profiles.ToList();
+
+            // React to settings toggles like v1's ConfigModel did: restart the affected
+            // service when a mode changes, keep render pacing and autostart in sync.
+            Settings.PropertyChanged += async (_, e) =>
+            {
+                try
+                {
+                    switch (e.PropertyName)
+                    {
+                        case nameof(Settings.ThermalrightPanelMultiDeviceMode):
+                            await ThermalrightPanelTask.Instance.StopAsync();
+                            if (Settings.ThermalrightPanelMultiDeviceMode) await ThermalrightPanelTask.Instance.StartAsync();
+                            break;
+                        case nameof(Settings.TuringPanelMultiDeviceMode):
+                            await TuringPanelTask.Instance.StopAsync();
+                            if (Settings.TuringPanelMultiDeviceMode) await TuringPanelTask.Instance.StartAsync();
+                            break;
+                        case nameof(Settings.BeadaPanelMultiDeviceMode):
+                            await BeadaPanelTask.Instance.StopAsync();
+                            if (Settings.BeadaPanelMultiDeviceMode) await BeadaPanelTask.Instance.StartAsync();
+                            break;
+                        case nameof(Settings.WebServer):
+                            if (Settings.WebServer) await WebServerTask.Instance.StartAsync();
+                            else await WebServerTask.Instance.StopAsync();
+                            break;
+                        case nameof(Settings.AutoStart):
+                        case nameof(Settings.AutoStartDelay):
+                            Platform.PlatformServices.Autostart?.Apply(Settings.AutoStart, Settings.AutoStartDelay);
+                            break;
+                        case nameof(Settings.TargetFrameRate):
+                            RenderContext.TargetFrameRate = Settings.TargetFrameRate;
+                            break;
+                        case nameof(Settings.TargetGraphUpdateRate):
+                            RenderContext.TargetGraphUpdateRate = Settings.TargetGraphUpdateRate;
+                            break;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.Error(ex, "Error applying settings change {Property}", e.PropertyName);
+                }
+            };
 
             // Render pacing from settings
             RenderContext.TargetFrameRate = Settings.TargetFrameRate;
@@ -84,10 +127,16 @@ namespace InfoPanel
             await BeadaPanelTask.Instance.StartAsync(token);
             await TuringPanelTask.Instance.StartAsync(token);
             await ThermalrightPanelTask.Instance.StartAsync(token);
+
+            if (Settings.WebServer)
+            {
+                await WebServerTask.Instance.StartAsync(token);
+            }
         }
 
         public async Task StopDevicesAsync()
         {
+            try { await WebServerTask.Instance.StopAsync(shutdown: true); } catch { }
             await BeadaPanelTask.Instance.StopAsync(shutdown: true);
             await TuringPanelTask.Instance.StopAsync(shutdown: true);
             await ThermalrightPanelTask.Instance.StopAsync(shutdown: true);

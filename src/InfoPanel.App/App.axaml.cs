@@ -39,6 +39,7 @@ namespace InfoPanel
 
                 // Marshal Core model notifications through the Avalonia dispatcher
                 UiThread.Configure(action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
+                UiLogSink.Instance.AttachDispatcher(action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
 
                 _host = new AppHost();
                 _host.Initialize();
