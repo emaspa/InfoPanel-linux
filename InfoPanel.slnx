@@ -1,10 +1,16 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/InfoPanel.App/InfoPanel.App.csproj" />
     <Project Path="src/InfoPanel.Core/InfoPanel.Core.csproj" />
+    <Project Path="src/InfoPanel.Devices.Thermalright/InfoPanel.Devices.Thermalright.csproj" />
+    <Project Path="src/InfoPanel.Devices/InfoPanel.Devices.csproj" />
     <Project Path="src/InfoPanel.Extras/InfoPanel.Extras.csproj" />
+    <Project Path="src/InfoPanel.Platform.Linux/InfoPanel.Platform.Linux.csproj" />
+    <Project Path="src/InfoPanel.Platform/InfoPanel.Platform.csproj" />
     <Project Path="src/InfoPanel.Plugins.Loader/InfoPanel.Plugins.Loader.csproj" />
     <Project Path="src/InfoPanel.Plugins.Simulator/InfoPanel.Plugins.Simulator.csproj" />
     <Project Path="src/InfoPanel.Plugins/InfoPanel.Plugins.csproj" />
+    <Project Path="src/InfoPanel.Rendering/InfoPanel.Rendering.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/InfoPanel.Core.Tests/InfoPanel.Core.Tests.csproj" />

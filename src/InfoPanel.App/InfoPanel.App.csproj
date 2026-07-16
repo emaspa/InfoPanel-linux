@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>InfoPanel</RootNamespace>
+    <AssemblyName>infopanel</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="4.3.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="6.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\InfoPanel.Core\InfoPanel.Core.csproj" />
+    <ProjectReference Include="..\InfoPanel.Devices\InfoPanel.Devices.csproj" />
+    <ProjectReference Include="..\InfoPanel.Devices.Thermalright\InfoPanel.Devices.Thermalright.csproj" />
+    <ProjectReference Include="..\InfoPanel.Platform.Linux\InfoPanel.Platform.Linux.csproj" />
+    <ProjectReference Include="..\InfoPanel.Rendering\InfoPanel.Rendering.csproj" />
+  </ItemGroup>
+
+</Project>
