@@ -287,41 +287,61 @@ namespace InfoPanel.Views.Pages
 
         private void AddSensorAsBar_Click(object? sender, RoutedEventArgs e)
         {
-            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
-            var item = new BarDisplayItem { Name = leaf.Name, Width = 200, Height = 30, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
-            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            if (_session == null) return;
+            var item = new BarDisplayItem { Name = "New bar", Width = 200, Height = 30, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            if (SelectedSensorLeaf is { } leaf)
+            {
+                item.Name = leaf.Name;
+                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            }
             AddBoundItem(item);
         }
 
         private void AddSensorAsGraph_Click(object? sender, RoutedEventArgs e)
         {
-            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
-            var item = new GraphDisplayItem { Name = leaf.Name, Width = 240, Height = 100, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
-            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            if (_session == null) return;
+            var item = new GraphDisplayItem { Name = "New graph", Width = 240, Height = 100, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            if (SelectedSensorLeaf is { } leaf)
+            {
+                item.Name = leaf.Name;
+                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            }
             AddBoundItem(item);
         }
 
         private void AddSensorAsDonut_Click(object? sender, RoutedEventArgs e)
         {
-            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
-            var item = new DonutDisplayItem { Name = leaf.Name, Radius = 50, Thickness = 12, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
-            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            if (_session == null) return;
+            var item = new DonutDisplayItem { Name = "New donut", Radius = 50, Thickness = 12, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            if (SelectedSensorLeaf is { } leaf)
+            {
+                item.Name = leaf.Name;
+                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            }
             AddBoundItem(item);
         }
 
         private void AddSensorAsGauge_Click(object? sender, RoutedEventArgs e)
         {
-            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
-            var item = new GaugeDisplayItem { Name = leaf.Name, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
-            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            if (_session == null) return;
+            var item = new GaugeDisplayItem { Name = "New gauge", X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            if (SelectedSensorLeaf is { } leaf)
+            {
+                item.Name = leaf.Name;
+                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            }
             AddBoundItem(item);
         }
 
         private void AddSensorAsImage_Click(object? sender, RoutedEventArgs e)
         {
-            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
-            var item = new SensorImageDisplayItem { Name = leaf.Name, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
-            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            if (_session == null) return;
+            var item = new SensorImageDisplayItem { Name = "New sensor image", X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            if (SelectedSensorLeaf is { } leaf)
+            {
+                item.Name = leaf.Name;
+                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            }
             AddBoundItem(item);
         }
 

@@ -31,6 +31,12 @@
                             <MenuItem Header="Sensor" Click="AddSensor_Click" />
                             <MenuItem Header="Clock" Click="AddClock_Click" />
                             <MenuItem Header="Calendar" Click="AddCalendar_Click" />
+                            <MenuItem Header="Bar" Click="AddSensorAsBar_Click" />
+                            <MenuItem Header="Graph" Click="AddSensorAsGraph_Click" />
+                            <MenuItem Header="Donut" Click="AddSensorAsDonut_Click" />
+                            <MenuItem Header="Gauge" Click="AddSensorAsGauge_Click" />
+                            <MenuItem Header="Sensor image" Click="AddSensorAsImage_Click" />
+                            <Separator />
                             <MenuItem Header="Image…" Click="AddImage_Click" />
                             <MenuItem Header="Shape" Click="AddShape_Click" />
                             <MenuItem Header="Group" Click="AddGroup_Click" />
