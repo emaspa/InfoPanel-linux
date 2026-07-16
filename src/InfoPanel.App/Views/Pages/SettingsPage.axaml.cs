@@ -86,7 +86,7 @@ namespace InfoPanel.Views.Pages
                 }
 
                 var version = Assembly.GetExecutingAssembly().GetName().Version;
-                VersionText.Text = $"InfoPanel Linux — v{version?.ToString(3) ?? "0.0.1"}";
+                VersionText.Text = $"InfoPanel Linux — v{version?.ToString(3) ?? "0.0.1"} alpha";
             }
             finally
             {

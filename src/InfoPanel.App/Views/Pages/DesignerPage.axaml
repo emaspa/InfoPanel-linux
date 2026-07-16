@@ -66,14 +66,14 @@
                     <DockPanel>
                         <TextBox x:Name="LayerSearch" DockPanel.Dock="Top" PlaceholderText="Filter items…"
                                  Margin="4" TextChanged="LayerSearch_TextChanged" />
-                        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="4" Margin="4">
-                            <Button Content="Del" FontSize="11" Click="LayerDelete_Click" ToolTip.Tip="Delete selected" />
-                            <Button Content="Dup" FontSize="11" Click="LayerDuplicate_Click" ToolTip.Tip="Duplicate selected" />
-                            <Button Content="↑" FontSize="11" Click="LayerUp_Click" ToolTip.Tip="Move up (draw later)" />
-                            <Button Content="↓" FontSize="11" Click="LayerDown_Click" ToolTip.Tip="Move down" />
-                            <Button Content="Top" FontSize="11" Click="LayerTop_Click" />
-                            <Button Content="Bottom" FontSize="11" Click="LayerBottom_Click" />
-                        </StackPanel>
+                        <WrapPanel DockPanel.Dock="Bottom" Margin="4">
+                            <Button Content="Del" FontSize="11" Margin="0,0,4,4" Click="LayerDelete_Click" ToolTip.Tip="Delete selected" />
+                            <Button Content="Dup" FontSize="11" Margin="0,0,4,4" Click="LayerDuplicate_Click" ToolTip.Tip="Duplicate selected" />
+                            <Button Content="↑" FontSize="11" Margin="0,0,4,4" Click="LayerUp_Click" ToolTip.Tip="Move up (draw later)" />
+                            <Button Content="↓" FontSize="11" Margin="0,0,4,4" Click="LayerDown_Click" ToolTip.Tip="Move down" />
+                            <Button Content="Top" FontSize="11" Margin="0,0,4,4" Click="LayerTop_Click" />
+                            <Button Content="Bottom" FontSize="11" Margin="0,0,4,4" Click="LayerBottom_Click" />
+                        </WrapPanel>
                         <TreeView x:Name="LayersTree" SelectionChanged="LayersTree_SelectionChanged">
                             <TreeView.ItemTemplate>
                                 <TreeDataTemplate x:DataType="models:DisplayItem">
