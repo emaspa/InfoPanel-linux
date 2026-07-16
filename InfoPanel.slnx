@@ -2,7 +2,9 @@
   <Folder Name="/src/">
     <Project Path="src/InfoPanel.App/InfoPanel.App.csproj" />
     <Project Path="src/InfoPanel.Core/InfoPanel.Core.csproj" />
+    <Project Path="src/InfoPanel.Devices.BeadaPanel/InfoPanel.Devices.BeadaPanel.csproj" />
     <Project Path="src/InfoPanel.Devices.Thermalright/InfoPanel.Devices.Thermalright.csproj" />
+    <Project Path="src/InfoPanel.Devices.TuringPanel/InfoPanel.Devices.TuringPanel.csproj" />
     <Project Path="src/InfoPanel.Devices/InfoPanel.Devices.csproj" />
     <Project Path="src/InfoPanel.Extras/InfoPanel.Extras.csproj" />
     <Project Path="src/InfoPanel.Platform.Linux/InfoPanel.Platform.Linux.csproj" />
@@ -13,6 +15,8 @@
     <Project Path="src/InfoPanel.Rendering/InfoPanel.Rendering.csproj" />
     <Project Path="src/InfoPanel.Sensors.Linux/InfoPanel.Sensors.Linux.csproj" />
     <Project Path="src/InfoPanel.Sensors/InfoPanel.Sensors.csproj" />
+    <Project Path="src/TuringSmartScreenLib.Helpers.SkiaSharp/TuringSmartScreenLib.Helpers.SkiaSharp.csproj" />
+    <Project Path="src/TuringSmartScreenLib/TuringSmartScreenLib.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/InfoPanel.Core.Tests/InfoPanel.Core.Tests.csproj" />

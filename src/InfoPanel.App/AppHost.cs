@@ -69,11 +69,15 @@ namespace InfoPanel
 
         public async Task StartDevicesAsync(CancellationToken token)
         {
+            await BeadaPanelTask.Instance.StartAsync(token);
+            await TuringPanelTask.Instance.StartAsync(token);
             await ThermalrightPanelTask.Instance.StartAsync(token);
         }
 
         public async Task StopDevicesAsync()
         {
+            await BeadaPanelTask.Instance.StopAsync(shutdown: true);
+            await TuringPanelTask.Instance.StopAsync(shutdown: true);
             await ThermalrightPanelTask.Instance.StopAsync(shutdown: true);
 
             try { await Monitors.PluginMonitor.Instance.StopAsync().WaitAsync(TimeSpan.FromSeconds(3)); } catch { }
