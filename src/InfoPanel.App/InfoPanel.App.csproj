@@ -44,8 +44,8 @@
        replicating v1's layout: the plugin folder deliberately excludes InfoPanel.Plugins.dll
        so the contract assembly resolves from the host (shared type identity). -->
   <Target Name="BuildExtras" BeforeTargets="Build">
-    <MSBuild Projects="..\InfoPanel.Extras\InfoPanel.Extras.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0;SelfContained=false" />
-    <MSBuild Projects="..\InfoPanel.Extras\InfoPanel.Extras.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);TargetFramework=net8.0">
+    <MSBuild Projects="..\InfoPanel.Extras\InfoPanel.Extras.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0;SelfContained=false" RemoveProperties="RuntimeIdentifier;PublishDir;SelfContained" />
+    <MSBuild Projects="..\InfoPanel.Extras\InfoPanel.Extras.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);TargetFramework=net8.0" RemoveProperties="RuntimeIdentifier;PublishDir;SelfContained">
       <Output TaskParameter="TargetOutputs" PropertyName="_ExtrasAssemblyPath" />
     </MSBuild>
     <PropertyGroup>
