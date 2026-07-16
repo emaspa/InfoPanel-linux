@@ -29,10 +29,29 @@ namespace InfoPanel
                 var host = new AppHost();
                 host.Initialize();
 
+                // --dump-sensors: start monitors, poll briefly, print all readings and exit
+                if (args.Contains("--dump-sensors"))
+                {
+                    await host.StartSensorsAsync();
+                    await Task.Delay(2500);
+
+                    foreach (var (id, reading) in Services.HwmonMonitor.SENSORHASH.OrderBy(kv => kv.Key))
+                    {
+                        Console.WriteLine($"{id,-40} {reading.ValueNow,12:0.###} {reading.Unit}");
+                    }
+
+                    Log.Information("{Count} hwmon sensors, {PluginCount} plugin sensors",
+                        Services.HwmonMonitor.SENSORHASH.Count, Monitors.PluginMonitor.SENSORHASH.Count);
+                    Environment.Exit(0);
+                }
+
                 // --render-once [dir]: render every profile to PNG and exit (pipeline verification)
                 var renderOnceIndex = Array.IndexOf(args, "--render-once");
                 if (renderOnceIndex >= 0)
                 {
+                    await host.StartSensorsAsync();
+                    await Task.Delay(2500); // let monitors populate so sensor items render real values
+
                     var outDir = args.Length > renderOnceIndex + 1 && !args[renderOnceIndex + 1].StartsWith("--")
                         ? args[renderOnceIndex + 1]
                         : Directory.GetCurrentDirectory();
@@ -59,6 +78,7 @@ namespace InfoPanel
                     cts.Cancel();
                 };
 
+                await host.StartSensorsAsync();
                 await host.StartDevicesAsync(cts.Token);
                 Log.Information("InfoPanel running headless — Ctrl+C to exit");
 

@@ -7,11 +7,12 @@ using System.Threading.Tasks;
 
 namespace InfoPanel.Utils
 {
-    class FileUtil
+    public class FileUtil
     {
         public static string GetBundledPluginFolder()
         {
-            return Path.Combine("plugins");
+            // Anchor to the app directory so the CLI works from any working directory
+            return Path.Combine(AppContext.BaseDirectory, "plugins");
         }
 
         public static string GetExternalPluginFolder()

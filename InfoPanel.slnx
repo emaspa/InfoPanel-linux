@@ -11,6 +11,8 @@
     <Project Path="src/InfoPanel.Plugins.Simulator/InfoPanel.Plugins.Simulator.csproj" />
     <Project Path="src/InfoPanel.Plugins/InfoPanel.Plugins.csproj" />
     <Project Path="src/InfoPanel.Rendering/InfoPanel.Rendering.csproj" />
+    <Project Path="src/InfoPanel.Sensors.Linux/InfoPanel.Sensors.Linux.csproj" />
+    <Project Path="src/InfoPanel.Sensors/InfoPanel.Sensors.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/InfoPanel.Core.Tests/InfoPanel.Core.Tests.csproj" />

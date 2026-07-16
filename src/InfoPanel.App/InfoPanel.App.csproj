@@ -19,6 +19,39 @@
     <ProjectReference Include="..\InfoPanel.Devices.Thermalright\InfoPanel.Devices.Thermalright.csproj" />
     <ProjectReference Include="..\InfoPanel.Platform.Linux\InfoPanel.Platform.Linux.csproj" />
     <ProjectReference Include="..\InfoPanel.Rendering\InfoPanel.Rendering.csproj" />
+    <ProjectReference Include="..\InfoPanel.Sensors\InfoPanel.Sensors.csproj" />
+    <ProjectReference Include="..\InfoPanel.Sensors.Linux\InfoPanel.Sensors.Linux.csproj" />
   </ItemGroup>
+
+  <!-- Build InfoPanel.Extras (net8.0 plugin) and ship it under plugins/InfoPanel.Extras,
+       replicating v1's layout: the plugin folder deliberately excludes InfoPanel.Plugins.dll
+       so the contract assembly resolves from the host (shared type identity). -->
+  <Target Name="BuildExtras" BeforeTargets="Build">
+    <MSBuild Projects="..\InfoPanel.Extras\InfoPanel.Extras.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0;SelfContained=false" />
+    <MSBuild Projects="..\InfoPanel.Extras\InfoPanel.Extras.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);TargetFramework=net8.0">
+      <Output TaskParameter="TargetOutputs" PropertyName="_ExtrasAssemblyPath" />
+    </MSBuild>
+    <PropertyGroup>
+      <ExtrasOutputDir>$([System.IO.Path]::GetDirectoryName('$(_ExtrasAssemblyPath)'))</ExtrasOutputDir>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="CopyExtrasToBuildOutput" AfterTargets="BuildExtras">
+    <ItemGroup>
+      <ExtrasFiles Include="$(ExtrasOutputDir)\**\*.*" Exclude="$(ExtrasOutputDir)\InfoPanel.Plugins.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ExtrasFiles)" DestinationFolder="$(OutputPath)plugins/InfoPanel.Extras" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyExtrasToPublishOutput" AfterTargets="Publish">
+    <ItemGroup>
+      <ExtrasPublishFiles Include="$(ExtrasOutputDir)\**\*.*" Exclude="$(ExtrasOutputDir)\InfoPanel.Plugins.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(ExtrasPublishFiles)" DestinationFolder="$(PublishDir)plugins/InfoPanel.Extras" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CleanPluginsDirectory" BeforeTargets="Clean">
+    <RemoveDir Directories="$(OutputPath)plugins" />
+  </Target>
 
 </Project>

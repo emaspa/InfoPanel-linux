@@ -38,6 +38,33 @@ namespace InfoPanel
             // Render pacing from settings
             RenderContext.TargetFrameRate = Settings.TargetFrameRate;
             RenderContext.TargetGraphUpdateRate = Settings.TargetGraphUpdateRate;
+
+            // Sensor sources for display items and graphs
+            SensorReader.ConfigureHwmonSource(static id =>
+                HwmonMonitor.SENSORHASH.TryGetValue(id, out var reading) ? reading : null);
+            SensorReader.ConfigurePluginSource(Sensors.PluginSensorReader.Read);
+        }
+
+        public async Task StartSensorsAsync()
+        {
+            try
+            {
+                await Monitors.PluginMonitor.Instance.StartAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Plugin monitor initialization failed");
+            }
+
+            try
+            {
+                // HwmonMonitor's poll also drives LinuxSystemSensors and the GPU monitors
+                HwmonMonitor.Instance.Start(Settings.TargetGraphUpdateRate);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "HwmonMonitor initialization failed");
+            }
         }
 
         public async Task StartDevicesAsync(CancellationToken token)
@@ -48,6 +75,10 @@ namespace InfoPanel
         public async Task StopDevicesAsync()
         {
             await ThermalrightPanelTask.Instance.StopAsync(shutdown: true);
+
+            try { await Monitors.PluginMonitor.Instance.StopAsync().WaitAsync(TimeSpan.FromSeconds(3)); } catch { }
+            try { HwmonMonitor.Instance.Stop(); } catch { }
+            try { IntelGpuMonitor.Instance.Shutdown(); } catch { }
         }
     }
 }
