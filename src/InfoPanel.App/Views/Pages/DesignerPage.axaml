@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:designer="using:InfoPanel.Designer"
              xmlns:models="using:InfoPanel.Models"
+             xmlns:vm="using:InfoPanel.ViewModels"
              x:Class="InfoPanel.Views.Pages.DesignerPage">
 
     <DockPanel>
@@ -24,6 +25,10 @@
                 <Button x:Name="UndoButton" Content="&#x21B6; Undo" Click="Undo_Click" IsEnabled="False" />
                 <Button x:Name="RedoButton" Content="&#x21B7; Redo" Click="Redo_Click" IsEnabled="False" />
                 <Separator Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                <Button Content="+ Text" Click="AddText_Click" />
+                <Button Content="+ Sensor" Click="AddSensor_Click" />
+                <Button Content="+ Shape" Click="AddShape_Click" />
+                <Separator Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
                 <ToggleButton x:Name="SnapToggle" Content="Snap" IsChecked="True" Click="Snap_Click" />
                 <Button Content="Fit" Click="Fit_Click" />
                 <TextBlock x:Name="ZoomLabel" VerticalAlignment="Center" Text="100%"
@@ -35,7 +40,54 @@
             </StackPanel>
         </Border>
 
-        <designer:DesignCanvas x:Name="Canvas" />
+        <Grid ColumnDefinitions="260,4,*,4,280">
+
+            <!-- Left: layers + sensors -->
+            <TabControl Grid.Column="0">
+                <TabItem Header="Layers">
+                    <TreeView x:Name="LayersTree" SelectionChanged="LayersTree_SelectionChanged">
+                        <TreeView.ItemTemplate>
+                            <TreeDataTemplate x:DataType="models:DisplayItem">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="{Binding Kind}" FontSize="11" Opacity="0.6" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </TreeDataTemplate>
+                        </TreeView.ItemTemplate>
+                    </TreeView>
+                </TabItem>
+                <TabItem Header="Sensors">
+                    <DockPanel>
+                        <TextBox x:Name="SensorSearch" DockPanel.Dock="Top" Watermark="Search sensors…"
+                                 Margin="4" TextChanged="SensorSearch_TextChanged" />
+                        <TextBlock DockPanel.Dock="Bottom" Margin="6,4" FontSize="11" Opacity="0.6"
+                                   Text="Double-click a sensor to add it to the canvas" TextWrapping="Wrap" />
+                        <TreeView x:Name="SensorTree" DoubleTapped="SensorTree_DoubleTapped"
+                                  SelectionChanged="SensorTree_SelectionChanged">
+                            <TreeView.ItemTemplate>
+                                <TreeDataTemplate x:DataType="vm:SensorTreeItem" ItemsSource="{Binding Children}">
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding DisplayValue}"
+                                                   FontSize="11" Opacity="0.7" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                    </DockPanel>
+                                </TreeDataTemplate>
+                            </TreeView.ItemTemplate>
+                        </TreeView>
+                    </DockPanel>
+                </TabItem>
+            </TabControl>
+
+            <GridSplitter Grid.Column="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+
+            <designer:DesignCanvas x:Name="Canvas" Grid.Column="2" />
+
+            <GridSplitter Grid.Column="3" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+
+            <!-- Right: inspector -->
+            <designer:InspectorPanel x:Name="Inspector" Grid.Column="4" />
+
+        </Grid>
 
     </DockPanel>
 
