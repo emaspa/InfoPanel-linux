@@ -9,9 +9,17 @@ namespace InfoPanel.Extras
     /// RTSS/PresentMon). Tails the newest CSV in the MangoHud log folder while a
     /// game is running.
     ///
-    /// Enable logging per game, e.g. in Steam launch options:
-    ///   MANGOHUD_CONFIG=autostart_log=1,log_interval=500,log_folder=/home/USER/mangohud_logs mangohud %command%
-    /// or set the same keys in ~/.config/MangoHud/MangoHud.conf.
+    /// Recommended ~/.config/MangoHud/MangoHud.conf (verified against MangoHud 0.8.4):
+    ///   fps_only
+    ///   autostart_log=1
+    ///   log_interval=1000
+    ///   output_folder=/home/USER/mangohud_logs
+    /// Notes: the folder key is 'output_folder' (not 'log_folder') on 0.8.x, and
+    /// 'no_display' silently disables autostart_log — use fps_only to minimize the
+    /// overlay instead. Enable per game with 'mangohud %command%' or globally for
+    /// Vulkan titles with MANGOHUD=1. Flatpak games additionally need the
+    /// org.freedesktop.Platform.VulkanLayer.MangoHud extension and, if the app
+    /// overrides XDG_DATA_DIRS, an override appending /usr/lib/extensions/vulkan/share.
     /// </summary>
     public partial class MangoHudPlugin : BasePlugin
     {
