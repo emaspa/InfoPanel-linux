@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/InfoPanel.Core/InfoPanel.Core.csproj" />
     <Project Path="src/InfoPanel.Extras/InfoPanel.Extras.csproj" />
     <Project Path="src/InfoPanel.Plugins.Loader/InfoPanel.Plugins.Loader.csproj" />
     <Project Path="src/InfoPanel.Plugins.Simulator/InfoPanel.Plugins.Simulator.csproj" />
