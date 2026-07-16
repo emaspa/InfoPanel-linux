@@ -2,7 +2,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:ui="using:FluentAvalonia.UI.Controls"
         x:Class="InfoPanel.Views.MainWindow"
-        Title="InfoPanel"
+        Title="InfoPanel Linux"
         Icon="avares://infopanel/Assets/favicon.ico"
         Width="1280" Height="800"
         MinWidth="900" MinHeight="600">

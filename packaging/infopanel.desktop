@@ -1,7 +1,7 @@
 [Desktop Entry]
-Name=InfoPanel
+Name=InfoPanel Linux
 Comment=Display hardware monitoring data on desktop overlays and USB LCD panels
-Exec=InfoPanel
+Exec=infopanel
 Icon=infopanel
 Type=Application
 Categories=Utility;System;Monitor;

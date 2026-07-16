@@ -10,7 +10,7 @@
 
     <TrayIcon.Icons>
         <TrayIcons>
-            <TrayIcon Icon="avares://infopanel/Assets/favicon.ico" ToolTipText="InfoPanel">
+            <TrayIcon Icon="avares://infopanel/Assets/favicon.ico" ToolTipText="InfoPanel Linux">
                 <TrayIcon.Menu>
                     <NativeMenu>
                         <NativeMenuItem Header="Open InfoPanel" Click="TrayMenu_Open" />

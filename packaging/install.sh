@@ -15,6 +15,11 @@ ln -sf "$APP_DIR/infopanel" "$BIN_DIR/infopanel"
 
 sed "s|^Exec=.*|Exec=$APP_DIR/infopanel|" infopanel.desktop > "$DESKTOP_DIR/infopanel.desktop"
 
+ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+mkdir -p "$ICON_DIR"
+cp infopanel.png "$ICON_DIR/infopanel.png" 2>/dev/null || true
+gtk-update-icon-cache -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
+
 echo "Installing udev rules (sudo required, grants USB panel access to plugdev)"
 sudo cp infopanel-udev.rules /etc/udev/rules.d/99-infopanel.rules
 sudo udevadm control --reload-rules

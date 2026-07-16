@@ -76,7 +76,7 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v2.0.0 — Ground-up Linux rebuild" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.0.1 — Ground-up Linux rebuild" FontWeight="SemiBold" FontSize="12" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="New Avalonia 12 UI with a direct-manipulation designer (zoom/pan canvas, undo/redo, layers, live sensor tree). Latest Thermalright/TRCC device support from the Windows fork with USB replug self-healing. Video backgrounds via ffmpeg. Web server, XDG autostart, profile import/export. Profiles remain fully compatible with v1.4 and InfoPanel for Windows." />
                     </StackPanel>
