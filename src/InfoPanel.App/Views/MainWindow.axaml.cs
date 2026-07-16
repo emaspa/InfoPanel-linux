@@ -22,7 +22,11 @@ namespace InfoPanel.Views
 
             Loaded += (_, _) =>
             {
-                NavView.SelectedItem = NavView.MenuItems.OfType<FANavigationViewItem>().First();
+                // Dev/testing hook: INFOPANEL_START_PAGE=designer opens that page directly
+                var startPage = Environment.GetEnvironmentVariable("INFOPANEL_START_PAGE");
+                NavView.SelectedItem = NavView.MenuItems.OfType<FANavigationViewItem>()
+                    .FirstOrDefault(item => (string?)item.Tag == startPage)
+                    ?? NavView.MenuItems.OfType<FANavigationViewItem>().First();
 
                 _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
                 _statusTimer.Tick += (_, _) => UpdateStatus();

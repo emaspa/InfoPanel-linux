@@ -1,9 +1,42 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:designer="using:InfoPanel.Designer"
+             xmlns:models="using:InfoPanel.Models"
              x:Class="InfoPanel.Views.Pages.DesignerPage">
-    <StackPanel Margin="24" Spacing="8">
-        <TextBlock Text="Designer" FontSize="28" FontWeight="SemiBold" />
-        <TextBlock Text="Coming in a later milestone."
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-    </StackPanel>
+
+    <DockPanel>
+
+        <!-- Toolbar -->
+        <Border DockPanel.Dock="Top"
+                Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="12,6">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ComboBox x:Name="ProfilePicker" MinWidth="180" SelectionChanged="ProfilePicker_SelectionChanged">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate x:DataType="models:Profile">
+                            <TextBlock Text="{Binding Name}" />
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
+                <Separator Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                <Button x:Name="UndoButton" Content="&#x21B6; Undo" Click="Undo_Click" IsEnabled="False" />
+                <Button x:Name="RedoButton" Content="&#x21B7; Redo" Click="Redo_Click" IsEnabled="False" />
+                <Separator Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                <ToggleButton x:Name="SnapToggle" Content="Snap" IsChecked="True" Click="Snap_Click" />
+                <Button Content="Fit" Click="Fit_Click" />
+                <TextBlock x:Name="ZoomLabel" VerticalAlignment="Center" Text="100%"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" MinWidth="48" />
+                <Separator Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
+                <Button Content="Save" Click="Save_Click" />
+                <TextBlock x:Name="SelectionLabel" VerticalAlignment="Center"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+        </Border>
+
+        <designer:DesignCanvas x:Name="Canvas" />
+
+    </DockPanel>
+
 </UserControl>

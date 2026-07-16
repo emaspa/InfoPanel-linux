@@ -3,7 +3,7 @@
         xmlns:controls="using:InfoPanel.Views.Controls"
         x:Class="InfoPanel.Views.DisplayWindow"
         Title="DisplayWindow"
-        SystemDecorations="None"
+        WindowDecorations="None"
         ShowInTaskbar="False"
         Background="Transparent"
         TransparencyLevelHint="Transparent"

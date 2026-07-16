@@ -19,6 +19,7 @@
     <Project Path="src/TuringSmartScreenLib/TuringSmartScreenLib.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/InfoPanel.App.Tests/InfoPanel.App.Tests.csproj" />
     <Project Path="tests/InfoPanel.Core.Tests/InfoPanel.Core.Tests.csproj" />
   </Folder>
 </Solution>

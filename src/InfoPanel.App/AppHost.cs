@@ -39,6 +39,9 @@ namespace InfoPanel
             RenderContext.TargetFrameRate = Settings.TargetFrameRate;
             RenderContext.TargetGraphUpdateRate = Settings.TargetGraphUpdateRate;
 
+            // Live display items: renderers see designer edits immediately
+            RenderContext.GetDisplayItems = Stores.DisplayItemStore.Instance.GetSnapshot;
+
             // Sensor sources for display items and graphs
             SensorReader.ConfigureHwmonSource(static id =>
                 HwmonMonitor.SENSORHASH.TryGetValue(id, out var reading) ? reading : null);
