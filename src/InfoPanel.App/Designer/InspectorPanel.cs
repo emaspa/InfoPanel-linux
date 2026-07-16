@@ -91,6 +91,11 @@ namespace InfoPanel.Designer
                     BuildChartSection(session, chart);
                 }
 
+                if (item is ImageDisplayItem imageItem)
+                {
+                    BuildImageSection(session, imageItem);
+                }
+
                 if (item is ShapeDisplayItem shape)
                 {
                     BuildShapeSection(session, shape);
@@ -200,6 +205,70 @@ namespace InfoPanel.Designer
             _root.Children.Add(auto);
 
             _root.Children.Add(Field("Color", ColorEditor(session, chart, nameof(chart.Color), chart.Color, v => chart.Color = v)));
+        }
+
+        private void BuildImageSection(DesignerSession session, ImageDisplayItem image)
+        {
+            _root.Children.Add(Header("Image / Video"));
+            _root.Children.Add(Label(image.CalculatedPath ?? "No source selected"));
+
+            var pick = new Button { Content = "Choose file…" };
+            pick.Click += async (_, _) =>
+            {
+                var storage = Avalonia.Controls.TopLevel.GetTopLevel(this)?.StorageProvider;
+                if (storage == null) return;
+
+                var files = await storage.OpenFilePickerAsync(new Avalonia.Platform.Storage.FilePickerOpenOptions
+                {
+                    Title = "Choose image or video",
+                    AllowMultiple = false,
+                    FileTypeFilter =
+                    [
+                        new Avalonia.Platform.Storage.FilePickerFileType("Images & videos")
+                        {
+                            Patterns = ["*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp", "*.svg", "*.bmp", "*.mp4", "*.mkv", "*.webm", "*.avi", "*.mov"]
+                        }
+                    ]
+                });
+
+                if (files.Count == 0 || files[0].Path is not { IsFile: true } fileUri)
+                {
+                    return;
+                }
+
+                var localPath = fileUri.LocalPath;
+
+                // copy into the profile's assets folder like v1 did, then reference relatively
+                var fileName = System.IO.Path.GetFileName(localPath);
+                var data = await System.IO.File.ReadAllBytesAsync(localPath);
+                await InfoPanel.Utils.FileUtil.SaveAsset(session.Profile, fileName, data);
+
+                var oldFile = image.FilePath;
+                var oldRelative = image.RelativePath;
+                session.Undo.Execute(new SetPropertyAction<(string?, bool)>(image, "Image source",
+                    v =>
+                    {
+                        image.FilePath = v.Item1;
+                        image.RelativePath = v.Item2;
+                    },
+                    (oldFile, oldRelative), (fileName, true)));
+
+                Rebuild();
+            };
+            _root.Children.Add(pick);
+
+            var url = new TextBox { Text = (image as HttpImageDisplayItem)?.HttpUrl ?? image.HttpUrl, Watermark = "…or http(s):// image URL" };
+            url.LostFocus += (_, _) =>
+            {
+                var text = url.Text ?? "";
+                if (!_rebuilding && text != (image.HttpUrl ?? "") && (text.Length == 0 || text.StartsWith("http")))
+                {
+                    Commit(session, image, nameof(image.HttpUrl), v => image.HttpUrl = v, image.HttpUrl ?? "", text);
+                }
+            };
+            _root.Children.Add(url);
+
+            _root.Children.Add(Field("Scale %", IntEditor(image.Scale, v => Commit(session, image, nameof(image.Scale), x => image.Scale = x, image.Scale, v))));
         }
 
         private void BuildShapeSection(DesignerSession session, ShapeDisplayItem shape)

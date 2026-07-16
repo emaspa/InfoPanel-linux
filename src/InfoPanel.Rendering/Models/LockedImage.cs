@@ -40,17 +40,17 @@ namespace InfoPanel.Models
 
         private readonly SKSvg? SKSvg;
 
-        // Video player stubbed out for Linux port (FlyleafLib is Windows-only)
-        // TODO: Replace with LibVLCSharp in Phase 5.5
+        // Video decoded via the system ffmpeg binary (v1 used Windows-only FlyleafLib)
+        private Video.FfmpegVideoDecoder? _videoDecoder;
 
         public TimeSpan? CurrentTime => null;
-        public TimeSpan? Duration => null;
-        public double? FrameRate => null;
+        public TimeSpan? Duration => _videoDecoder?.Duration;
+        public double? FrameRate => _videoDecoder?.FrameRate;
 
         public bool HasAudio => false;
 
-        public bool IsLive => false;
-        public VideoPlayerStatus? VideoPlayerStatus => null;
+        public bool IsLive => ImagePath.StartsWith("rtsp", StringComparison.OrdinalIgnoreCase);
+        public VideoPlayerStatus? VideoPlayerStatus => _videoDecoder != null ? Models.VideoPlayerStatus.Playing : null;
 
         public float Volume
         {
@@ -80,8 +80,19 @@ namespace InfoPanel.Models
 
             try
             {
-                var uri = new UriBuilder(imagePath) { Query = "" };
-                var strippedUrl = uri.Uri.ToString();
+                // UriBuilder chokes on plain unix paths; only strip query strings off real URLs
+                var strippedUrl = imagePath;
+                if (imagePath.Contains("://"))
+                {
+                    try
+                    {
+                        var uri = new UriBuilder(imagePath) { Query = "" };
+                        strippedUrl = uri.Uri.ToString();
+                    }
+                    catch (UriFormatException)
+                    {
+                    }
+                }
                 if (strippedUrl.StartsWith("rtsp://", StringComparison.OrdinalIgnoreCase)
                         || strippedUrl.StartsWith("rtsps://", StringComparison.OrdinalIgnoreCase)
                         || strippedUrl.EndsWith(".mp4", StringComparison.OrdinalIgnoreCase)
@@ -103,11 +114,23 @@ namespace InfoPanel.Models
                         }
                     }
 
-                    // Video playback not yet supported on Linux (FlyleafLib is Windows-only)
-                    // TODO: Replace with LibVLCSharp in Phase 5.5
                     Type = ImageType.FFMPEG;
-                    Logger.Warning("Video playback is not yet supported on Linux: {ImagePath}", ImagePath);
-                    throw new PlatformNotSupportedException("Video playback requires FlyleafLib which is Windows-only. LibVLCSharp support is planned.");
+                    _videoDecoder = Video.FfmpegVideoDecoder.Open(ImagePath);
+                    if (_videoDecoder == null)
+                    {
+                        throw new InvalidOperationException($"Could not open video (is ffmpeg installed?): {ImagePath}");
+                    }
+
+                    Width = _videoDecoder.Width;
+                    Height = _videoDecoder.Height;
+
+                    if (sourceImageDisplayItem != null)
+                    {
+                        AddImageDisplayItem(sourceImageDisplayItem);
+                    }
+
+                    Loaded = true;
+                    return;
                 }
                 else if (ImagePath.IsUrl())
                 {
@@ -508,7 +531,19 @@ namespace InfoPanel.Models
             {
                 if (Type == ImageType.FFMPEG)
                 {
-                    // Video rendering not yet supported on Linux
+                    // Video frames change every access: resize the latest decoded frame
+                    // directly, bypassing the per-frame caches.
+                    _videoDecoder?.TryAccessFrame(frameBitmap =>
+                    {
+                        using var resized = frameBitmap.Resize(
+                            new SKImageInfo(targetWidth, targetHeight),
+                            new SKSamplingOptions(SKCubicResampler.Mitchell));
+                        if (resized != null)
+                        {
+                            using var image = SKImage.FromBitmap(resized);
+                            access(image);
+                        }
+                    });
                     return;
                 }
 
@@ -602,7 +637,8 @@ namespace InfoPanel.Models
 
                     SKSvg?.Dispose();
 
-                    // Video player disposed with FlyleafLib (stubbed out for Linux)
+                    _videoDecoder?.Dispose();
+                    _videoDecoder = null;
 
                     _codec?.Dispose();
                     _stream?.Dispose();

@@ -43,6 +43,10 @@ namespace InfoPanel
 
                 foreach (var profile in host.Profiles)
                 {
+                    // warmup: image/video sources load asynchronously on first draw
+                    PanelRenderer.RenderSK(profile).Dispose();
+                    await Task.Delay(3000);
+
                     using var bitmap = PanelRenderer.RenderSK(profile);
                     using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
                     using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);

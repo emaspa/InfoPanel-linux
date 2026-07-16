@@ -28,6 +28,7 @@
                 <Button Content="+ Text" Click="AddText_Click" />
                 <Button Content="+ Sensor" Click="AddSensor_Click" />
                 <Button Content="+ Shape" Click="AddShape_Click" />
+                <Button Content="+ Image" Click="AddImage_Click" />
                 <Separator Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
                 <ToggleButton x:Name="SnapToggle" Content="Snap" IsChecked="True" Click="Snap_Click" />
                 <Button Content="Fit" Click="Fit_Click" />

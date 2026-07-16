@@ -277,6 +277,18 @@ namespace InfoPanel.Views.Pages
             Canvas.InvalidateVisual();
         }
 
+        private void AddImage_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null) return;
+            _session.AddItem(new ImageDisplayItem
+            {
+                Name = "New image",
+                X = _session.Profile.Width / 3,
+                Y = _session.Profile.Height / 3,
+            });
+            Canvas.InvalidateVisual();
+        }
+
         private void Undo_Click(object? sender, RoutedEventArgs e)
         {
             _session?.Undo.Undo();
