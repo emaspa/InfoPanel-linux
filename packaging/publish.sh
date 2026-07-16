@@ -17,6 +17,7 @@ dotnet publish src/InfoPanel.App/InfoPanel.App.csproj \
 
 cp packaging/infopanel-udev.rules "$OUT/"
 cp packaging/infopanel.desktop "$OUT/"
+cp packaging/infopanel-smart-dump.sh packaging/infopanel-smart.service packaging/infopanel-smart.timer "$OUT/"
 cp src/InfoPanel.App/Assets/logo.png "$OUT/infopanel.png"
 cp packaging/install.sh "$OUT/"
 chmod +x "$OUT/install.sh" "$OUT/infopanel/infopanel"

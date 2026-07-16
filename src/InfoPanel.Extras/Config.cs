@@ -15,6 +15,7 @@ namespace InfoPanel.Extras
         public readonly static string SECTION_WEATHER = "Weather"; 
         public readonly static string SECTION_SYSTEM_INFO = "System Info";
         public readonly static string SECTION_MANGOHUD = "MangoHud";
+        public readonly static string SECTION_SMART = "SMART";
 
         private IniData? IniData { get; set; }
         private bool IsDirty { get; set; }

@@ -25,5 +25,17 @@ sudo cp infopanel-udev.rules /etc/udev/rules.d/99-infopanel.rules
 sudo udevadm control --reload-rules
 sudo udevadm trigger
 
+# SMART drive health sensors: a root systemd timer dumps smartctl JSON to
+# /run/infopanel/smart.json, which the bundled Drive Health plugin reads.
+if command -v smartctl >/dev/null 2>&1; then
+    echo "Installing SMART sensor timer (sudo required)"
+    sudo install -D -m 0755 infopanel-smart-dump.sh /usr/local/lib/infopanel/infopanel-smart-dump.sh
+    sudo cp infopanel-smart.service infopanel-smart.timer /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl enable --now infopanel-smart.timer
+else
+    echo "smartmontools not found — skipping SMART sensors (install it and re-run for drive health sensors)"
+fi
+
 echo
 echo "Done. Make sure your user is in the plugdev group, then run: infopanel"

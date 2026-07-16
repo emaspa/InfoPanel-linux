@@ -1,0 +1,6 @@
+[Unit]
+Description=InfoPanel SMART data dump
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/lib/infopanel/infopanel-smart-dump.sh
