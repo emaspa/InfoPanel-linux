@@ -63,7 +63,7 @@ namespace InfoPanel.Views.Pages
             {
                 AddRow(
                     title: device.ModelInfo?.Name ?? device.Model.ToString(),
-                    subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
+                    subtitle: $"{device.DeviceId} · {device.DeviceLocation} · renders at {device.DisplayWidth}×{device.DisplayHeight}",
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
                     profileGuid: device.ProfileGuid,
@@ -75,6 +75,8 @@ namespace InfoPanel.Views.Pages
                     rotation: device.Rotation,
                     setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
                 AddThermalrightAdvanced(device);
+                AddMatchingProfileButton(device.ModelInfo?.Name ?? device.Model.ToString(),
+                    device.DisplayWidth, device.DisplayHeight, g => { device.ProfileGuid = g; _app.Host.SaveSettings(); });
             }
 
             AddFamilyHeader("Turing Smart Screen", settings.TuringPanelMultiDeviceMode,
@@ -190,6 +192,43 @@ namespace InfoPanel.Views.Pages
 
             expander.Content = panel;
             DeviceRows.Children.Add(expander);
+        }
+
+        /// <summary>Offers a one-click profile sized exactly to the panel's render resolution (avoids letterboxing).</summary>
+        private void AddMatchingProfileButton(string deviceName, int width, int height, Action<Guid> assign)
+        {
+            if (_app == null || width <= 0 || height <= 0) return;
+
+            // only offer when no existing profile matches the panel size
+            if (_app.Host.Profiles.Any(p => p.Width == width && p.Height == height))
+            {
+                return;
+            }
+
+            var button = new Button
+            {
+                Content = $"Create matching {width}×{height} profile",
+                FontSize = 11,
+                Margin = new Thickness(24, -6, 0, 0),
+            };
+            button.Click += (_, _) =>
+            {
+                var profile = new Models.Profile
+                {
+                    Guid = Guid.NewGuid(),
+                    Name = deviceName,
+                    Width = width,
+                    Height = height,
+                    BackgroundColor = "#FF000000",
+                    Color = "#FFFFFFFF",
+                };
+                _app.Host.Profiles.Add(profile);
+                _app.Host.SaveProfiles();
+                Stores.DisplayItemStore.Instance.Save(profile);
+                assign(profile.Guid);
+                RebuildRows();
+            };
+            DeviceRows.Children.Add(button);
         }
 
         private void AddFamilyHeader(string title, bool multiMode, Action<bool> setMultiMode)
