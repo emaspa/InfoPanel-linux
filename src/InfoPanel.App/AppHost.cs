@@ -4,6 +4,7 @@ using InfoPanel.Persistence;
 using InfoPanel.Platform.Linux;
 using InfoPanel.Services;
 using Serilog;
+using System.Collections.ObjectModel;
 
 namespace InfoPanel
 {
@@ -17,7 +18,7 @@ namespace InfoPanel
         private static readonly ILogger Logger = Log.ForContext<AppHost>();
 
         public Settings Settings { get; private set; } = new();
-        public List<Profile> Profiles { get; private set; } = [];
+        public ObservableCollection<Profile> Profiles { get; } = [];
 
         public void Initialize()
         {
@@ -27,7 +28,10 @@ namespace InfoPanel
 
             // Configuration
             Settings = ConfigPersistence.LoadSettings() ?? new Settings();
-            Profiles = ConfigPersistence.LoadProfiles() ?? [];
+            foreach (var profile in ConfigPersistence.LoadProfiles() ?? [])
+            {
+                Profiles.Add(profile);
+            }
             Logger.Information("Loaded {ProfileCount} profiles, {DeviceCount} Thermalright devices",
                 Profiles.Count, Settings.ThermalrightPanelDevices.Count);
 
@@ -47,6 +51,10 @@ namespace InfoPanel
                 HwmonMonitor.SENSORHASH.TryGetValue(id, out var reading) ? reading : null);
             SensorReader.ConfigurePluginSource(Sensors.PluginSensorReader.Read);
         }
+
+        public void SaveProfiles() => ConfigPersistence.SaveProfiles([.. Profiles]);
+
+        public void SaveSettings() => _ = ConfigPersistence.SaveSettingsAsync(Settings);
 
         public async Task StartSensorsAsync()
         {

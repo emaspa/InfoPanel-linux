@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 
 namespace InfoPanel.TuringPanel
 {
-    internal partial class TuringPanelHelper
+    public partial class TuringPanelHelper
     {
         private static readonly ILogger Logger = Log.ForContext(typeof(TuringPanelHelper));
         private static readonly SemaphoreSlim _semaphore = new(1, 1);

@@ -1,9 +1,37 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:InfoPanel.ViewModels"
              x:Class="InfoPanel.Views.Pages.SensorsPage">
-    <StackPanel Margin="24" Spacing="8">
-        <TextBlock Text="Sensors" FontSize="28" FontWeight="SemiBold" />
-        <TextBlock Text="Coming in a later milestone."
-                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
-    </StackPanel>
+
+    <Grid ColumnDefinitions="*,4,340" Margin="24">
+
+        <DockPanel Grid.Column="0">
+            <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,12">
+                <TextBlock Text="Sensors" FontSize="28" FontWeight="SemiBold" />
+                <TextBlock x:Name="SensorCount" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+            <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Watermark="Search sensors…"
+                     Margin="0,0,0,8" TextChanged="Search_TextChanged" />
+            <TreeView x:Name="Tree">
+                <TreeView.ItemTemplate>
+                    <TreeDataTemplate x:DataType="vm:SensorTreeItem" ItemsSource="{Binding Children}">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Right" Text="{Binding DisplayValue}"
+                                       FontSize="12" Opacity="0.75" VerticalAlignment="Center" Margin="8,0,0,0" />
+                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </TreeDataTemplate>
+                </TreeView.ItemTemplate>
+            </TreeView>
+        </DockPanel>
+
+        <GridSplitter Grid.Column="1" Background="Transparent" />
+
+        <DockPanel Grid.Column="2" Margin="12,0,0,0">
+            <TextBlock DockPanel.Dock="Top" Text="Plugins" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12" />
+            <StackPanel x:Name="PluginRows" Spacing="8" />
+        </DockPanel>
+
+    </Grid>
+
 </UserControl>
