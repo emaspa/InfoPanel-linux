@@ -23,6 +23,17 @@ namespace InfoPanel
                     Console.WriteLine($"{id,-40} {reading.ValueNow,12:0.###} {reading.Unit}");
                 }
 
+                foreach (var (id, reading) in Monitors.PluginMonitor.SENSORHASH.OrderBy(kv => kv.Key))
+                {
+                    var value = reading.Data switch
+                    {
+                        Plugins.IPluginSensor sensor => $"{sensor.Value:0.###} {sensor.Unit}",
+                        Plugins.IPluginText text => text.Value,
+                        _ => ""
+                    };
+                    Console.WriteLine($"{id,-60} {value}");
+                }
+
                 Log.Information("{Count} hwmon sensors, {PluginCount} plugin sensors",
                     Services.HwmonMonitor.SENSORHASH.Count, Monitors.PluginMonitor.SENSORHASH.Count);
                 Log.CloseAndFlush();
