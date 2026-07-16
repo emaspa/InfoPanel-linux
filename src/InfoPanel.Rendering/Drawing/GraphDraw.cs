@@ -350,12 +350,17 @@ namespace InfoPanel.Drawing
                                 ), barDisplayItem.CornerRadius));
                             }
 
+                            // Clip the fill to the container's round rect: at low values the
+                            // fill is narrower than the corner radius, and unclipped it pokes
+                            // square corners outside the rounded background.
+                            using var containerPath = new SKPath();
+                            containerPath.AddRoundRect(new SKRoundRect(new SKRect(frameRect.Left, frameRect.Top, frameRect.Left + frameRect.Width, frameRect.Top + frameRect.Height), barDisplayItem.CornerRadius));
+                            using var clippedUsagePath = usagePath.Op(containerPath, SKPathOp.Intersect) ?? new SKPath(usagePath);
+
                             // Draw background if enabled
                             if (chartDisplayItem.Background && SKColor.TryParse(barDisplayItem.BackgroundColor, out var backgroundColor))
                             {
-                                using var bgPath = new SKPath();
-                                bgPath.AddRoundRect(new SKRoundRect(new SKRect(frameRect.Left, frameRect.Top, frameRect.Left + frameRect.Width, frameRect.Top + frameRect.Height), barDisplayItem.CornerRadius));
-                                g.FillPath(bgPath, backgroundColor);
+                                g.FillPath(containerPath, backgroundColor);
                             }
 
                             // Draw the bar if it has size
@@ -363,11 +368,11 @@ namespace InfoPanel.Drawing
                             {
                                 if (barDisplayItem.Gradient && SKColor.TryParse(barDisplayItem.GradientColor, out var gradientColor))
                                 {
-                                    g.FillPath(usagePath, barColor, barColor, gradientColor);
+                                    g.FillPath(clippedUsagePath, barColor, barColor, gradientColor);
                                 }
                                 else
                                 {
-                                    g.FillPath(usagePath, barColor);
+                                    g.FillPath(clippedUsagePath, barColor);
                                 }
                             }
 

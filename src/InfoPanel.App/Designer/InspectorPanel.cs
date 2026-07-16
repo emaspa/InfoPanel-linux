@@ -17,6 +17,10 @@ namespace InfoPanel.Designer
         private readonly StackPanel _root;
         private bool _rebuilding;
 
+        // gauge frame previews: decoded once per file, refreshed on rebuild
+        private readonly Dictionary<string, (Avalonia.Media.Imaging.Bitmap? Bitmap, int Width, int Height)> _gaugeFrameCache = [];
+        private Avalonia.Threading.DispatcherTimer? _gaugePreviewTimer;
+
         public InspectorPanel()
         {
             _root = new StackPanel { Spacing = 10, Margin = new Thickness(12) };
@@ -53,7 +57,11 @@ namespace InfoPanel.Designer
             _rebuilding = true;
             try
             {
+                _gaugePreviewTimer?.Stop();
+                _gaugePreviewTimer = null;
+
                 _root.Children.Clear();
+                _gaugeFrameCache.Clear();
 
                 var session = _session;
                 if (session == null || session.Selection.Count == 0)
@@ -511,13 +519,117 @@ namespace InfoPanel.Designer
             _root.Children.Add(Header("Image steps"));
             _root.Children.Add(Label("Frames from min to max; the shown frame follows the sensor value."));
 
-            var imageList = new ListBox { MaxHeight = 160, SelectionMode = SelectionMode.Single };
+            // Live preview of the frame the render loop is currently animating.
+            var previewImage = new Image { Height = 130, Stretch = Stretch.Uniform };
+            var previewCaption = new TextBlock
+            {
+                FontSize = 12,
+                Opacity = 0.7,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Text = "No frames",
+            };
+            var previewStack = new StackPanel { Spacing = 6 };
+            previewStack.Children.Add(previewImage);
+            previewStack.Children.Add(previewCaption);
+            _root.Children.Add(new Border
+            {
+                Background = new SolidColorBrush(Color.FromArgb(60, 0, 0, 0)),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(10),
+                Child = previewStack,
+            });
+
+            string? shownPath = null;
+            void UpdatePreview()
+            {
+                var current = gauge.CurrentImage;
+                var path = current?.CalculatedPath;
+                if (path != shownPath)
+                {
+                    shownPath = path;
+                    previewImage.Source = GetGaugeFrame(path).Bitmap;
+                }
+
+                if (current == null || gauge.Images.Count == 0)
+                {
+                    previewCaption.Text = "No frames";
+                    return;
+                }
+
+                var index = gauge.Images.IndexOf(current);
+                var reading = gauge.GetValue();
+                if (reading?.ValueNow is double value && gauge.MaxValue > gauge.MinValue)
+                {
+                    var percent = Math.Clamp((value - gauge.MinValue) / (gauge.MaxValue - gauge.MinValue) * 100, 0, 100);
+                    previewCaption.Text = $"Frame {index + 1}/{gauge.Images.Count} — {value:0.#}{reading.Value.Unit} ({percent:0}%)";
+                }
+                else
+                {
+                    previewCaption.Text = $"Frame {index + 1}/{gauge.Images.Count}";
+                }
+            }
+
+            _gaugePreviewTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _gaugePreviewTimer.Tick += (_, _) => UpdatePreview();
+            _gaugePreviewTimer.Start();
+
+            var imageList = new ListBox { MaxHeight = 260, SelectionMode = SelectionMode.Single };
             void RefreshImageList()
             {
-                imageList.ItemsSource = gauge.Images.Select(i => i.FilePath ?? i.CalculatedPath ?? "?").ToList();
+                var selected = imageList.SelectedIndex;
+                var count = gauge.Images.Count;
+                var step = count > 1 ? 100.0 / (count - 1) : 100.0;
+                var rows = new List<Control>();
+
+                for (int i = 0; i < count; i++)
+                {
+                    var frame = gauge.Images[i];
+                    var (bitmap, width, height) = GetGaugeFrame(frame.CalculatedPath);
+
+                    var row = new Grid { ColumnDefinitions = new ColumnDefinitions("56,54,*"), Height = 44 };
+
+                    var thumb = new Image { Source = bitmap, Width = 48, Height = 38, Stretch = Stretch.Uniform, VerticalAlignment = VerticalAlignment.Center };
+                    Grid.SetColumn(thumb, 0);
+                    row.Children.Add(thumb);
+
+                    var stepLabel = new TextBlock
+                    {
+                        Text = i == count - 1 ? "≤100%" : $"<{Math.Round((i + 1) * step)}%",
+                        FontSize = 12,
+                        Opacity = 0.8,
+                        VerticalAlignment = VerticalAlignment.Center,
+                    };
+                    Grid.SetColumn(stepLabel, 1);
+                    row.Children.Add(stepLabel);
+
+                    var info = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Spacing = 1 };
+                    info.Children.Add(new TextBlock
+                    {
+                        Text = frame.FilePath ?? frame.CalculatedPath ?? "?",
+                        FontSize = 12,
+                        TextTrimming = TextTrimming.CharacterEllipsis,
+                    });
+                    info.Children.Add(new TextBlock
+                    {
+                        Text = bitmap != null ? $"{width}×{height}" : "file missing",
+                        FontSize = 11,
+                        Opacity = 0.6,
+                    });
+                    Grid.SetColumn(info, 2);
+                    row.Children.Add(info);
+
+                    rows.Add(row);
+                }
+
+                imageList.ItemsSource = rows;
+                if (selected >= 0 && selected < rows.Count)
+                {
+                    imageList.SelectedIndex = selected;
+                }
             }
 
             RefreshImageList();
+            UpdatePreview();
             _root.Children.Add(imageList);
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 6 };
@@ -600,6 +712,58 @@ namespace InfoPanel.Designer
             buttons.Children.Add(down);
 
             _root.Children.Add(buttons);
+        }
+
+        /// <summary>Decoded preview + original pixel size for a gauge frame, cached per file.</summary>
+        private (Avalonia.Media.Imaging.Bitmap? Bitmap, int Width, int Height) GetGaugeFrame(string? path)
+        {
+            if (string.IsNullOrEmpty(path))
+            {
+                return (null, 0, 0);
+            }
+
+            if (_gaugeFrameCache.TryGetValue(path, out var cached))
+            {
+                return cached;
+            }
+
+            (Avalonia.Media.Imaging.Bitmap?, int, int) entry;
+            try
+            {
+                if (!System.IO.File.Exists(path))
+                {
+                    entry = (null, 0, 0);
+                }
+                else
+                {
+                    int width = 0, height = 0;
+                    using (var codec = SkiaSharp.SKCodec.Create(path))
+                    {
+                        if (codec != null)
+                        {
+                            width = codec.Info.Width;
+                            height = codec.Info.Height;
+                        }
+                    }
+
+                    using var stream = System.IO.File.OpenRead(path);
+                    entry = (Avalonia.Media.Imaging.Bitmap.DecodeToWidth(stream, 256), width, height);
+                }
+            }
+            catch
+            {
+                entry = (null, 0, 0);
+            }
+
+            _gaugeFrameCache[path] = entry;
+            return entry;
+        }
+
+        protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
+        {
+            base.OnDetachedFromVisualTree(e);
+            _gaugePreviewTimer?.Stop();
+            _gaugePreviewTimer = null;
         }
 
         private void BuildShapeSection(DesignerSession session, ShapeDisplayItem shape)
