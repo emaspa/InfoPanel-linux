@@ -68,6 +68,7 @@ namespace InfoPanel.Platform.Linux
 
         // Linux SG_IO constants
         private const uint SG_IO = 0x2285;
+        private const int SG_DXFER_NONE = -1;
         private const int SG_DXFER_FROM_DEV = -3;
         private const int SG_DXFER_TO_DEV = -2;
         internal const int O_RDWR = 2;
@@ -135,7 +136,9 @@ namespace InfoPanel.Platform.Linux
                 var hdr = new sg_io_hdr_t
                 {
                     interface_id = 'S',
-                    dxfer_direction = direction == ScsiDataDirection.FromDevice ? SG_DXFER_FROM_DEV : SG_DXFER_TO_DEV,
+                    // zero-length data phases (e.g. TEST UNIT READY) must use SG_DXFER_NONE
+                    dxfer_direction = data.Length == 0 ? SG_DXFER_NONE
+                        : direction == ScsiDataDirection.FromDevice ? SG_DXFER_FROM_DEV : SG_DXFER_TO_DEV,
                     cmd_len = (byte)cdb.Length,
                     mx_sb_len = SENSE_BUFFER_SIZE,
                     dxfer_len = (uint)data.Length,
