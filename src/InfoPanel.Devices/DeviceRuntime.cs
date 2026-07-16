@@ -11,6 +11,9 @@ namespace InfoPanel
     {
         public static Func<Guid, Profile?> GetProfile { get; set; } = static _ => null;
 
+        /// <summary>Persists Settings (device tasks call this after self-healing a stored device id).</summary>
+        public static Action RequestSettingsSave { get; set; } = static () => { };
+
         private static Settings? _settings;
 
         public static Settings Settings

@@ -69,7 +69,9 @@ namespace InfoPanel.Views.Pages
                     status: () => device.RuntimeProperties.IsRunning
                         ? $"running · {device.RuntimeProperties.FrameRate} fps"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
-                    remove: () => { settings.ThermalrightPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); });
+                    remove: () => { settings.ThermalrightPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
+                    rotation: device.Rotation,
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
             }
 
             AddFamilyHeader("Turing Smart Screen", settings.TuringPanelMultiDeviceMode,
@@ -86,7 +88,9 @@ namespace InfoPanel.Views.Pages
                     status: () => device.RuntimeProperties.IsRunning
                         ? $"running · {device.RuntimeProperties.FrameRate} fps"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
-                    remove: () => { settings.TuringPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); });
+                    remove: () => { settings.TuringPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
+                    rotation: device.Rotation,
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
             }
 
             AddFamilyHeader("BeadaPanel", settings.BeadaPanelMultiDeviceMode,
@@ -103,7 +107,9 @@ namespace InfoPanel.Views.Pages
                     status: () => device.RuntimeProperties.IsRunning
                         ? $"running · {device.RuntimeProperties.FrameRate} fps"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
-                    remove: () => { settings.BeadaPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); });
+                    remove: () => { settings.BeadaPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
+                    rotation: device.Rotation,
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
             }
         }
 
@@ -124,7 +130,8 @@ namespace InfoPanel.Views.Pages
         }
 
         private void AddRow(string title, string subtitle, bool isEnabled, Action<bool> setEnabled,
-            Guid profileGuid, Action<Guid> setProfile, Func<string> status, Action remove)
+            Guid profileGuid, Action<Guid> setProfile, Func<string> status, Action remove,
+            LCD_ROTATION rotation = LCD_ROTATION.RotateNone, Action<LCD_ROTATION>? setRotation = null)
         {
             var border = new Border
             {
@@ -135,7 +142,7 @@ namespace InfoPanel.Views.Pages
                 BorderThickness = new Thickness(1),
             };
 
-            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto") };
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto,Auto") };
 
             var info = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
             info.Children.Add(new TextBlock { Text = title, FontWeight = Avalonia.Media.FontWeight.SemiBold });
@@ -161,6 +168,27 @@ namespace InfoPanel.Views.Pages
             Grid.SetColumn(profilePicker, 1);
             grid.Children.Add(profilePicker);
 
+            if (setRotation != null)
+            {
+                var rotationPicker = new ComboBox
+                {
+                    MinWidth = 90,
+                    Margin = new Thickness(0, 0, 12, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    ItemsSource = new[] { "0°", "90°", "180°", "270°" },
+                    SelectedIndex = (int)rotation,
+                };
+                rotationPicker.SelectionChanged += (_, _) =>
+                {
+                    if (rotationPicker.SelectedIndex >= 0)
+                    {
+                        setRotation((LCD_ROTATION)rotationPicker.SelectedIndex);
+                    }
+                };
+                Grid.SetColumn(rotationPicker, 2);
+                grid.Children.Add(rotationPicker);
+            }
+
             var enabled = new ToggleSwitch
             {
                 IsChecked = isEnabled,
@@ -170,12 +198,12 @@ namespace InfoPanel.Views.Pages
                 VerticalAlignment = VerticalAlignment.Center,
             };
             enabled.IsCheckedChanged += (_, _) => setEnabled(enabled.IsChecked == true);
-            Grid.SetColumn(enabled, 2);
+            Grid.SetColumn(enabled, 3);
             grid.Children.Add(enabled);
 
             var removeButton = new Button { Content = "Remove", VerticalAlignment = VerticalAlignment.Center };
             removeButton.Click += (_, _) => remove();
-            Grid.SetColumn(removeButton, 3);
+            Grid.SetColumn(removeButton, 4);
             grid.Children.Add(removeButton);
 
             border.Child = grid;

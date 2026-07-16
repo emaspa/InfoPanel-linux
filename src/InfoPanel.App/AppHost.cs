@@ -38,6 +38,7 @@ namespace InfoPanel
             // Device runtime seams
             DeviceRuntime.Settings = Settings;
             DeviceRuntime.GetProfile = guid => Profiles.FirstOrDefault(p => p.Guid == guid);
+            DeviceRuntime.RequestSettingsSave = SaveSettings;
 
             // Render pacing from settings
             RenderContext.TargetFrameRate = Settings.TargetFrameRate;

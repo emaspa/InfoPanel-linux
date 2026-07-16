@@ -356,6 +356,8 @@ namespace InfoPanel.Services
         /// </summary>
         private UsbRegistry? FindUsbRegistry(int vendorId, int productId, bool matchDeviceId = true)
         {
+            var vidPidMatches = new List<(UsbRegistry Registry, string? DeviceId)>();
+
             foreach (UsbRegistry deviceReg in UsbDevice.AllDevices)
             {
                 if (deviceReg.Vid == vendorId && deviceReg.Pid == productId)
@@ -372,8 +374,42 @@ namespace InfoPanel.Services
                     {
                         return deviceReg;
                     }
+
+                    vidPidMatches.Add((deviceReg, deviceId));
                 }
             }
+
+            // Self-heal: on Linux the libusb device id (usbdevBUS.DEV) changes on every
+            // replug, so a saved id never matches again. When exactly one device with
+            // this VID/PID is present, rebind to it and update the stored id.
+            if (vidPidMatches.Count == 1)
+            {
+                var (registry, currentId) = vidPidMatches[0];
+                Logger.Information(
+                    "ThermalrightPanelDevice {Device}: saved id {Saved} not present; rebinding to sole VID/PID match {Current}",
+                    _device, _device.DeviceId, currentId);
+
+                if (!string.IsNullOrEmpty(currentId))
+                {
+                    if (_device.DeviceLocation == _device.DeviceId)
+                    {
+                        _device.DeviceLocation = currentId;
+                    }
+
+                    _device.DeviceId = currentId;
+                    DeviceRuntime.RequestSettingsSave();
+                }
+
+                return registry;
+            }
+
+            if (vidPidMatches.Count > 1)
+            {
+                Logger.Warning(
+                    "ThermalrightPanelDevice {Device}: saved id {Saved} not present and {Count} devices share VID/PID — not rebinding (ambiguous). Rescan devices to update.",
+                    _device, _device.DeviceId, vidPidMatches.Count);
+            }
+
             return null;
         }
 
