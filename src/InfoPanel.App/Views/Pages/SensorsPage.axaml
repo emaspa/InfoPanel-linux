@@ -60,7 +60,7 @@
             </StackPanel>
             <TextBox x:Name="SearchBox" DockPanel.Dock="Top" PlaceholderText="Search sensors…"
                      Margin="0,0,0,8" TextChanged="Search_TextChanged" />
-            <TreeView x:Name="Tree">
+            <TreeView x:Name="Tree" Tapped="Tree_Tapped">
                 <TreeView.ItemTemplate>
                     <TreeDataTemplate x:DataType="vm:SensorTreeItem" ItemsSource="{Binding Children}">
                         <DockPanel>

@@ -19,6 +19,22 @@ namespace InfoPanel.Views.Pages
         {
             InitializeComponent();
 
+            Canvas.ViewportChanged += (_, _) => UpdateScrollBars();
+            CanvasHScroll.Scroll += (_, _) =>
+            {
+                if (!_syncingScroll)
+                {
+                    Canvas.Pan = new SkiaSharp.SKPoint((float)(ScrollMargin - CanvasHScroll.Value), Canvas.Pan.Y);
+                }
+            };
+            CanvasVScroll.Scroll += (_, _) =>
+            {
+                if (!_syncingScroll)
+                {
+                    Canvas.Pan = new SkiaSharp.SKPoint(Canvas.Pan.X, (float)(ScrollMargin - CanvasVScroll.Value));
+                }
+            };
+
             Loaded += (_, _) =>
             {
                 if (Avalonia.Application.Current is App app)
@@ -51,6 +67,40 @@ namespace InfoPanel.Views.Pages
                 _sensorTimer?.Stop();
                 _sensorTimer = null;
             };
+        }
+
+        // ================= canvas scrollbars =================
+
+        private const double ScrollMargin = 48;
+        private bool _syncingScroll;
+
+        private void UpdateScrollBars()
+        {
+            if (Canvas.Session is not { } session || Canvas.Bounds.Width <= 0)
+            {
+                return;
+            }
+
+            _syncingScroll = true;
+
+            var contentWidth = session.Profile.Width * Canvas.Zoom + ScrollMargin * 2;
+            var contentHeight = session.Profile.Height * Canvas.Zoom + ScrollMargin * 2;
+            var offsetX = ScrollMargin - Canvas.Pan.X;
+            var offsetY = ScrollMargin - Canvas.Pan.Y;
+
+            CanvasHScroll.ViewportSize = Canvas.Bounds.Width;
+            CanvasHScroll.Minimum = Math.Min(0, offsetX);
+            CanvasHScroll.Maximum = Math.Max(contentWidth - Canvas.Bounds.Width, offsetX);
+            CanvasHScroll.Value = offsetX;
+            CanvasHScroll.IsVisible = CanvasHScroll.Maximum - CanvasHScroll.Minimum > 0.5;
+
+            CanvasVScroll.ViewportSize = Canvas.Bounds.Height;
+            CanvasVScroll.Minimum = Math.Min(0, offsetY);
+            CanvasVScroll.Maximum = Math.Max(contentHeight - Canvas.Bounds.Height, offsetY);
+            CanvasVScroll.Value = offsetY;
+            CanvasVScroll.IsVisible = CanvasVScroll.Maximum - CanvasVScroll.Minimum > 0.5;
+
+            _syncingScroll = false;
         }
 
         // ================= profile =================
@@ -226,6 +276,11 @@ namespace InfoPanel.Views.Pages
         private void SensorTree_DoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)
         {
             AddSensorAsText_Click(sender, new RoutedEventArgs());
+        }
+
+        private void SensorTree_Tapped(object? sender, Avalonia.Input.TappedEventArgs e)
+        {
+            InfoPanel.Utils.TreeViewHelpers.ToggleCategoryOnTap(e);
         }
 
         private void SensorSearch_TextChanged(object? sender, TextChangedEventArgs e)

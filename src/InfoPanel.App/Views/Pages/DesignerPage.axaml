@@ -119,6 +119,7 @@
                                     ToolTip.Tip="Bind this sensor to the item selected on the canvas" />
                         </StackPanel>
                         <TreeView x:Name="SensorTree" DoubleTapped="SensorTree_DoubleTapped"
+                                  Tapped="SensorTree_Tapped"
                                   SelectionChanged="SensorTree_SelectionChanged">
                             <TreeView.ItemTemplate>
                                 <TreeDataTemplate x:DataType="vm:SensorTreeItem" ItemsSource="{Binding Children}">
@@ -136,7 +137,13 @@
 
             <GridSplitter Grid.Column="1" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 
-            <designer:DesignCanvas x:Name="Canvas" Grid.Column="2" />
+            <Grid Grid.Column="2" RowDefinitions="*,Auto" ColumnDefinitions="*,Auto">
+                <designer:DesignCanvas x:Name="Canvas" />
+                <ScrollBar x:Name="CanvasVScroll" Grid.Column="1" Orientation="Vertical"
+                           AllowAutoHide="False" IsVisible="False" />
+                <ScrollBar x:Name="CanvasHScroll" Grid.Row="1" Orientation="Horizontal"
+                           AllowAutoHide="False" IsVisible="False" />
+            </Grid>
 
             <GridSplitter Grid.Column="3" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
 

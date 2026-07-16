@@ -41,6 +41,11 @@ namespace InfoPanel.Views.Pages
             };
         }
 
+        private void Tree_Tapped(object? sender, Avalonia.Input.TappedEventArgs e)
+        {
+            Utils.TreeViewHelpers.ToggleCategoryOnTap(e);
+        }
+
         private void UpdateCount()
         {
             SensorCount.Text = $"{Services.HwmonMonitor.SENSORHASH.Count} hardware · {PluginMonitor.SENSORHASH.Count} plugin sensors, live";

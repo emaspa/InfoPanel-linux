@@ -39,6 +39,7 @@ namespace InfoPanel.Designer
         private int _resizeHandle = -1;
         private DisplayItem? _resizeItem;
         private bool _spaceDown;
+        private bool _fitPending;
 
         private const float MinZoom = 0.1f;
         private const float MaxZoom = 8f;
@@ -60,6 +61,9 @@ namespace InfoPanel.Designer
                 _session = value;
                 if (value != null)
                 {
+                    // keep re-fitting through layout passes until the user takes over —
+                    // the first fit often runs before splitters settle the final bounds
+                    _fitPending = true;
                     ZoomToFit();
                 }
 
@@ -69,6 +73,21 @@ namespace InfoPanel.Designer
 
         public float Zoom => _zoom;
         public event EventHandler? ZoomChanged;
+
+        /// <summary>Raised whenever pan, zoom, or control size changes — hosts sync scrollbars from this.</summary>
+        public event EventHandler? ViewportChanged;
+
+        public SKPoint Pan
+        {
+            get => _pan;
+            set
+            {
+                _pan = value;
+                _fitPending = false;
+                ViewportChanged?.Invoke(this, EventArgs.Empty);
+                InvalidateVisual();
+            }
+        }
 
         public bool SnapToGrid { get; set; } = true;
         public int GridSpacing { get; set; } = 20;
@@ -124,11 +143,13 @@ namespace InfoPanel.Designer
                 ((float)Bounds.Width - _session.Profile.Width * _zoom) / 2,
                 ((float)Bounds.Height - _session.Profile.Height * _zoom) / 2);
             ZoomChanged?.Invoke(this, EventArgs.Empty);
+            ViewportChanged?.Invoke(this, EventArgs.Empty);
             InvalidateVisual();
         }
 
         public void SetZoom(float zoom, Point? anchorView = null)
         {
+            _fitPending = false;
             var anchor = anchorView ?? new Point(Bounds.Width / 2, Bounds.Height / 2);
             var worldAnchor = ViewToWorld(anchor);
             _zoom = Math.Clamp(zoom, MinZoom, MaxZoom);
@@ -136,7 +157,19 @@ namespace InfoPanel.Designer
                 (float)anchor.X - worldAnchor.X * _zoom,
                 (float)anchor.Y - worldAnchor.Y * _zoom);
             ZoomChanged?.Invoke(this, EventArgs.Empty);
+            ViewportChanged?.Invoke(this, EventArgs.Empty);
             InvalidateVisual();
+        }
+
+        protected override void OnSizeChanged(SizeChangedEventArgs e)
+        {
+            base.OnSizeChanged(e);
+            if (_fitPending)
+            {
+                ZoomToFit();
+            }
+
+            ViewportChanged?.Invoke(this, EventArgs.Empty);
         }
 
         // ---- rendering ----
@@ -262,6 +295,7 @@ namespace InfoPanel.Designer
         {
             base.OnPointerPressed(e);
             Focus();
+            _fitPending = false;
 
             var session = _session;
             if (session == null) return;
@@ -348,10 +382,9 @@ namespace InfoPanel.Designer
             switch (_state)
             {
                 case InteractionState.Panning:
-                    _pan = new SKPoint(
+                    Pan = new SKPoint(
                         _pan.X + (float)(view.X - _lastView.X),
                         _pan.Y + (float)(view.Y - _lastView.Y));
-                    InvalidateVisual();
                     break;
 
                 case InteractionState.MovingItems:
@@ -440,13 +473,11 @@ namespace InfoPanel.Designer
             }
             else if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
             {
-                _pan = new SKPoint(_pan.X + (float)e.Delta.Y * 40, _pan.Y);
-                InvalidateVisual();
+                Pan = new SKPoint(_pan.X + (float)e.Delta.Y * 40, _pan.Y);
             }
             else
             {
-                _pan = new SKPoint(_pan.X + (float)e.Delta.X * 40, _pan.Y + (float)e.Delta.Y * 40);
-                InvalidateVisual();
+                Pan = new SKPoint(_pan.X + (float)e.Delta.X * 40, _pan.Y + (float)e.Delta.Y * 40);
             }
 
             e.Handled = true;

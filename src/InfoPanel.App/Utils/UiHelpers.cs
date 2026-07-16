@@ -1,9 +1,39 @@
+using Avalonia.Controls;
 using Avalonia.Data.Converters;
+using Avalonia.Interactivity;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using System.Globalization;
 
 namespace InfoPanel.Utils
 {
+    public static class TreeViewHelpers
+    {
+        /// <summary>
+        /// Makes a single click anywhere on a category row toggle its expansion,
+        /// not just the chevron. Wire to the TreeView's Tapped event.
+        /// </summary>
+        public static void ToggleCategoryOnTap(RoutedEventArgs e)
+        {
+            if (e.Source is not Control source)
+            {
+                return;
+            }
+
+            // the chevron's ToggleButton already toggles — don't undo it
+            if (source.FindAncestorOfType<Avalonia.Controls.Primitives.ToggleButton>(includeSelf: true) != null)
+            {
+                return;
+            }
+
+            var container = source.FindAncestorOfType<TreeViewItem>(includeSelf: true);
+            if (container?.DataContext is ViewModels.SensorTreeItem item && item.Children.Count > 0)
+            {
+                container.IsExpanded = !container.IsExpanded;
+            }
+        }
+    }
+
     /// <summary>Two-way #AARRGGBB string ↔ Avalonia Color for ColorPicker bindings.</summary>
     public sealed class ColorHexConverter : IValueConverter
     {
