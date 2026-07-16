@@ -11,6 +11,7 @@ namespace InfoPanel.Core.Tests
     /// New elements added by v2 (e.g. DisplayMask/FlickerFix) are allowed; losing or
     /// changing an existing one is a failure.
     /// </summary>
+    [Collection("ConfigPersistence")]
     public class GoldenFileTests : IDisposable
     {
         private readonly string _tempDir;

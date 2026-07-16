@@ -22,7 +22,7 @@ namespace InfoPanel.Views.Pages
                     Tree.ItemsSource = _tree.Roots;
                 }
 
-                RebuildPlugins();
+                DataContext ??= new PluginsPageViewModel();
                 UpdateCount();
 
                 _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
@@ -44,38 +44,6 @@ namespace InfoPanel.Views.Pages
         private void UpdateCount()
         {
             SensorCount.Text = $"{Services.HwmonMonitor.SENSORHASH.Count} hardware · {PluginMonitor.SENSORHASH.Count} plugin sensors, live";
-        }
-
-        private void RebuildPlugins()
-        {
-            PluginRows.Children.Clear();
-
-            foreach (var descriptor in PluginMonitor.Instance.Plugins)
-            {
-                var border = new Border
-                {
-                    CornerRadius = new Avalonia.CornerRadius(8),
-                    Padding = new Avalonia.Thickness(12, 8),
-                    Background = ThemeBrush("CardBackgroundFillColorDefaultBrush"),
-                    BorderBrush = ThemeBrush("CardStrokeColorDefaultBrush"),
-                    BorderThickness = new Avalonia.Thickness(1),
-                };
-
-                var panel = new StackPanel { Spacing = 2 };
-                panel.Children.Add(new TextBlock
-                {
-                    Text = descriptor.PluginInfo?.Name ?? descriptor.FolderName ?? descriptor.FileName,
-                    FontWeight = Avalonia.Media.FontWeight.SemiBold,
-                });
-                panel.Children.Add(new TextBlock
-                {
-                    Text = $"{descriptor.PluginInfo?.Version ?? "?"} · {descriptor.PluginWrappers.Count} module(s)",
-                    FontSize = 11,
-                    Opacity = 0.6,
-                });
-                border.Child = panel;
-                PluginRows.Children.Add(border);
-            }
         }
 
         private void Search_TextChanged(object? sender, TextChangedEventArgs e)
@@ -109,7 +77,5 @@ namespace InfoPanel.Views.Pages
             Tree.ItemsSource = matches;
         }
 
-        private Avalonia.Media.IBrush? ThemeBrush(string key) =>
-            this.TryFindResource(key, ActualThemeVariant, out var value) ? value as Avalonia.Media.IBrush : null;
     }
 }

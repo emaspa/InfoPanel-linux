@@ -75,6 +75,18 @@ namespace InfoPanel
                         case nameof(Settings.TargetGraphUpdateRate):
                             RenderContext.TargetGraphUpdateRate = Settings.TargetGraphUpdateRate;
                             break;
+                        case nameof(Settings.ShowGridLines):
+                            RenderContext.ShowGridLines = Settings.ShowGridLines;
+                            break;
+                        case nameof(Settings.GridLinesSpacing):
+                            RenderContext.GridLinesSpacing = (int)Settings.GridLinesSpacing;
+                            break;
+                        case nameof(Settings.GridLinesColor):
+                            RenderContext.GridLinesColor = Settings.GridLinesColor;
+                            break;
+                        case nameof(Settings.SelectedItemColor):
+                            RenderContext.SelectedItemColor = Settings.SelectedItemColor;
+                            break;
                     }
                 }
                 catch (Exception ex)
@@ -83,9 +95,13 @@ namespace InfoPanel
                 }
             };
 
-            // Render pacing from settings
+            // Render pacing + designer chrome from settings
             RenderContext.TargetFrameRate = Settings.TargetFrameRate;
             RenderContext.TargetGraphUpdateRate = Settings.TargetGraphUpdateRate;
+            RenderContext.ShowGridLines = Settings.ShowGridLines;
+            RenderContext.GridLinesSpacing = (int)Settings.GridLinesSpacing;
+            RenderContext.GridLinesColor = Settings.GridLinesColor;
+            RenderContext.SelectedItemColor = Settings.SelectedItemColor;
 
             // Live display items: renderers see designer edits immediately
             RenderContext.GetDisplayItems = Stores.DisplayItemStore.Instance.GetSnapshot;
@@ -98,7 +114,10 @@ namespace InfoPanel
 
         public void SaveProfiles() => ConfigPersistence.SaveProfiles([.. Profiles]);
 
-        public void SaveSettings() => _ = ConfigPersistence.SaveSettingsAsync(Settings);
+        private readonly Utils.Debouncer _settingsSaveDebouncer = new();
+
+        public void SaveSettings() =>
+            _settingsSaveDebouncer.Debounce(() => _ = ConfigPersistence.SaveSettingsAsync(Settings), 500);
 
         public async Task StartSensorsAsync()
         {

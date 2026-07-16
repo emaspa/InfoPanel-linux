@@ -4,7 +4,9 @@ using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
 using InfoPanel.Models;
+using InfoPanel.BeadaPanel;
 using InfoPanel.ThermalrightPanel;
+using LibUsbDotNet.Main;
 using InfoPanel.TuringPanel;
 using Serilog;
 
@@ -91,7 +93,9 @@ namespace InfoPanel.Views.Pages
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.TuringPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
-                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
+                    brightness: device.Brightness,
+                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
             }
 
             AddFamilyHeader("BeadaPanel", settings.BeadaPanelMultiDeviceMode,
@@ -110,7 +114,9 @@ namespace InfoPanel.Views.Pages
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.BeadaPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
-                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
+                    brightness: device.Brightness,
+                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
             }
         }
 
@@ -204,7 +210,8 @@ namespace InfoPanel.Views.Pages
 
         private void AddRow(string title, string subtitle, bool isEnabled, Action<bool> setEnabled,
             Guid profileGuid, Action<Guid> setProfile, Func<string> status, Action remove,
-            LCD_ROTATION rotation = LCD_ROTATION.RotateNone, Action<LCD_ROTATION>? setRotation = null)
+            LCD_ROTATION rotation = LCD_ROTATION.RotateNone, Action<LCD_ROTATION>? setRotation = null,
+            int brightness = 100, Action<int>? setBrightness = null)
         {
             var border = new Border
             {
@@ -240,6 +247,31 @@ namespace InfoPanel.Views.Pages
             };
             Grid.SetColumn(profilePicker, 1);
             grid.Children.Add(profilePicker);
+
+            if (setBrightness != null)
+            {
+                var brightnessSlider = new Slider
+                {
+                    Minimum = 0,
+                    Maximum = 100,
+                    Value = brightness,
+                    Width = 110,
+                    Margin = new Thickness(0, 0, 12, 0),
+                    VerticalAlignment = VerticalAlignment.Center,
+                };
+                ToolTip.SetTip(brightnessSlider, "Brightness");
+                brightnessSlider.ValueChanged += (_, _) => setBrightness((int)brightnessSlider.Value);
+                Grid.SetColumn(brightnessSlider, 1);
+                // shares the cell with the profile picker column shift below
+                grid.ColumnDefinitions.Insert(1, new ColumnDefinition(GridLength.Auto));
+                foreach (var child in grid.Children)
+                {
+                    var col = Grid.GetColumn((Control)child);
+                    if (col >= 1) Grid.SetColumn((Control)child, col + 1);
+                }
+                Grid.SetColumn(brightnessSlider, 1);
+                grid.Children.Add(brightnessSlider);
+            }
 
             if (setRotation != null)
             {
@@ -343,6 +375,50 @@ namespace InfoPanel.Views.Pages
                         }
 
                         updated++;
+                    }
+                }
+
+                // BeadaPanel (StatusLink probe per VID 4E58 PID 1001 device)
+                foreach (UsbRegistry deviceReg in LibUsbDotNet.UsbDevice.AllDevices)
+                {
+                    if (deviceReg.Vid != 0x4e58 || deviceReg.Pid != 0x1001) continue;
+
+                    var deviceId = deviceReg.DeviceProperties.TryGetValue("DeviceID", out var devIdObj) && devIdObj is string devIdStr
+                        ? devIdStr : deviceReg.DevicePath ?? $"USB\\VID_{deviceReg.Vid:X4}&PID_{deviceReg.Pid:X4}";
+                    var deviceLocation = deviceReg.DeviceProperties.TryGetValue("LocationInformation", out var locObj) && locObj is string locStr
+                        ? locStr : deviceReg.DevicePath ?? deviceId;
+
+                    try
+                    {
+                        var panelInfo = await BeadaPanelHelper.GetPanelInfoAsync(deviceReg);
+                        if (panelInfo != null && BeadaPanelModelDatabase.Models.ContainsKey(panelInfo.Model))
+                        {
+                            var existing = settings.BeadaPanelDevices.FirstOrDefault(d => d.DeviceId == deviceId);
+                            if (existing == null)
+                            {
+                                settings.BeadaPanelDevices.Add(new BeadaPanelDevice
+                                {
+                                    DeviceId = deviceId,
+                                    DeviceLocation = deviceLocation,
+                                    Model = panelInfo.Model.ToString(),
+                                    ProfileGuid = _app.Host.Profiles.FirstOrDefault()?.Guid ?? Guid.Empty,
+                                });
+                                added++;
+                            }
+                            else
+                            {
+                                existing.DeviceLocation = deviceLocation;
+                                updated++;
+                            }
+                        }
+                        else
+                        {
+                            Logger.Information("BeadaPanel at {Path}: StatusLink unavailable (likely already streaming)", deviceReg.DevicePath);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Error(ex, "Error probing BeadaPanel device");
                     }
                 }
 

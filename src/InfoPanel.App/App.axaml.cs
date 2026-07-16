@@ -94,6 +94,22 @@ namespace InfoPanel
 
         private void TrayMenu_Open(object? sender, EventArgs e) => ShowMainWindow();
 
+        private void OpenAt(string tag)
+        {
+            ShowMainWindow();
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
+                && desktop.MainWindow is MainWindow main)
+            {
+                main.NavigateTo(tag);
+            }
+        }
+
+        private void TrayMenu_Dashboard(object? sender, EventArgs e) => OpenAt("dashboard");
+        private void TrayMenu_Designer(object? sender, EventArgs e) => OpenAt("designer");
+        private void TrayMenu_Devices(object? sender, EventArgs e) => OpenAt("devices");
+        private void TrayMenu_Sensors(object? sender, EventArgs e) => OpenAt("sensors");
+        private void TrayMenu_Settings(object? sender, EventArgs e) => OpenAt("settings");
+
         private void TrayMenu_Exit(object? sender, EventArgs e) => Shutdown();
 
         public void Shutdown()

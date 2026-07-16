@@ -1,7 +1,55 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:InfoPanel.ViewModels"
-             x:Class="InfoPanel.Views.Pages.SensorsPage">
+             x:Class="InfoPanel.Views.Pages.SensorsPage"
+             x:DataType="vm:PluginsPageViewModel">
+
+    <UserControl.Resources>
+        <DataTemplate x:Key="PluginCardTemplate" x:DataType="vm:PluginViewModel">
+            <Border CornerRadius="8" Padding="12,8" Margin="0,0,0,8"
+                    Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1">
+                <StackPanel Spacing="4">
+                    <DockPanel>
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Activated, Mode=TwoWay}"
+                                      IsEnabled="{Binding ControlEnabled}" OnContent="" OffContent="" MinWidth="0" />
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock FontSize="11" Opacity="0.6">
+                                <Run Text="{Binding Version}" /> · <Run Text="{Binding Author}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </DockPanel>
+                    <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+                    <ItemsControl ItemsSource="{Binding Plugins}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:PluginModuleViewModel">
+                                <DockPanel Margin="0,2,0,0">
+                                    <Button DockPanel.Dock="Right" Content="Reload" FontSize="10" Padding="6,2"
+                                            Command="{Binding ReloadCommand}" />
+                                    <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Actions}" Margin="0,0,6,0">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <StackPanel Orientation="Horizontal" Spacing="4" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:PluginActionCommand">
+                                                <Button Content="{Binding DisplayName}" FontSize="10" Padding="6,2"
+                                                        Command="{Binding Command}" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                    <TextBlock Text="{Binding Name}" FontSize="11" Opacity="0.75" VerticalAlignment="Center" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
 
     <Grid ColumnDefinitions="*,4,340" Margin="24">
 
@@ -28,8 +76,24 @@
         <GridSplitter Grid.Column="1" Background="Transparent" />
 
         <DockPanel Grid.Column="2" Margin="12,0,0,0">
-            <TextBlock DockPanel.Dock="Top" Text="Plugins" FontSize="20" FontWeight="SemiBold" Margin="0,0,0,12" />
-            <StackPanel x:Name="PluginRows" Spacing="8" />
+            <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,12">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Add plugin…" FontSize="12" Command="{Binding AddPluginFromZipCommand}" />
+                    <TextBlock Text="Plugins" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBlock Text="{Binding PluginFolder}" FontSize="10" Opacity="0.6" TextWrapping="Wrap" />
+                <Border IsVisible="{Binding ShowRestartBanner}" Background="#33FFA500" CornerRadius="4" Padding="8,4">
+                    <TextBlock Text="Restart InfoPanel to load the new plugin." FontSize="12" />
+                </Border>
+            </StackPanel>
+            <ScrollViewer>
+                <StackPanel Spacing="8">
+                    <TextBlock Text="Bundled" FontSize="13" FontWeight="SemiBold" Opacity="0.8" />
+                    <ItemsControl ItemsSource="{Binding BundledPlugins}" ItemTemplate="{StaticResource PluginCardTemplate}" />
+                    <TextBlock Text="External" FontSize="13" FontWeight="SemiBold" Opacity="0.8" Margin="0,8,0,0" />
+                    <ItemsControl ItemsSource="{Binding ExternalPlugins}" ItemTemplate="{StaticResource PluginCardTemplate}" />
+                </StackPanel>
+            </ScrollViewer>
         </DockPanel>
 
     </Grid>

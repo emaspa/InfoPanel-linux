@@ -15,6 +15,12 @@
                     <NativeMenu>
                         <NativeMenuItem Header="Open InfoPanel" Click="TrayMenu_Open" />
                         <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Dashboard" Click="TrayMenu_Dashboard" />
+                        <NativeMenuItem Header="Designer" Click="TrayMenu_Designer" />
+                        <NativeMenuItem Header="Devices" Click="TrayMenu_Devices" />
+                        <NativeMenuItem Header="Sensors" Click="TrayMenu_Sensors" />
+                        <NativeMenuItem Header="Settings" Click="TrayMenu_Settings" />
+                        <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Exit" Click="TrayMenu_Exit" />
                     </NativeMenu>
                 </TrayIcon.Menu>

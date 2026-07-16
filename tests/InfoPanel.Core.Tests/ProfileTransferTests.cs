@@ -4,6 +4,7 @@ using Xunit;
 
 namespace InfoPanel.Core.Tests
 {
+    [Collection("ConfigPersistence")]
     public class ProfileTransferTests : IDisposable
     {
         private readonly string _tempDir;

@@ -11,7 +11,7 @@ using System.Threading.Tasks;
 
 namespace InfoPanel.BeadaPanel
 {
-    internal static class BeadaPanelHelper
+    public static class BeadaPanelHelper
     {
         private static readonly ILogger Logger = Log.ForContext(typeof(BeadaPanelHelper));
         private static readonly TypedMemoryCache<BeadaPanelInfo> _panelInfoCache = new();

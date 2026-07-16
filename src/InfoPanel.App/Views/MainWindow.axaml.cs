@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input.Platform;
 using Avalonia.Threading;
 using FluentAvalonia.UI.Controls;
 using InfoPanel.Views.Pages;
@@ -13,6 +14,34 @@ namespace InfoPanel.Views
         public MainWindow()
         {
             InitializeComponent();
+
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+            Title = $"InfoPanel - v{version?.ToString(3) ?? "2.0.0"}";
+
+            if (Avalonia.Application.Current is App sizeApp)
+            {
+                var settings = sizeApp.Host.Settings;
+                if (settings.UiWidth > 400) Width = settings.UiWidth;
+                if (settings.UiHeight > 300) Height = settings.UiHeight;
+            }
+
+            PropertyChanged += (_, args) =>
+            {
+                if (args.Property == BoundsProperty && Avalonia.Application.Current is App app)
+                {
+                    app.Host.Settings.UiWidth = (int)Bounds.Width;
+                    app.Host.Settings.UiHeight = (int)Bounds.Height;
+                    app.Host.SaveSettings();
+                }
+                else if (args.Property == WindowStateProperty
+                    && WindowState == WindowState.Minimized
+                    && Avalonia.Application.Current is App trayApp
+                    && trayApp.Host.Settings.MinimizeToTray)
+                {
+                    WindowState = WindowState.Normal;
+                    Hide();
+                }
+            };
 
             _pages["dashboard"] = new DashboardPage();
             _pages["designer"] = new DesignerPage();
@@ -62,6 +91,22 @@ namespace InfoPanel.Views
             StatusText.Text = $"{deviceCount} devices · {sensorCount} sensors";
         }
 
+        /// <summary>Selects a nav destination by tag (used by the tray menu).</summary>
+        public void NavigateTo(string tag)
+        {
+            if (tag == "settings")
+            {
+                PageHost.Content = _pages["settings"];
+                return;
+            }
+
+            var item = NavView.MenuItems.OfType<FANavigationViewItem>().FirstOrDefault(i => (string?)i.Tag == tag);
+            if (item != null)
+            {
+                NavView.SelectedItem = item;
+            }
+        }
+
         private void LogsToggle_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
         {
             LogsDrawer.IsVisible = LogsToggle.IsChecked == true;
@@ -84,6 +129,14 @@ namespace InfoPanel.Views
             if (Utils.UiLogSink.Instance.Lines.Count > 0)
             {
                 LogsList.ScrollIntoView(Utils.UiLogSink.Instance.Lines[^1]);
+            }
+        }
+
+        private async void LogsCopy_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+        {
+            if (Clipboard is { } clipboard)
+            {
+                await clipboard.SetTextAsync(string.Join(Environment.NewLine, Utils.UiLogSink.Instance.Lines));
             }
         }
 

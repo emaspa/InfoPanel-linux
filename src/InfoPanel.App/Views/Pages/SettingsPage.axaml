@@ -42,7 +42,20 @@
                     <TextBlock Text="Port" VerticalAlignment="Center" Margin="0,0,12,0" />
                     <NumericUpDown x:Name="WebServerPort" Minimum="1" Maximum="65535" Increment="1" FormatString="0" />
                 </DockPanel>
+                <DockPanel MaxWidth="300" HorizontalAlignment="Left">
+                    <TextBlock Text="Refresh rate (ms)" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <NumericUpDown x:Name="WebRefreshRate" Minimum="16" Maximum="5000" Increment="16" FormatString="0" />
+                </DockPanel>
                 <TextBlock x:Name="WebServerLink" FontSize="12" Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
+                <TextBlock Text="Design grid" FontSize="18" FontWeight="SemiBold" />
+                <ToggleSwitch x:Name="GridLinesToggle" OnContent="Show grid lines in designer and overlays" OffContent="Show grid lines in designer and overlays" />
+                <DockPanel MaxWidth="300" HorizontalAlignment="Left">
+                    <TextBlock Text="Grid spacing" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <NumericUpDown x:Name="GridSpacing" Minimum="5" Maximum="100" Increment="5" FormatString="0" />
+                </DockPanel>
             </StackPanel>
 
             <StackPanel Spacing="8">
@@ -54,6 +67,26 @@
                     <Button Content="Open data folder" Click="OpenDataFolder_Click" />
                     <Button Content="Open log folder" Click="OpenLogFolder_Click" />
                 </StackPanel>
+                <WrapPanel>
+                    <Button Content="Website" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://infopanel.net/" />
+                    <Button Content="GitHub" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://github.com/emaspa/InfoPanel-linux" />
+                    <Button Content="Discord" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://discord.gg/cQnjdMC7Qc" />
+                    <Button Content="Reddit" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://www.reddit.com/r/InfoPanel/" />
+                    <Button Content="Support development ♥" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://buymeacoffee.com/emaspa" />
+                </WrapPanel>
+                <Expander Header="Release notes" FontSize="12">
+                    <StackPanel Spacing="4" Margin="0,8,0,0">
+                        <TextBlock Text="v2.0.0 — Ground-up Linux rebuild" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="New Avalonia 12 UI with a direct-manipulation designer (zoom/pan canvas, undo/redo, layers, live sensor tree). Latest Thermalright/TRCC device support from the Windows fork with USB replug self-healing. Video backgrounds via ffmpeg. Web server, XDG autostart, profile import/export. Profiles remain fully compatible with v1.4 and InfoPanel for Windows." />
+                    </StackPanel>
+                </Expander>
+                <Expander Header="Contributors" FontSize="12">
+                    <StackPanel x:Name="ContributorsList" Spacing="4" Margin="0,8,0,0" />
+                </Expander>
+                <Expander Header="Third-party licenses" FontSize="12">
+                    <StackPanel x:Name="LicensesList" Spacing="4" Margin="0,8,0,0" />
+                </Expander>
             </StackPanel>
 
         </StackPanel>
