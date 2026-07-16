@@ -26,7 +26,7 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:ProfileCardViewModel">
-                        <Border Width="360" Margin="0,0,16,16"
+                        <Border Width="360" Margin="0,0,16,16" VerticalAlignment="Top"
                                 CornerRadius="8"
                                 Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
