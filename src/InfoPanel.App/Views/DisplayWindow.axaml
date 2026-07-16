@@ -1,0 +1,16 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="using:InfoPanel.Views.Controls"
+        x:Class="InfoPanel.Views.DisplayWindow"
+        Title="DisplayWindow"
+        SystemDecorations="None"
+        ShowInTaskbar="False"
+        Background="Transparent"
+        TransparencyLevelHint="Transparent"
+        WindowStartupLocation="Manual"
+        MaxWidth="10000"
+        MaxHeight="10000">
+    <Canvas x:Name="SkiaContainer">
+        <controls:SkiaCanvas x:Name="SkiaElement" />
+    </Canvas>
+</Window>

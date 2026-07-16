@@ -18,7 +18,7 @@ namespace InfoPanel.Drawing
         public readonly int Rotation = rotation;
     }
 
-    internal class PanelDraw
+    public class PanelDraw
     {
         private static readonly ILogger Logger = Log.ForContext<PanelDraw>();
         private static readonly Stopwatch _selectionStopwatch = new();

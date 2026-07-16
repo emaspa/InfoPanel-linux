@@ -11,7 +11,7 @@ using Topten.RichTextKit;
 
 namespace InfoPanel.Drawing
 {
-    internal partial class SkiaGraphics(SKCanvas? canvas, float fontScale): IDisposable
+    public partial class SkiaGraphics(SKCanvas? canvas, float fontScale): IDisposable
     {
         private static readonly ILogger Logger = Log.ForContext<SkiaGraphics>();
         public readonly SKCanvas Canvas = canvas!;

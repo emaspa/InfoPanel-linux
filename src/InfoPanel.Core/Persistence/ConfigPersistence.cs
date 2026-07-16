@@ -38,6 +38,7 @@ namespace InfoPanel.Persistence
 
         public static string BaseFolder =>
             BaseFolderOverride ??
+            Environment.GetEnvironmentVariable("INFOPANEL_DATA_DIR") ??
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel");
 
         public static string ProfilesFolder => Path.Combine(BaseFolder, "profiles");

@@ -1,0 +1,45 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ui="using:FluentAvalonia.UI.Controls"
+        x:Class="InfoPanel.Views.MainWindow"
+        Title="InfoPanel"
+        Icon="avares://infopanel/Assets/favicon.ico"
+        Width="1280" Height="800"
+        MinWidth="900" MinHeight="600">
+
+    <DockPanel>
+
+        <!-- Status bar -->
+        <Border DockPanel.Dock="Bottom"
+                Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
+                BorderBrush="{DynamicResource DividerStrokeColorDefaultBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12,4">
+            <DockPanel>
+                <TextBlock x:Name="StatusText"
+                           VerticalAlignment="Center"
+                           FontSize="12"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                           Text="Starting…" />
+            </DockPanel>
+        </Border>
+
+        <ui:FANavigationView x:Name="NavView"
+                           PaneDisplayMode="LeftCompact"
+                           IsSettingsVisible="True"
+                           IsBackButtonVisible="False"
+                           OpenPaneLength="220"
+                           SelectionChanged="NavView_SelectionChanged">
+            <ui:FANavigationView.MenuItems>
+                <ui:FANavigationViewItem Content="Dashboard" Tag="dashboard" IconSource="Home" />
+                <ui:FANavigationViewItem Content="Designer" Tag="designer" IconSource="Edit" />
+                <ui:FANavigationViewItem Content="Devices" Tag="devices" IconSource="Video" />
+                <ui:FANavigationViewItem Content="Sensors &amp; Plugins" Tag="sensors" IconSource="Library" />
+            </ui:FANavigationView.MenuItems>
+
+            <ContentControl x:Name="PageHost" />
+        </ui:FANavigationView>
+
+    </DockPanel>
+
+</Window>
