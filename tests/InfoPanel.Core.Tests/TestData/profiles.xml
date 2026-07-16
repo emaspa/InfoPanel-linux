@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ArrayOfProfile xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Profile>
+    <Guid>b1480583-5510-4f08-9ecb-acc427ab1afe</Guid>
+    <Name>Profile 1</Name>
+    <Width>600</Width>
+    <Height>400</Height>
+    <Drag>true</Drag>
+    <BackgroundColor>#FFFFFFFF</BackgroundColor>
+    <Active>false</Active>
+    <Topmost>false</Topmost>
+    <Font>Inter</Font>
+    <FontSize>26</FontSize>
+    <Color>#FF000000</Color>
+    <WindowX>0</WindowX>
+    <WindowY>0</WindowY>
+    <Resize>true</Resize>
+    <StrictWindowMatching>false</StrictWindowMatching>
+    <IsSelected>false</IsSelected>
+    <ShowFps>false</ShowFps>
+    <OpenGL>false</OpenGL>
+    <FontScale>1.33</FontScale>
+  </Profile>
+</ArrayOfProfile>

@@ -6,4 +6,7 @@
     <Project Path="src/InfoPanel.Plugins.Simulator/InfoPanel.Plugins.Simulator.csproj" />
     <Project Path="src/InfoPanel.Plugins/InfoPanel.Plugins.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/InfoPanel.Core.Tests/InfoPanel.Core.Tests.csproj" />
+  </Folder>
 </Solution>

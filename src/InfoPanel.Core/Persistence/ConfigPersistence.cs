@@ -33,7 +33,11 @@ namespace InfoPanel.Persistence
             typeof(GaugeDisplayItem), typeof(ShapeDisplayItem)
         ];
 
+        /// <summary>Overrides the data directory (tests, portable mode). Null = default XDG location.</summary>
+        public static string? BaseFolderOverride { get; set; }
+
         public static string BaseFolder =>
+            BaseFolderOverride ??
             Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel");
 
         public static string ProfilesFolder => Path.Combine(BaseFolder, "profiles");

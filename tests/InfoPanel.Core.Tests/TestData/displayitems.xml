@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<ArrayOfDisplayItem xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <DisplayItem xsi:type="TextDisplayItem">
+    <Name>Go to Design tab to start your journey.</Name>
+    <Hidden>false</Hidden>
+    <X>50</X>
+    <Y>100</Y>
+    <IsLocked>false</IsLocked>
+    <Rotation>0</Rotation>
+    <Font>Arial</Font>
+    <FontSize>20</FontSize>
+    <Bold>false</Bold>
+    <Italic>true</Italic>
+    <Underline>false</Underline>
+    <Strikeout>false</Strikeout>
+    <Color>#000000</Color>
+    <Uppercase>false</Uppercase>
+    <FontStyle />
+    <RightAlign>false</RightAlign>
+    <CenterAlign>false</CenterAlign>
+    <Wrap>true</Wrap>
+    <Ellipsis>true</Ellipsis>
+    <Width>0</Width>
+    <Height>0</Height>
+    <Marquee>false</Marquee>
+    <MarqueeSpeed>50</MarqueeSpeed>
+    <MarqueeSpacing>40</MarqueeSpacing>
+  </DisplayItem>
+  <DisplayItem xsi:type="TextDisplayItem">
+    <Name>Drag this panel to reposition.</Name>
+    <Hidden>false</Hidden>
+    <X>50</X>
+    <Y>150</Y>
+    <IsLocked>false</IsLocked>
+    <Rotation>0</Rotation>
+    <Font>Arial</Font>
+    <FontSize>20</FontSize>
+    <Bold>false</Bold>
+    <Italic>true</Italic>
+    <Underline>false</Underline>
+    <Strikeout>false</Strikeout>
+    <Color>#000000</Color>
+    <Uppercase>false</Uppercase>
+    <FontStyle />
+    <RightAlign>false</RightAlign>
+    <CenterAlign>false</CenterAlign>
+    <Wrap>true</Wrap>
+    <Ellipsis>true</Ellipsis>
+    <Width>0</Width>
+    <Height>0</Height>
+    <Marquee>false</Marquee>
+    <MarqueeSpeed>50</MarqueeSpeed>
+    <MarqueeSpacing>40</MarqueeSpacing>
+  </DisplayItem>
+  <DisplayItem xsi:type="GaugeDisplayItem">
+    <Name>Pin 5</Name>
+    <Hidden>false</Hidden>
+    <X>100</X>
+    <Y>100</Y>
+    <IsLocked>false</IsLocked>
+    <Rotation>0</Rotation>
+    <_valueType>NOW</_valueType>
+    <SensorName>Pin 5</SensorName>
+    <SensorType>Hwmon</SensorType>
+    <Id>0</Id>
+    <Instance>0</Instance>
+    <EntryId>0</EntryId>
+    <LibreSensorId>hwmon4/curr5</LibreSensorId>
+    <PluginSensorId />
+    <ValueType>NOW</ValueType>
+    <MinValue>0</MinValue>
+    <MaxValue>100</MaxValue>
+    <Scale>100</Scale>
+    <Images />
+    <Width>0</Width>
+    <Height>0</Height>
+  </DisplayItem>
+</ArrayOfDisplayItem>

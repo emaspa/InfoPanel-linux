@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Settings xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <BeadaPanelDevices />
+  <TuringPanelDevices />
+  <ThermalrightPanelDevices>
+    <ThermalrightPanelDevice>
+      <DeviceId>usbdev3.9</DeviceId>
+      <DeviceLocation>usbdev3.9</DeviceLocation>
+      <Model>TrofeoVision916</Model>
+      <Enabled>true</Enabled>
+      <ProfileGuid>b1480583-5510-4f08-9ecb-acc427ab1afe</ProfileGuid>
+      <Rotation>RotateNone</Rotation>
+      <Brightness>100</Brightness>
+      <TargetFrameRate>15</TargetFrameRate>
+      <JpegQuality>95</JpegQuality>
+    </ThermalrightPanelDevice>
+  </ThermalrightPanelDevices>
+  <UiWidth>1854</UiWidth>
+  <UiHeight>1011</UiHeight>
+  <UiScale>1</UiScale>
+  <IsPaneOpen>true</IsPaneOpen>
+  <AutoStart>false</AutoStart>
+  <AutoStartDelay>5</AutoStartDelay>
+  <StartMinimized>false</StartMinimized>
+  <MinimizeToTray>true</MinimizeToTray>
+  <SelectedItemColor>#FF00FF00</SelectedItemColor>
+  <ShowGridLines>true</ShowGridLines>
+  <GridLinesSpacing>20</GridLinesSpacing>
+  <GridLinesColor>#1A808080</GridLinesColor>
+  <BeadaPanelMultiDeviceMode>false</BeadaPanelMultiDeviceMode>
+  <TuringPanelMultiDeviceMode>false</TuringPanelMultiDeviceMode>
+  <ThermalrightPanelMultiDeviceMode>true</ThermalrightPanelMultiDeviceMode>
+  <WebServer>false</WebServer>
+  <WebServerListenIp>127.0.0.1</WebServerListenIp>
+  <WebServerListenPort>80</WebServerListenPort>
+  <WebServerRefreshRate>66</WebServerRefreshRate>
+  <TargetFrameRate>15</TargetFrameRate>
+  <TargetGraphUpdateRate>1000</TargetGraphUpdateRate>
+  <Version>131</Version>
+</Settings>
