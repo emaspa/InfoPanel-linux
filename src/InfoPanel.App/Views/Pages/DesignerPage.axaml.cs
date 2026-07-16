@@ -4,7 +4,6 @@ using Avalonia.Threading;
 using InfoPanel.Designer;
 using InfoPanel.Models;
 using InfoPanel.ViewModels;
-using SkiaSharp;
 
 namespace InfoPanel.Views.Pages
 {
@@ -14,6 +13,7 @@ namespace InfoPanel.Views.Pages
         private readonly SensorTreeViewModel _sensorTree = new();
         private DispatcherTimer? _sensorTimer;
         private bool _syncingLayerSelection;
+        private bool _syncingActiveToggle;
 
         public DesignerPage()
         {
@@ -21,10 +21,16 @@ namespace InfoPanel.Views.Pages
 
             Loaded += (_, _) =>
             {
-                if (Avalonia.Application.Current is App app && ProfilePicker.ItemsSource == null)
+                if (Avalonia.Application.Current is App app)
                 {
-                    ProfilePicker.ItemsSource = app.Host.Profiles;
-                    ProfilePicker.SelectedIndex = app.Host.Profiles.Count > 0 ? 0 : -1;
+                    if (ProfilePicker.ItemsSource == null)
+                    {
+                        ProfilePicker.ItemsSource = app.Host.Profiles;
+                        ProfilePicker.SelectedIndex = app.Host.Profiles.Count > 0 ? 0 : -1;
+                    }
+
+                    Canvas.GridSpacing = (int)app.Host.Settings.GridLinesSpacing;
+                    Canvas.SnapToGrid = SnapToggle.IsChecked == true;
                 }
 
                 if (_sensorTree.Roots.Count == 0)
@@ -34,11 +40,7 @@ namespace InfoPanel.Views.Pages
                 }
 
                 _sensorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-                _sensorTimer.Tick += (_, _) =>
-                {
-                    _sensorTree.RefreshValues();
-                    Inspector.Rebuild();
-                };
+                _sensorTimer.Tick += (_, _) => _sensorTree.RefreshValues();
                 _sensorTimer.Start();
 
                 Inspector.BindSensorRequested += Inspector_BindSensorRequested;
@@ -50,6 +52,8 @@ namespace InfoPanel.Views.Pages
                 _sensorTimer = null;
             };
         }
+
+        // ================= profile =================
 
         private void ProfilePicker_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
@@ -66,13 +70,42 @@ namespace InfoPanel.Views.Pages
             }
 
             _session = new DesignerSession(profile);
+            InfoPanel.Drawing.RenderContext.IsSelectedProfile = p => p.Guid == profile.Guid;
             _session.Undo.StateChanged += Undo_StateChanged;
             _session.SelectionChanged += Session_SelectionChanged;
             Canvas.Session = _session;
             Inspector.Session = _session;
-            LayersTree.ItemsSource = _session.Items;
+            RefreshLayerList();
             Canvas.ZoomChanged += (_, _) => ZoomLabel.Text = $"{Canvas.Zoom * 100:0}%";
             ZoomLabel.Text = $"{Canvas.Zoom * 100:0}%";
+
+            _syncingActiveToggle = true;
+            ActiveToggle.IsChecked = profile.Active;
+            _syncingActiveToggle = false;
+        }
+
+        private void ActiveToggle_Changed(object? sender, RoutedEventArgs e)
+        {
+            if (_syncingActiveToggle || _session == null || Avalonia.Application.Current is not App app)
+            {
+                return;
+            }
+
+            var profile = _session.Profile;
+            var active = ActiveToggle.IsChecked == true;
+            if (profile.Active == active) return;
+
+            profile.Active = active;
+            app.Host.SaveProfiles();
+
+            if (active)
+            {
+                DisplayWindowManager.Instance.ShowDisplayWindow(profile);
+            }
+            else
+            {
+                DisplayWindowManager.Instance.CloseDisplayWindow(profile.Guid);
+            }
         }
 
         private void Undo_StateChanged(object? sender, EventArgs e)
@@ -80,6 +113,7 @@ namespace InfoPanel.Views.Pages
             UndoButton.IsEnabled = _session?.Undo.CanUndo == true;
             RedoButton.IsEnabled = _session?.Undo.CanRedo == true;
             Inspector.Rebuild();
+            RefreshLayerList();
         }
 
         private void Session_SelectionChanged(object? sender, EventArgs e)
@@ -92,7 +126,6 @@ namespace InfoPanel.Views.Pages
                 _ => $"{count} items selected"
             };
 
-            // reflect canvas selection into the layers tree
             _syncingLayerSelection = true;
             try
             {
@@ -103,6 +136,22 @@ namespace InfoPanel.Views.Pages
                 _syncingLayerSelection = false;
             }
         }
+
+        // ================= layers panel =================
+
+        private void RefreshLayerList()
+        {
+            if (_session == null) return;
+
+            var query = LayerSearch.Text?.Trim() ?? "";
+            LayersTree.ItemsSource = query.Length == 0
+                ? _session.Items
+                : _session.Items.Where(i =>
+                    i.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
+                    || i.Kind.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+        }
+
+        private void LayerSearch_TextChanged(object? sender, TextChangedEventArgs e) => RefreshLayerList();
 
         private void LayersTree_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
@@ -118,7 +167,56 @@ namespace InfoPanel.Views.Pages
             }
         }
 
-        // ---- sensors tab ----
+        private void LayerDelete_Click(object? sender, RoutedEventArgs e)
+        {
+            _session?.DeleteSelection();
+            AfterListEdit();
+        }
+
+        private void LayerDuplicate_Click(object? sender, RoutedEventArgs e)
+        {
+            _session?.Duplicate();
+            AfterListEdit();
+        }
+
+        private void LayerUp_Click(object? sender, RoutedEventArgs e)
+        {
+            _session?.PushBy(1);
+            AfterListEdit();
+        }
+
+        private void LayerDown_Click(object? sender, RoutedEventArgs e)
+        {
+            _session?.PushBy(-1);
+            AfterListEdit();
+        }
+
+        private void LayerTop_Click(object? sender, RoutedEventArgs e)
+        {
+            _session?.PushToEnd(front: true);
+            AfterListEdit();
+        }
+
+        private void LayerBottom_Click(object? sender, RoutedEventArgs e)
+        {
+            _session?.PushToEnd(front: false);
+            AfterListEdit();
+        }
+
+        private void AfterListEdit()
+        {
+            RefreshLayerList();
+            Canvas.InvalidateVisual();
+        }
+
+        // ================= sensors tab =================
+
+        private void RefreshSensors_Click(object? sender, RoutedEventArgs e)
+        {
+            _sensorTree.Rebuild();
+            SensorTree.ItemsSource = _sensorTree.Roots;
+            SensorSearch.Text = "";
+        }
 
         private void SensorTree_SelectionChanged(object? sender, SelectionChangedEventArgs e)
         {
@@ -127,40 +225,171 @@ namespace InfoPanel.Views.Pages
 
         private void SensorTree_DoubleTapped(object? sender, Avalonia.Input.TappedEventArgs e)
         {
-            if (_session == null || SensorTree.SelectedItem is not SensorTreeItem { IsSensor: true } leaf)
-            {
-                return;
-            }
-
-            _session.AddItem(CreateSensorItem(leaf, _session.Profile));
-            Canvas.InvalidateVisual();
+            AddSensorAsText_Click(sender, new RoutedEventArgs());
         }
 
-        private void Inspector_BindSensorRequested(object? sender, SensorDisplayItem target)
+        private void SensorSearch_TextChanged(object? sender, TextChangedEventArgs e)
         {
-            if (_session == null || _sensorTree.SelectedItem is not { IsSensor: true } leaf)
+            var query = SensorSearch.Text?.Trim() ?? "";
+            if (query.Length == 0)
+            {
+                SensorTree.ItemsSource = _sensorTree.Roots;
+                return;
+            }
+
+            var matches = new List<SensorTreeItem>();
+            void Walk(SensorTreeItem node)
+            {
+                if (node.IsSensor && node.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                {
+                    matches.Add(node);
+                }
+
+                foreach (var child in node.Children)
+                {
+                    Walk(child);
+                }
+            }
+
+            foreach (var root in _sensorTree.Roots)
+            {
+                Walk(root);
+            }
+
+            SensorTree.ItemsSource = matches;
+        }
+
+        private SensorTreeItem? SelectedSensorLeaf =>
+            _sensorTree.SelectedItem is { IsSensor: true } leaf ? leaf : null;
+
+        private void BindSensorFields(SensorTreeItem leaf, Action<Enums.SensorType, string, string, string> apply)
+        {
+            var isPlugin = leaf.SensorType == Enums.SensorType.Plugin;
+            apply(
+                isPlugin ? Enums.SensorType.Plugin : Enums.SensorType.Hwmon,
+                isPlugin ? "" : leaf.SensorId!,
+                isPlugin ? leaf.SensorId! : "",
+                leaf.Name);
+        }
+
+        private void AddBoundItem(DisplayItem item)
+        {
+            if (_session == null) return;
+            _session.AddItem(item);
+            AfterListEdit();
+        }
+
+        private void AddSensorAsText_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
+            AddBoundItem(CreateSensorItem(leaf, _session.Profile));
+        }
+
+        private void AddSensorAsBar_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
+            var item = new BarDisplayItem { Name = leaf.Name, Width = 200, Height = 30, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            AddBoundItem(item);
+        }
+
+        private void AddSensorAsGraph_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
+            var item = new GraphDisplayItem { Name = leaf.Name, Width = 240, Height = 100, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            AddBoundItem(item);
+        }
+
+        private void AddSensorAsDonut_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
+            var item = new DonutDisplayItem { Name = leaf.Name, Radius = 50, Thickness = 12, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            AddBoundItem(item);
+        }
+
+        private void AddSensorAsGauge_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
+            var item = new GaugeDisplayItem { Name = leaf.Name, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            AddBoundItem(item);
+        }
+
+        private void AddSensorAsImage_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null || SelectedSensorLeaf is not { } leaf) return;
+            var item = new SensorImageDisplayItem { Name = leaf.Name, X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
+            BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+            AddBoundItem(item);
+        }
+
+        private void ReplaceSensor_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session is { Selection.Count: 1 })
+            {
+                Inspector_BindSensorRequested(this, _session.Selection[0]);
+            }
+        }
+
+        private void Inspector_BindSensorRequested(object? sender, DisplayItem target)
+        {
+            if (_session == null || SelectedSensorLeaf is not { } leaf)
             {
                 return;
             }
 
-            var oldType = target.SensorType;
-            var oldLibre = target.LibreSensorId;
-            var oldPlugin = target.PluginSensorId;
+            var isPlugin = leaf.SensorType == Enums.SensorType.Plugin;
+            var newType = isPlugin ? Enums.SensorType.Plugin : Enums.SensorType.Hwmon;
+            var newLibre = isPlugin ? "" : leaf.SensorId!;
+            var newPlugin = isPlugin ? leaf.SensorId! : "";
 
-            _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string)>(
-                target, "Sensor binding",
-                v =>
-                {
-                    target.SensorType = v.Item1;
-                    target.LibreSensorId = v.Item2;
-                    target.PluginSensorId = v.Item3;
-                },
-                (oldType, oldLibre, oldPlugin),
-                leaf.SensorType == Enums.SensorType.Plugin
-                    ? (Enums.SensorType.Plugin, "", leaf.SensorId!)
-                    : (Enums.SensorType.Hwmon, leaf.SensorId!, "")));
+            switch (target)
+            {
+                case SensorDisplayItem sensor:
+                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
+                        sensor, "Sensor binding",
+                        v => { sensor.SensorType = v.Item1; sensor.LibreSensorId = v.Item2; sensor.PluginSensorId = v.Item3; sensor.SensorName = v.Item4; },
+                        (sensor.SensorType, sensor.LibreSensorId, sensor.PluginSensorId, sensor.SensorName),
+                        (newType, newLibre, newPlugin, leaf.Name)));
+                    break;
+
+                case ChartDisplayItem chart:
+                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
+                        chart, "Sensor binding",
+                        v => { chart.SensorType = v.Item1; chart.LibreSensorId = v.Item2; chart.PluginSensorId = v.Item3; chart.SensorName = v.Item4; },
+                        (chart.SensorType, chart.LibreSensorId, chart.PluginSensorId, chart.SensorName),
+                        (newType, newLibre, newPlugin, leaf.Name)));
+                    break;
+
+                case GaugeDisplayItem gauge:
+                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
+                        gauge, "Sensor binding",
+                        v => { gauge.SensorType = v.Item1; gauge.LibreSensorId = v.Item2; gauge.PluginSensorId = v.Item3; gauge.SensorName = v.Item4; },
+                        (gauge.SensorType, gauge.LibreSensorId, gauge.PluginSensorId, gauge.SensorName),
+                        (newType, newLibre, newPlugin, leaf.Name)));
+                    break;
+
+                case SensorImageDisplayItem sensorImage:
+                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
+                        sensorImage, "Sensor binding",
+                        v => { sensorImage.SensorType = v.Item1; sensorImage.LibreSensorId = v.Item2; sensorImage.PluginSensorId = v.Item3; sensorImage.SensorName = v.Item4; },
+                        (sensorImage.SensorType, sensorImage.LibreSensorId, sensorImage.PluginSensorId, sensorImage.SensorName),
+                        (newType, newLibre, newPlugin, leaf.Name)));
+                    break;
+
+                case TableSensorDisplayItem table when isPlugin:
+                    _session.Undo.Execute(new SetPropertyAction<(string, string)>(
+                        table, "Sensor binding",
+                        v => { table.PluginSensorId = v.Item1; table.SensorName = v.Item2; },
+                        (table.PluginSensorId, table.SensorName),
+                        (leaf.SensorId!, leaf.Name)));
+                    break;
+            }
 
             Inspector.Rebuild();
+            Canvas.InvalidateVisual();
         }
 
         private static SensorDisplayItem CreateSensorItem(SensorTreeItem leaf, Profile profile)
@@ -190,44 +419,19 @@ namespace InfoPanel.Views.Pages
             return item;
         }
 
-        private void SensorSearch_TextChanged(object? sender, TextChangedEventArgs e)
+        // ================= add toolbar =================
+
+        private void AddItemAtCenter(DisplayItem item)
         {
-            var query = SensorSearch.Text?.Trim() ?? "";
-            if (query.Length == 0)
-            {
-                SensorTree.ItemsSource = _sensorTree.Roots;
-                return;
-            }
-
-            // flat filtered list of matching leaves
-            var matches = new List<SensorTreeItem>();
-            void Walk(SensorTreeItem node)
-            {
-                if (node.IsSensor && node.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
-                {
-                    matches.Add(node);
-                }
-
-                foreach (var child in node.Children)
-                {
-                    Walk(child);
-                }
-            }
-
-            foreach (var root in _sensorTree.Roots)
-            {
-                Walk(root);
-            }
-
-            SensorTree.ItemsSource = matches;
+            if (_session == null) return;
+            _session.AddItem(item);
+            AfterListEdit();
         }
-
-        // ---- toolbar ----
 
         private void AddText_Click(object? sender, RoutedEventArgs e)
         {
             if (_session == null) return;
-            _session.AddItem(new TextDisplayItem
+            AddItemAtCenter(new TextDisplayItem
             {
                 Name = "New text",
                 X = _session.Profile.Width / 3,
@@ -236,20 +440,19 @@ namespace InfoPanel.Views.Pages
                 FontSize = _session.Profile.FontSize,
                 Color = _session.Profile.Color,
             });
-            Canvas.InvalidateVisual();
         }
 
         private void AddSensor_Click(object? sender, RoutedEventArgs e)
         {
             if (_session == null) return;
 
-            if (_sensorTree.SelectedItem is { IsSensor: true } leaf)
+            if (SelectedSensorLeaf is { } leaf)
             {
-                _session.AddItem(CreateSensorItem(leaf, _session.Profile));
+                AddItemAtCenter(CreateSensorItem(leaf, _session.Profile));
             }
             else
             {
-                _session.AddItem(new SensorDisplayItem
+                AddItemAtCenter(new SensorDisplayItem
                 {
                     Name = "New sensor",
                     X = _session.Profile.Width / 3,
@@ -259,14 +462,51 @@ namespace InfoPanel.Views.Pages
                     Color = _session.Profile.Color,
                 });
             }
+        }
 
-            Canvas.InvalidateVisual();
+        private void AddClock_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null) return;
+            AddItemAtCenter(new ClockDisplayItem
+            {
+                Name = "Clock",
+                X = _session.Profile.Width / 3,
+                Y = _session.Profile.Height / 3,
+                Font = _session.Profile.Font,
+                FontSize = _session.Profile.FontSize,
+                Color = _session.Profile.Color,
+            });
+        }
+
+        private void AddCalendar_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null) return;
+            AddItemAtCenter(new CalendarDisplayItem
+            {
+                Name = "Calendar",
+                X = _session.Profile.Width / 3,
+                Y = _session.Profile.Height / 3,
+                Font = _session.Profile.Font,
+                FontSize = _session.Profile.FontSize,
+                Color = _session.Profile.Color,
+            });
+        }
+
+        private void AddImage_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null) return;
+            AddItemAtCenter(new ImageDisplayItem
+            {
+                Name = "New image",
+                X = _session.Profile.Width / 3,
+                Y = _session.Profile.Height / 3,
+            });
         }
 
         private void AddShape_Click(object? sender, RoutedEventArgs e)
         {
             if (_session == null) return;
-            _session.AddItem(new ShapeDisplayItem
+            AddItemAtCenter(new ShapeDisplayItem
             {
                 Name = "New shape",
                 X = _session.Profile.Width / 3,
@@ -274,20 +514,15 @@ namespace InfoPanel.Views.Pages
                 Width = 120,
                 Height = 80,
             });
-            Canvas.InvalidateVisual();
         }
 
-        private void AddImage_Click(object? sender, RoutedEventArgs e)
+        private void AddGroup_Click(object? sender, RoutedEventArgs e)
         {
             if (_session == null) return;
-            _session.AddItem(new ImageDisplayItem
-            {
-                Name = "New image",
-                X = _session.Profile.Width / 3,
-                Y = _session.Profile.Height / 3,
-            });
-            Canvas.InvalidateVisual();
+            AddItemAtCenter(new GroupDisplayItem { Name = "New group" });
         }
+
+        // ================= misc toolbar =================
 
         private void Undo_Click(object? sender, RoutedEventArgs e)
         {
@@ -314,6 +549,16 @@ namespace InfoPanel.Views.Pages
         private void Save_Click(object? sender, RoutedEventArgs e)
         {
             _session?.SaveNow();
+        }
+
+        private void Reload_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null) return;
+
+            _session.ClearSelection();
+            Stores.DisplayItemStore.Instance.Reload(_session.Profile);
+            _session.Undo.Clear();
+            AfterListEdit();
         }
     }
 }

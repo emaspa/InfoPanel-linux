@@ -158,6 +158,21 @@ namespace InfoPanel.Views.Pages
             Persistence.ProfileTransfer.Export(card.Profile, uri.LocalPath);
         }
 
+        private void ResetPosition_Click(object? sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is ProfileCardViewModel card)
+            {
+                card.Profile.WindowX = 0;
+                card.Profile.WindowY = 0;
+                _app?.Host.SaveProfiles();
+            }
+        }
+
+        private void SaveProfile_Click(object? sender, RoutedEventArgs e)
+        {
+            _app?.Host.SaveProfiles();
+        }
+
         private void Delete_Click(object? sender, RoutedEventArgs e)
         {
             if (_app == null || (sender as Button)?.Tag is not ProfileCardViewModel card) return;

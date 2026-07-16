@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:InfoPanel.ViewModels"
+             xmlns:utils="using:InfoPanel.Utils"
              x:Class="InfoPanel.Views.Pages.DashboardPage">
 
     <ScrollViewer>
@@ -49,6 +50,43 @@
                                         <Button Content="Delete" Click="Delete_Click" Tag="{Binding}" />
                                         <Button Content="Export" Click="Export_Click" Tag="{Binding}" />
                                     </StackPanel>
+
+                                    <Expander Header="Profile settings" FontSize="12">
+                                        <StackPanel Spacing="8" Margin="0,8,0,0">
+                                            <TextBox Text="{Binding Profile.Name, Mode=TwoWay}" PlaceholderText="Name" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <NumericUpDown Value="{Binding Profile.Width, Mode=TwoWay}" Minimum="1" Maximum="10000" Increment="1" FormatString="0" Width="120" />
+                                                <TextBlock Text="×" VerticalAlignment="Center" />
+                                                <NumericUpDown Value="{Binding Profile.Height, Mode=TwoWay}" Minimum="1" Maximum="10000" Increment="1" FormatString="0" Width="120" />
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="Background" VerticalAlignment="Center" Width="90" FontSize="11" />
+                                                <ColorPicker Color="{Binding Profile.BackgroundColor, Mode=TwoWay, Converter={x:Static utils:ColorHexConverter.Instance}}" Width="64" Height="26" />
+                                                <TextBlock Text="Text" VerticalAlignment="Center" FontSize="11" />
+                                                <ColorPicker Color="{Binding Profile.Color, Mode=TwoWay, Converter={x:Static utils:ColorHexConverter.Instance}}" Width="64" Height="26" />
+                                            </StackPanel>
+                                            <ComboBox ItemsSource="{x:Static utils:UiCatalog.FontFamilies}" SelectedItem="{Binding Profile.Font, Mode=TwoWay}" MaxDropDownHeight="360" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="Font size" VerticalAlignment="Center" FontSize="11" />
+                                                <NumericUpDown Value="{Binding Profile.FontSize, Mode=TwoWay}" Minimum="1" Maximum="200" Increment="1" FormatString="0" Width="110" />
+                                                <TextBlock Text="Scale" VerticalAlignment="Center" FontSize="11" />
+                                                <NumericUpDown Value="{Binding Profile.FontScale, Mode=TwoWay}" Minimum="0.1" Maximum="10" Increment="0.01" FormatString="0.00" Width="110" />
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="Overlay X/Y" VerticalAlignment="Center" FontSize="11" />
+                                                <NumericUpDown Value="{Binding Profile.WindowX, Mode=TwoWay}" Increment="1" FormatString="0" Width="110" />
+                                                <NumericUpDown Value="{Binding Profile.WindowY, Mode=TwoWay}" Increment="1" FormatString="0" Width="110" />
+                                                <Button Content="Reset" FontSize="11" Click="ResetPosition_Click" Tag="{Binding}" />
+                                            </StackPanel>
+                                            <WrapPanel>
+                                                <CheckBox Content="Always on top" IsChecked="{Binding Profile.Topmost, Mode=TwoWay}" FontSize="12" Margin="0,0,8,0" />
+                                                <CheckBox Content="Draggable" IsChecked="{Binding Profile.Drag, Mode=TwoWay}" FontSize="12" Margin="0,0,8,0" />
+                                                <CheckBox Content="Resizable" IsChecked="{Binding Profile.Resize, Mode=TwoWay}" FontSize="12" Margin="0,0,8,0" />
+                                                <CheckBox Content="Show FPS" IsChecked="{Binding Profile.ShowFps, Mode=TwoWay}" FontSize="12" Margin="0,0,8,0" />
+                                            </WrapPanel>
+                                            <Button Content="Save profile" FontSize="12" Click="SaveProfile_Click" Tag="{Binding}" />
+                                        </StackPanel>
+                                    </Expander>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

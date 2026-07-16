@@ -10,7 +10,7 @@
                 <TextBlock Text="Sensors" FontSize="28" FontWeight="SemiBold" />
                 <TextBlock x:Name="SensorCount" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </StackPanel>
-            <TextBox x:Name="SearchBox" DockPanel.Dock="Top" Watermark="Search sensors…"
+            <TextBox x:Name="SearchBox" DockPanel.Dock="Top" PlaceholderText="Search sensors…"
                      Margin="0,0,0,8" TextChanged="Search_TextChanged" />
             <TreeView x:Name="Tree">
                 <TreeView.ItemTemplate>

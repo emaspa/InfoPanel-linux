@@ -36,7 +36,7 @@
                 <ToggleSwitch x:Name="WebServerToggle" OnContent="Enabled" OffContent="Disabled" />
                 <DockPanel MaxWidth="380" HorizontalAlignment="Left">
                     <TextBlock Text="Listen address" VerticalAlignment="Center" Margin="0,0,12,0" />
-                    <TextBox x:Name="WebServerIp" Watermark="127.0.0.1" />
+                    <TextBox x:Name="WebServerIp" PlaceholderText="127.0.0.1" />
                 </DockPanel>
                 <DockPanel MaxWidth="300" HorizontalAlignment="Left">
                     <TextBlock Text="Port" VerticalAlignment="Center" Margin="0,0,12,0" />

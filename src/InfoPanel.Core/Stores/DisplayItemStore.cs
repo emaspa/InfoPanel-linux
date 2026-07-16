@@ -137,6 +137,20 @@ namespace InfoPanel.Stores
             debouncer.Debounce(() => Save(profile), 2000);
         }
 
+        /// <summary>Discards in-memory items and reloads the profile's collection from disk.</summary>
+        public void Reload(Profile profile)
+        {
+            if (_items.TryGetValue(profile.Guid, out var collection))
+            {
+                var loaded = ConfigPersistence.LoadDisplayItems(profile);
+                collection.Clear();
+                foreach (var item in loaded)
+                {
+                    collection.Add(item);
+                }
+            }
+        }
+
         /// <summary>Saves immediately (Ctrl+S, profile switch, shutdown).</summary>
         public void Save(Profile profile)
         {
