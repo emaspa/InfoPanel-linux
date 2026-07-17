@@ -26,6 +26,34 @@ namespace InfoPanel.Services
 
         public TuringPanelDevice Device => _device;
 
+        private bool IsLianLi => _device.ModelInfo?.Model == TuringPanelModel.LIANLI_88INCH_USB;
+
+        /// <summary>Adapts the fork's TuringDevice to the shared IUsbScreenDevice loop (frames are PNG).</summary>
+        private sealed class TuringScreenAdapter(TuringDevice inner) : IUsbScreenDevice
+        {
+            public bool Sync()
+            {
+                inner.SendSyncCommand();
+                return true;
+            }
+
+            public bool StopMedia() => true; // fork driver has no stop-media command
+
+            public bool SetBrightness(byte value)
+            {
+                inner.SendBrightnessCommand(value);
+                return true;
+            }
+
+            public bool DrawFrame(byte[] imageBytes)
+            {
+                inner.SendPngBytes(imageBytes);
+                return true;
+            }
+
+            public void Dispose() => inner.Dispose();
+        }
+
         public TuringPanelUsbDeviceTask(TuringPanelDevice device)
         {
             _device = device ?? throw new ArgumentNullException(nameof(device));
@@ -46,6 +74,31 @@ namespace InfoPanel.Services
             if (DeviceRuntime.GetProfile(profileGuid) is Profile profile)
             {
                 var rotation = _device.Rotation;
+
+                // The Lian Li 8.8" framebuffer is natively portrait (480x1920);
+                // landscape profiles rotate 90 degrees into the portrait frame,
+                // and frames are sent as JPEG like the vendor app.
+                if (IsLianLi)
+                {
+                    if (rotation == LCD_ROTATION.RotateNone)
+                    {
+                        rotation = LCD_ROTATION.Rotate90FlipNone;
+                    }
+
+                    using var lianLiBitmap = PanelRenderer.RenderSK(profile, false);
+                    using var lianLiResized = SKBitmapExtensions.EnsureBitmapSize(lianLiBitmap, _panelWidth, _panelHeight, rotation);
+                    using var lianLiPixmap = lianLiResized.PeekPixels();
+                    using var lianLiData = lianLiPixmap.Encode(SKEncodedImageFormat.Jpeg, 95);
+
+                    if (lianLiData == null || lianLiData.IsEmpty)
+                    {
+                        Logger.Error("TuringPanelDevice {Device}: Failed to encode bitmap to JPEG", _device);
+                        return null;
+                    }
+
+                    return lianLiData.ToArray();
+                }
+
                 using var bitmap = PanelRenderer.RenderSK(profile, false,
                     colorType: DateTime.Now > _downgradeRenderingUntil ? SKColorType.Rgba8888 : SKColorType.Argb4444);
 
@@ -109,6 +162,49 @@ namespace InfoPanel.Services
                 return null;
             }
             return data.ToArray();
+        }
+
+        private static byte[] EncodeSolidFrame(int width, int height, SKColor color, SKEncodedImageFormat format, int quality)
+        {
+            using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul));
+            bitmap.Erase(color);
+
+            using var pixmap = bitmap.PeekPixels();
+            using var data = pixmap.Encode(format, quality);
+            return data?.ToArray() ?? [];
+        }
+
+        private void PrepareLianLiImageLayers(LianLiUsbScreenDevice lianLiDevice)
+        {
+            try
+            {
+                // Match the vendor ApplyTemplate() prep sequence:
+                // SyncClockOnly, StopClock, clear PNG overlay, clear JPG background,
+                // then set the frame rate like the Linux driver does.
+                var syncClockOk = lianLiDevice.SyncClockOnly();
+                Thread.Sleep(50);
+
+                var stopClockOk = lianLiDevice.StopClock();
+                Thread.Sleep(50);
+
+                var clearPng = EncodeSolidFrame(_panelWidth, _panelHeight, SKColors.Transparent, SKEncodedImageFormat.Png, 100);
+                var clearPngOk = clearPng.Length > 0 && lianLiDevice.DrawPngLayer(clearPng);
+                Thread.Sleep(50);
+
+                var clearJpeg = EncodeSolidFrame(_panelWidth, _panelHeight, SKColors.Black, SKEncodedImageFormat.Jpeg, 95);
+                var clearJpegOk = clearJpeg.Length > 0 && lianLiDevice.DrawJpegLayer(clearJpeg);
+                Thread.Sleep(50);
+
+                var frameRateOk = lianLiDevice.SetFrameRate(30);
+
+                Logger.Information(
+                    "TuringPanelDevice {Device}: Lian Li prep results: SyncClockOnly={SyncClockOk}, StopClock={StopClockOk}, ClearPng={ClearPngOk}, ClearJpeg={ClearJpegOk}, SetFrameRate={FrameRateOk}",
+                    _device, syncClockOk, stopClockOk, clearPngOk, clearJpegOk, frameRateOk);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "TuringPanelDevice {Device}: Lian Li prep sequence failed", _device);
+            }
         }
 
         private Task<UsbRegistry?> FindTargetDeviceAsync()
@@ -181,35 +277,75 @@ namespace InfoPanel.Services
                     return;
                 }
 
-                using var device = new TuringDevice();
-                
-                try
+                IUsbScreenDevice screen;
+                if (IsLianLi)
                 {
-                    device.Initialize(usbRegistry);
+                    if (!usbRegistry.Open(out var usbDevice))
+                    {
+                        Logger.Error("TuringPanelDevice {Device}: Failed to open USB device", _device);
+                        _device.UpdateRuntimeProperties(errorMessage: "Failed to open USB device");
+                        return;
+                    }
+
+                    screen = new LianLiUsbScreenDevice(usbDevice);
                 }
-                catch (TuringDeviceException ex)
+                else
                 {
-                    Logger.Error("TuringPanelDevice {Device}: Failed to initialize - {Error}", _device, ex.Message);
-                    _device.UpdateRuntimeProperties(errorMessage: ex.Message);
-                    return;
+                    var turingDevice = new TuringDevice();
+                    try
+                    {
+                        turingDevice.Initialize(usbRegistry);
+                    }
+                    catch (TuringDeviceException ex)
+                    {
+                        Logger.Error("TuringPanelDevice {Device}: Failed to initialize - {Error}", _device, ex.Message);
+                        _device.UpdateRuntimeProperties(errorMessage: ex.Message);
+                        turingDevice.Dispose();
+                        return;
+                    }
+
+                    screen = new TuringScreenAdapter(turingDevice);
                 }
-                
+
+                using var device = screen;
+
                 Logger.Information("TuringPanelDevice {Device}: Initialized successfully", _device);
                 _device.UpdateRuntimeProperties(isRunning: true);
 
                 try
                 {
-                    // Delay for sync
-                    device.SendSyncCommand();
+                    // Delay for sync; bail if device firmware is not ready
+                    if (!device.Sync())
+                    {
+                        Logger.Warning("TuringPanelDevice {Device}: Sync failed, device not ready", _device);
+                        _device.UpdateRuntimeProperties(errorMessage: "Device not ready (sync failed)");
+                        return;
+                    }
                     Thread.Sleep(200);
-                    device.SendSyncCommand();
+
+                    if (!device.Sync())
+                    {
+                        Logger.Warning("TuringPanelDevice {Device}: Sync failed, device not ready", _device);
+                        _device.UpdateRuntimeProperties(errorMessage: "Device not ready (sync failed)");
+                        return;
+                    }
                     Thread.Sleep(200);
+
+                    // Stop any media playback and clear the Lian Li image layers
+                    // (vendor ApplyTemplate prep sequence), then set the frame rate.
+                    if (device is LianLiUsbScreenDevice lianLi)
+                    {
+                        lianLi.StopMedia();
+                        Thread.Sleep(200);
+                        PrepareLianLiImageLayers(lianLi);
+                        Thread.Sleep(200);
+                    }
 
                     // Set brightness
                     var brightness = _device.Brightness;
-                    device.SendBrightnessCommand((byte)brightness);
+                    device.SetBrightness((byte)brightness);
 
-                    device.SendSyncCommand();
+                    device.Sync();
                     Thread.Sleep(200);
 
                     FpsCounter fpsCounter = new(60);
@@ -267,9 +403,9 @@ namespace InfoPanel.Services
                                 if (brightness != _device.Brightness)
                                 {
                                     brightness = _device.Brightness;
-                                    device.SendBrightnessCommand((byte)brightness);
-                                    device.SendSyncCommand();
-                    Thread.Sleep(200);
+                                    device.SetBrightness((byte)brightness);
+                                    device.Sync();
+                                    Thread.Sleep(200);
                                 }
 
                                 if (_frameAvailable.WaitOne(100))
@@ -278,7 +414,12 @@ namespace InfoPanel.Services
                                     if (frame != null)
                                     {
                                         stopwatch2.Restart();
-                                        device.SendPngBytes(frame);
+                                        if (!device.DrawFrame(frame))
+                                        {
+                                            Logger.Warning("TuringPanelDevice {Device}: Frame draw failed", _device);
+                                            _device.UpdateRuntimeProperties(errorMessage: "Draw failed");
+                                            break;
+                                        }
 
                                         fpsCounter.Update(stopwatch2.ElapsedMilliseconds);
                                         _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
@@ -311,7 +452,7 @@ namespace InfoPanel.Services
                 {
                     try
                     {
-                        device.SendBrightnessCommand(0);
+                        device.SetBrightness(0);
                     }
                     catch (Exception ex)
                     {

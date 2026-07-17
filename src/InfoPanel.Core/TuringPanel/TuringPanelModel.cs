@@ -22,6 +22,9 @@
         REV_16INCH_USB,
         REV_21INCH_USB,
 
+        // Lian Li USB LCDs using the Turing-compatible transport
+        LIANLI_88INCH_USB,
+
         // TURZX 13 inch panel (CT13INCH)
         REV_13INCH_USB,
 

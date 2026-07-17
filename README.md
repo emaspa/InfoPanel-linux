@@ -143,6 +143,7 @@ CDC serial JPEG protocol at 2 Mbaud (VID `33C3`):
 | Turing Smart Screen 9.2" | 464×1920 | USB `1cbe:0092` |
 | Turing Smart Screen 1.6" | 400×400 | USB `1cbe:0016` |
 | Turing Smart Screen 4.6" | 320×960 | USB `1cbe:0046` |
+| Lian Li Universal Screen 8.8" | 480×1920 | USB `1cbe:a088` |
 | Shiny Snake G600 11.3" (Turing 10.2") | 440×1920 | Serial `0525:a4a7` |
 
 ### BeadaPanel (NXElec)
