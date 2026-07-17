@@ -75,10 +75,14 @@
                         <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </DockPanel>
                     <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
-                    <Separator Margin="0,2" Opacity="0.3" />
-                    <ItemsControl ItemsSource="{Binding ConfigEntries}"
-                                  ItemTemplate="{StaticResource ConfigEntryTemplate}" />
-                    <TextBlock Text="Changes apply and save automatically." FontSize="10" Opacity="0.5" Margin="0,2,0,0" />
+                    <Expander Header="Configuration" FontSize="12" Margin="0,4,0,0"
+                              HorizontalAlignment="Stretch" IsExpanded="False">
+                        <StackPanel Margin="0,4,0,4">
+                            <ItemsControl ItemsSource="{Binding ConfigEntries}"
+                                          ItemTemplate="{StaticResource ConfigEntryTemplate}" />
+                            <TextBlock Text="Changes apply and save automatically." FontSize="10" Opacity="0.5" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Expander>
                 </StackPanel>
             </Border>
         </DataTemplate>
