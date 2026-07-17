@@ -906,6 +906,14 @@ namespace InfoPanel.Designer
                 }
             }
 
+            if (image.Type == ImageDisplayItem.ImageType.URL || image is HttpImageDisplayItem)
+            {
+                _root.Children.Add(Field("Refresh every (s), 0 = never",
+                    IntEditor(image.RefreshIntervalSeconds, v => Commit(session, image, nameof(image.RefreshIntervalSeconds),
+                        x => image.RefreshIntervalSeconds = x, image.RefreshIntervalSeconds, v))));
+                _root.Children.Add(Label("Re-downloads the image periodically for webcams, rendered dashboards and other changing sources."));
+            }
+
             _root.Children.Add(Field("Scale %", SliderEditor(1, 500, image.Scale, v => Commit(session, image, nameof(image.Scale), x => image.Scale = x, image.Scale, v))));
 
             _root.Children.Add(CheckWithColor(session, image, "Fill layer", image.Layer, v => Commit(session, image, nameof(image.Layer), x => image.Layer = x, image.Layer, v),

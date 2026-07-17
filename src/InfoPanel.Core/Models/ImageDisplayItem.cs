@@ -157,6 +157,17 @@ namespace InfoPanel.Models
             }
         }
 
+        /// <summary>URL images only: re-download the image every N seconds (webcams, rendered dashboards). 0 keeps the single-fetch behavior.</summary>
+        private int _refreshIntervalSeconds = 0;
+        public int RefreshIntervalSeconds
+        {
+            get { return _refreshIntervalSeconds; }
+            set
+            {
+                SetProperty(ref _refreshIntervalSeconds, Math.Max(0, value));
+            }
+        }
+
         private int _scale = 100;
         public int Scale
         {

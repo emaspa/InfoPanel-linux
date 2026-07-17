@@ -9,8 +9,10 @@ using System.Diagnostics;
 using Serilog;
 using System.IO;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace InfoPanel.Models
 {
@@ -38,7 +40,7 @@ namespace InfoPanel.Models
 
         public readonly ImageType Type;
 
-        private readonly SKSvg? SKSvg;
+        private SKSvg? SKSvg;
 
         // Video decoded via the system ffmpeg binary (v1 used Windows-only FlyleafLib)
         private Video.FfmpegVideoDecoder? _videoDecoder;
@@ -58,13 +60,13 @@ namespace InfoPanel.Models
             set { }
         }
 
-        public readonly long Frames;
-        public readonly long TotalFrameTime;
+        public long Frames { get; private set; }
+        public long TotalFrameTime { get; private set; }
 
-        private readonly SKCodec? _codec;
-        private readonly Stream? _stream;
+        private SKCodec? _codec;
+        private Stream? _stream;
         private SKBitmap? _compositeBitmap;
-        private readonly long[]? _cumulativeFrameTimes;
+        private long[]? _cumulativeFrameTimes;
         private int _lastRenderedFrame = -1;
 
         private readonly string? _pluginId;
@@ -456,6 +458,174 @@ namespace InfoPanel.Models
             return index;
         }
 
+        // ---- URL refresh (per-item RefreshIntervalSeconds) ----
+
+        private DateTime _lastFetchUtc = DateTime.UtcNow;
+        private DateTime _nextFetchAllowedUtc = DateTime.MinValue;
+        private int _refreshInFlight;
+
+        /// <summary>
+        /// Smallest positive refresh interval across the display items showing this
+        /// image, or zero when none requests refreshing.
+        /// </summary>
+        private TimeSpan GetRefreshInterval()
+        {
+            int seconds = 0;
+            foreach (var item in imageDisplayItems.Values)
+            {
+                if (item.RefreshIntervalSeconds > 0 && (seconds == 0 || item.RefreshIntervalSeconds < seconds))
+                {
+                    seconds = item.RefreshIntervalSeconds;
+                }
+            }
+
+            return TimeSpan.FromSeconds(seconds);
+        }
+
+        /// <summary>
+        /// Kicks off a background re-download when the refresh interval has elapsed.
+        /// The current image keeps rendering until the new one is decoded and swapped
+        /// in, so rendering never blocks on the network.
+        /// </summary>
+        private void MaybeStartRefresh()
+        {
+            if (Type is not (ImageType.SK or ImageType.SVG) || !Loaded || !ImagePath.IsUrl())
+            {
+                return;
+            }
+
+            var interval = GetRefreshInterval();
+            if (interval <= TimeSpan.Zero)
+            {
+                return;
+            }
+
+            var now = DateTime.UtcNow;
+            if (now - _lastFetchUtc < interval || now < _nextFetchAllowedUtc)
+            {
+                return;
+            }
+
+            if (Interlocked.CompareExchange(ref _refreshInFlight, 1, 0) != 0)
+            {
+                return;
+            }
+
+            _ = Task.Run(RefreshFromUrlAsync);
+        }
+
+        private async Task RefreshFromUrlAsync()
+        {
+            try
+            {
+                using HttpClient client = new();
+                client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3");
+                client.DefaultRequestHeaders.CacheControl = new CacheControlHeaderValue { NoCache = true };
+
+                var data = await client.GetByteArrayAsync(ImagePath);
+                var newStream = new MemoryStream(data);
+
+                if (Type == ImageType.SVG)
+                {
+                    var newSvg = new SKSvg();
+                    newSvg.Load(newStream);
+                    if (newSvg.Picture is not SKPicture picture)
+                    {
+                        newSvg.Dispose();
+                        newStream.Dispose();
+                        throw new InvalidOperationException("Refreshed content is not a valid SVG.");
+                    }
+
+                    lock (Lock)
+                    {
+                        if (IsDisposed)
+                        {
+                            newSvg.Dispose();
+                            newStream.Dispose();
+                            return;
+                        }
+
+                        SKSvg?.Dispose();
+                        _stream?.Dispose();
+                        SKSvg = newSvg;
+                        _stream = newStream;
+                        Width = (int)picture.CullRect.Width;
+                        Height = (int)picture.CullRect.Height;
+
+                        SKImageMemoryCache.Clear();
+                        SKGLImageMemoryCache.Clear();
+                    }
+                }
+                else
+                {
+                    var newCodec = SKCodec.Create(newStream);
+                    if (newCodec == null)
+                    {
+                        newStream.Dispose();
+                        throw new InvalidOperationException("Refreshed content could not be decoded.");
+                    }
+
+                    lock (Lock)
+                    {
+                        if (IsDisposed)
+                        {
+                            newCodec.Dispose();
+                            newStream.Dispose();
+                            return;
+                        }
+
+                        _codec?.Dispose();
+                        _stream?.Dispose();
+                        _compositeBitmap?.Dispose();
+                        _compositeBitmap = null;
+                        _codec = newCodec;
+                        _stream = newStream;
+                        _lastRenderedFrame = -1;
+
+                        Width = newCodec.Info.Width;
+                        Height = newCodec.Info.Height;
+                        Frames = Math.Max(newCodec.FrameCount, 1);
+                        TotalFrameTime = 0;
+                        _cumulativeFrameTimes = new long[Frames];
+
+                        if (Frames > 1)
+                        {
+                            for (int i = 0; i < Frames; i++)
+                            {
+                                var frameDelay = newCodec.FrameInfo[i].Duration;
+                                if (frameDelay == 0)
+                                {
+                                    frameDelay = 100;
+                                }
+
+                                TotalFrameTime += frameDelay;
+                                _cumulativeFrameTimes[i] = TotalFrameTime;
+                            }
+
+                            Stopwatch.Restart();
+                        }
+
+                        // Frame caches hold images decoded from the previous download
+                        SKImageMemoryCache.Clear();
+                        SKGLImageMemoryCache.Clear();
+                    }
+                }
+
+                _lastFetchUtc = DateTime.UtcNow;
+            }
+            catch (Exception e)
+            {
+                Logger.Debug(e, "Refresh failed for {ImagePath}", ImagePath);
+                // Keep showing the last good image; retry no sooner than 10s from now
+                _lastFetchUtc = DateTime.UtcNow;
+                _nextFetchAllowedUtc = DateTime.UtcNow.AddSeconds(10);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _refreshInFlight, 0);
+            }
+        }
+
         public void AccessSVG(Action<SKPicture> access)
         {
             if (IsDisposed)
@@ -467,6 +637,8 @@ namespace InfoPanel.Models
             {
                 return;
             }
+
+            MaybeStartRefresh();
 
             lock (Lock)
             {
@@ -551,6 +723,8 @@ namespace InfoPanel.Models
 
             if (targetWidth <= 0 || targetHeight <= 0)
                 return;
+
+            MaybeStartRefresh();
 
             lock (Lock)
             {

@@ -5,9 +5,6 @@ natively for Linux on .NET 10 and Avalonia 12. Based on
 [InfoPanel](https://github.com/habibrehmansg/infopanel) and its
 [Thermalright-enabled fork](https://github.com/emaspa/infopanel-1).
 
-> The previous Linux port (v1.4.x) lives on the [`v1`](../../tree/v1) branch.
-> Profiles and settings are fully compatible in both directions.
-
 New here? Start with the [User Guide](docs/USER-GUIDE.md).
 
 ## Features
