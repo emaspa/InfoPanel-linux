@@ -20,6 +20,7 @@ namespace InfoPanel.Views.Pages
             AutoStartDelay.ValueChanged += (_, _) => Apply(s => s.AutoStartDelay = (int)(AutoStartDelay.Value ?? 5));
             StartMinimizedToggle.IsCheckedChanged += (_, _) => Apply(s => s.StartMinimized = StartMinimizedToggle.IsChecked == true);
             MinimizeToTrayToggle.IsCheckedChanged += (_, _) => Apply(s => s.MinimizeToTray = MinimizeToTrayToggle.IsChecked == true);
+            UpdateCheckToggle.IsCheckedChanged += (_, _) => Apply(s => s.UpdateCheckEnabled = UpdateCheckToggle.IsChecked == true);
             ProgramProfilesToggle.IsCheckedChanged += (_, _) => Apply(s => s.ProgramSpecificPanelsEnabled = ProgramProfilesToggle.IsChecked == true);
             HideOthersToggle.IsCheckedChanged += (_, _) => Apply(s => s.HideOtherProfilesWhenProgramSpecificShown = HideOthersToggle.IsChecked == true);
             FrameRate.ValueChanged += (_, _) => Apply(s => s.TargetFrameRate = (int)(FrameRate.Value ?? 15));
@@ -44,6 +45,7 @@ namespace InfoPanel.Views.Pages
                 AutoStartDelay.Value = settings.AutoStartDelay;
                 StartMinimizedToggle.IsChecked = settings.StartMinimized;
                 MinimizeToTrayToggle.IsChecked = settings.MinimizeToTray;
+                UpdateCheckToggle.IsChecked = settings.UpdateCheckEnabled;
                 ProgramProfilesToggle.IsChecked = settings.ProgramSpecificPanelsEnabled;
                 HideOthersToggle.IsChecked = settings.HideOtherProfilesWhenProgramSpecificShown;
                 if (Platform.PlatformServices.ForegroundApp is { } fg && (!fg.IsAvailable || fg.Limitation != null))

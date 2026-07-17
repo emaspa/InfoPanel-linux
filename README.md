@@ -104,6 +104,11 @@ module individually with enable/disable toggles and per-plugin reload.
 - **Refreshing URL images**: image items pointing at a URL can re-download
   on a per-item interval (webcams, rendered dashboards, weather radar),
   swapping frames in the background without blocking rendering.
+- **Update notifications**: a startup check against GitHub Releases (no
+  accounts, no telemetry, one anonymous request) sends a desktop
+  notification when a new version is out; the About page shows what
+  changed and links the download, and has a manual check button. Can be
+  turned off in Settings.
 
 Wayland note: hotkey grabs and foreground detection go through XWayland,
 so they act on X11 windows (games and most apps). On plain X11 sessions

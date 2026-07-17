@@ -15,6 +15,7 @@
                 </DockPanel>
                 <ToggleSwitch x:Name="StartMinimizedToggle" OnContent="Start minimized" OffContent="Start minimized" />
                 <ToggleSwitch x:Name="MinimizeToTrayToggle" OnContent="Close button minimizes to tray" OffContent="Close button minimizes to tray" />
+                <ToggleSwitch x:Name="UpdateCheckToggle" OnContent="Check for updates at startup" OffContent="Check for updates at startup" />
             </StackPanel>
 
             <StackPanel Spacing="8">

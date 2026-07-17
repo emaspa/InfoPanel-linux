@@ -29,6 +29,9 @@ namespace InfoPanel.Models
         private bool _startMinimized = false;
 
         [ObservableProperty]
+        private bool _updateCheckEnabled = true;
+
+        [ObservableProperty]
         private bool _programSpecificPanelsEnabled = false;
 
         [ObservableProperty]

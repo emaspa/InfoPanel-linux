@@ -12,7 +12,60 @@ namespace InfoPanel.Views.Pages
         {
             InitializeComponent();
 
-            Loaded += (_, _) => Populate();
+            Loaded += (_, _) =>
+            {
+                Populate();
+                RefreshUpdateUi();
+                Services.UpdateChecker.AvailableChanged += RefreshUpdateUi;
+            };
+            Unloaded += (_, _) => Services.UpdateChecker.AvailableChanged -= RefreshUpdateUi;
+        }
+
+        private void RefreshUpdateUi()
+        {
+            if (Services.UpdateChecker.Available is { } update)
+            {
+                UpdateStatusText.Text = "Update available.";
+                UpdateTitleText.Text = $"{update.Title} is available (you have v{Services.UpdateChecker.CurrentVersion.ToString(3)})";
+                UpdateNotesText.Text = string.IsNullOrWhiteSpace(update.Notes)
+                    ? "See the download page for details."
+                    : update.Notes;
+                UpdateDownloadButton.Tag = string.IsNullOrEmpty(update.Url)
+                    ? "https://github.com/emaspa/InfoPanel-linux/releases"
+                    : update.Url;
+                UpdateBox.IsVisible = true;
+            }
+            else
+            {
+                UpdateBox.IsVisible = false;
+            }
+        }
+
+        private async void CheckUpdates_Click(object? sender, RoutedEventArgs e)
+        {
+            CheckUpdatesButton.IsEnabled = false;
+            UpdateStatusText.Text = "Checking…";
+            try
+            {
+                var update = await Services.UpdateChecker.CheckAsync();
+                if (update == null)
+                {
+                    UpdateStatusText.Text = "You are running the latest version.";
+                    UpdateBox.IsVisible = false;
+                }
+                else
+                {
+                    RefreshUpdateUi();
+                }
+            }
+            catch
+            {
+                UpdateStatusText.Text = "Update check failed. Check your connection and try again.";
+            }
+            finally
+            {
+                CheckUpdatesButton.IsEnabled = true;
+            }
         }
 
         private void Populate()
@@ -77,7 +130,7 @@ namespace InfoPanel.Views.Pages
             }
 
             var version = Assembly.GetExecutingAssembly().GetName().Version;
-            VersionText.Text = $"InfoPanel Linux v{version?.ToString(3) ?? "0.0.1"} alpha";
+            VersionText.Text = $"InfoPanel Linux v{version?.ToString(3) ?? "0.0.2"} alpha";
         }
 
         private static void OpenUrl(string url)

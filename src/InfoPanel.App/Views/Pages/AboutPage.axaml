@@ -14,6 +14,24 @@
                     <Button Content="Open data folder" Click="OpenDataFolder_Click" />
                     <Button Content="Open log folder" Click="OpenLogFolder_Click" />
                 </StackPanel>
+                <StackPanel Spacing="6">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button x:Name="CheckUpdatesButton" Content="Check for updates" Click="CheckUpdates_Click" />
+                        <TextBlock x:Name="UpdateStatusText" VerticalAlignment="Center" FontSize="12"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <Border x:Name="UpdateBox" IsVisible="False" CornerRadius="6" Padding="12"
+                            Background="{DynamicResource CardBackgroundFillColorDefaultBrush}">
+                        <StackPanel Spacing="8">
+                            <TextBlock x:Name="UpdateTitleText" FontWeight="SemiBold" TextWrapping="Wrap" />
+                            <TextBlock Text="What changed:" FontSize="12" FontWeight="SemiBold" />
+                            <ScrollViewer MaxHeight="260">
+                                <TextBlock x:Name="UpdateNotesText" FontSize="11" Opacity="0.85" TextWrapping="Wrap" />
+                            </ScrollViewer>
+                            <Button x:Name="UpdateDownloadButton" Content="Open download page" Click="OpenLink_Click" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
                 <WrapPanel>
                     <Button Content="User guide" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://github.com/emaspa/InfoPanel-linux/blob/main/docs/USER-GUIDE.md" />
                     <Button Content="Website" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://infopanel.net/" />
@@ -24,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.0.1 alpha: ground-up Linux rebuild" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.0.2 alpha: first published build" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Self-contained tarball on GitHub Releases with installer, udev rules and SMART sensor timer. Update checking with release notes and desktop notification. Plugin-rendered images as live display items (Audio Spectrum bundled), program-specific profiles via foreground app detection, per-profile autosave backup restore, refreshing URL images, Thermaltake/ASRock, JL/Hongtai, VMAX and Lian Li panel support, profile and stopwatch hotkeys, plugin configuration UI, and the full 1.4.x designer feature set (glow, gauge mirror, thousands separator, guide items)." />
+                        <TextBlock Text="v0.0.1 alpha: ground-up Linux rebuild" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="New Avalonia 12 UI with a direct-manipulation designer (zoom/pan canvas, undo/redo, layers, live sensor tree). Latest Thermalright/TRCC device support from the Windows fork with USB replug self-healing. Video backgrounds via ffmpeg. Web server, XDG autostart, profile import/export. Profiles remain fully compatible with v1.4 and InfoPanel for Windows." />
                     </StackPanel>

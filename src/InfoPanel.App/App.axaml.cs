@@ -51,6 +51,11 @@ namespace InfoPanel
                     await _host.StartDevicesAsync(_cts.Token);
                 });
 
+                if (_host.Settings.UpdateCheckEnabled)
+                {
+                    _ = Task.Run(Services.UpdateChecker.RunStartupCheckAsync);
+                }
+
                 desktop.MainWindow = new MainWindow();
                 if (!_host.Settings.StartMinimized)
                 {

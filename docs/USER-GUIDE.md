@@ -16,6 +16,10 @@ InfoPanel turns hardware monitoring data into designable dashboards shown on des
 
 Optional: enable "Start at login" in Settings to install an XDG autostart entry.
 
+## Updates
+
+InfoPanel checks GitHub Releases once at startup (a single anonymous request, no accounts or telemetry) and sends a desktop notification when a newer version is available. The About page then shows the release notes and a download link; it also has a "Check for updates" button for manual checks. Disable the startup check in Settings with "Check for updates at startup". Updating is the same as installing: extract the new tarball and run `./install.sh` again; your profiles and settings are untouched.
+
 ## Dashboard
 
 The app opens on the Dashboard: profile cards with live thumbnails, quick navigation, and community links. Each profile card has:
