@@ -73,7 +73,7 @@ namespace InfoPanel.Views.Pages
                     profileGuid: device.ProfileGuid,
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
-                        ? $"running · {device.RuntimeProperties.FrameRate} fps"
+                        ? $"running · {device.RuntimeProperties.FrameRate} fps · {device.RuntimeProperties.FrameTime} ms"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.ThermalrightPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -95,7 +95,7 @@ namespace InfoPanel.Views.Pages
                     profileGuid: device.ProfileGuid,
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
-                        ? $"running · {device.RuntimeProperties.FrameRate} fps"
+                        ? $"running · {device.RuntimeProperties.FrameRate} fps · {device.RuntimeProperties.FrameTime} ms"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.TuringPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -116,7 +116,7 @@ namespace InfoPanel.Views.Pages
                     profileGuid: device.ProfileGuid,
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
-                        ? $"running · {device.RuntimeProperties.FrameRate} fps"
+                        ? $"running · {device.RuntimeProperties.FrameRate} fps · {device.RuntimeProperties.FrameTime} ms"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.BeadaPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -137,7 +137,7 @@ namespace InfoPanel.Views.Pages
                     profileGuid: device.ProfileGuid,
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
-                        ? $"running · {device.RuntimeProperties.FrameRate} fps"
+                        ? $"running · {device.RuntimeProperties.FrameRate} fps · {device.RuntimeProperties.FrameTime} ms"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.ThermaltakePanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -158,7 +158,7 @@ namespace InfoPanel.Views.Pages
                     profileGuid: device.ProfileGuid,
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
-                        ? $"running · {device.RuntimeProperties.FrameRate} fps"
+                        ? $"running · {device.RuntimeProperties.FrameRate} fps · {device.RuntimeProperties.FrameTime} ms"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.JlPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -179,7 +179,7 @@ namespace InfoPanel.Views.Pages
                     profileGuid: device.ProfileGuid,
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
-                        ? $"running · {device.RuntimeProperties.FrameRate} fps"
+                        ? $"running · {device.RuntimeProperties.FrameRate} fps · {device.RuntimeProperties.FrameTime} ms"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.VmaxPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
