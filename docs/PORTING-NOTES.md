@@ -45,3 +45,14 @@ the items below.
   detection re-expressed on sysfs VID/PID.
 - UI-thread marshaling in device model classes goes through the UiThread
   seam instead of the WPF dispatcher.
+
+## Hotkeys (PR #99)
+
+The Windows build registers global hotkeys with Win32 `RegisterHotKey`. Here
+they are X11 `XGrabKey` grabs on the root window (all Caps/Num lock variants),
+behind `IGlobalHotkeyService`. `HotkeyBinding.ModifierKeys`/`Key` are strings
+carrying the exact WPF enum text ("Control, Alt" / "F5") so settings.xml
+round-trips with Windows unchanged. Caveats: under a Wayland session the grab
+lives in XWayland and only fires while an X11 window has focus (fully global
+on X11 sessions), and combos owned by the compositor (e.g. Ctrl+Alt+F-keys)
+fail to grab and are logged.

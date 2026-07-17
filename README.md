@@ -23,6 +23,10 @@ natively for Linux on .NET 10 and Avalonia 12. Based on
   binaries load unchanged.
 - **Outputs**: transparent desktop overlays (X11/XWayland), USB panels, and a
   built-in web server serving live profile images.
+- **Profile hotkeys**: system-wide shortcuts (X11 `XGrabKey`) that switch a
+  panel to a profile, configured on the Devices page. On Wayland sessions the
+  grab goes through XWayland, so hotkeys only fire while an X11 window has
+  focus; on X11 sessions they are fully global.
 - **Headless mode**: `infopanel --headless` runs sensors + panels without a UI;
   `--render-once <dir>` renders profiles to PNG; `--dump-sensors` lists all
   live sensor readings.

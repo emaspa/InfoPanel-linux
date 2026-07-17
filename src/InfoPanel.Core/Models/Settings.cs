@@ -93,6 +93,13 @@ namespace InfoPanel.Models
         [ObservableProperty]
         private bool _jlPanelMultiDeviceMode = false;
 
+        private readonly ObservableCollection<HotkeyBinding> _hotkeyBindings = [];
+
+        public ObservableCollection<HotkeyBinding> HotkeyBindings
+        {
+            get { return _hotkeyBindings; }
+        }
+
         [ObservableProperty]
         private bool _webServer = false;
 

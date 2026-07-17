@@ -1,5 +1,6 @@
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
@@ -164,6 +165,172 @@ namespace InfoPanel.Views.Pages
                     brightness: device.Brightness,
                     setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
             }
+
+            AddHotkeysSection(settings);
+        }
+
+        // ================= profile hotkeys =================
+
+        private sealed record HotkeyDeviceChoice(string Type, string Id, string Display)
+        {
+            public override string ToString() => Display;
+        }
+
+        private void AddHotkeysSection(Settings settings)
+        {
+            var header = new DockPanel { Margin = new Thickness(0, 8, 0, 0) };
+            var addButton = new Button { Content = "Add hotkey" };
+            DockPanel.SetDock(addButton, Dock.Right);
+            header.Children.Add(addButton);
+            header.Children.Add(new TextBlock { Text = "Profile hotkeys", FontSize = 18, FontWeight = Avalonia.Media.FontWeight.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+            DeviceRows.Children.Add(header);
+
+            var caption = Services.HotkeyManager.IsAvailable
+                ? Services.HotkeyManager.Limitation ?? "System-wide shortcuts that switch a panel to a profile. Requires at least one modifier."
+                : "Global hotkeys are unavailable on this system (no X display).";
+            DeviceRows.Children.Add(new TextBlock { Text = caption, FontSize = 11, Opacity = 0.6, TextWrapping = Avalonia.Media.TextWrapping.Wrap });
+
+            var deviceChoices = new List<HotkeyDeviceChoice>();
+            foreach (var d in settings.BeadaPanelDevices) deviceChoices.Add(new("Beada", d.DeviceId, $"BeadaPanel {d.Model}"));
+            foreach (var d in settings.TuringPanelDevices) deviceChoices.Add(new("Turing", d.DeviceId, d.Model ?? d.DeviceId));
+            foreach (var d in settings.ThermalrightPanelDevices) deviceChoices.Add(new("Thermalright", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
+            foreach (var d in settings.ThermaltakePanelDevices) deviceChoices.Add(new("Thermaltake", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
+            foreach (var d in settings.JlPanelDevices) deviceChoices.Add(new("Jl", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
+
+            addButton.IsEnabled = deviceChoices.Count > 0;
+            addButton.Click += (_, _) =>
+            {
+                var first = deviceChoices.First();
+                settings.HotkeyBindings.Add(new HotkeyBinding
+                {
+                    DeviceType = first.Type,
+                    DeviceId = first.Id,
+                    ProfileGuid = _app!.Host.Profiles.FirstOrDefault()?.Guid ?? Guid.Empty,
+                });
+                _app.Host.SaveSettings();
+                RebuildRows();
+            };
+
+            foreach (var binding in settings.HotkeyBindings.ToList())
+            {
+                AddHotkeyRow(settings, binding, deviceChoices);
+            }
+        }
+
+        private void AddHotkeyRow(Settings settings, HotkeyBinding binding, List<HotkeyDeviceChoice> deviceChoices)
+        {
+            var border = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(16, 10),
+                Background = ThemeBrush("CardBackgroundFillColorDefaultBrush"),
+                BorderBrush = ThemeBrush("CardStrokeColorDefaultBrush"),
+                BorderThickness = new Thickness(1),
+            };
+
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*,Auto,Auto") };
+
+            // Hotkey capture: while toggled, the next key press is recorded
+            var captureButton = new ToggleButton
+            {
+                Content = binding.HotkeyDisplayText,
+                MinWidth = 140,
+                VerticalAlignment = VerticalAlignment.Center,
+            };
+            ToolTip.SetTip(captureButton, "Click, then press the key combination (needs Ctrl/Alt/Shift/Super)");
+            captureButton.IsCheckedChanged += (_, _) =>
+            {
+                captureButton.Content = captureButton.IsChecked == true ? "Press keys…" : binding.HotkeyDisplayText;
+            };
+            captureButton.KeyDown += (_, e) =>
+            {
+                if (captureButton.IsChecked != true) return;
+                e.Handled = true;
+
+                // Ignore presses of bare modifier keys — wait for the real key
+                if (e.Key is Avalonia.Input.Key.LeftCtrl or Avalonia.Input.Key.RightCtrl
+                    or Avalonia.Input.Key.LeftAlt or Avalonia.Input.Key.RightAlt
+                    or Avalonia.Input.Key.LeftShift or Avalonia.Input.Key.RightShift
+                    or Avalonia.Input.Key.LWin or Avalonia.Input.Key.RWin)
+                {
+                    return;
+                }
+
+                if (e.Key == Avalonia.Input.Key.Escape)
+                {
+                    captureButton.IsChecked = false;
+                    return;
+                }
+
+                var parts = new List<string>();
+                if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Control)) parts.Add("Control");
+                if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Alt)) parts.Add("Alt");
+                if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Shift)) parts.Add("Shift");
+                if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Meta)) parts.Add("Windows");
+
+                // Avalonia's Key enum uses the same member names as WPF's — the settings vocabulary
+                binding.ModifierKeys = parts.Count > 0 ? string.Join(", ", parts) : "None";
+                binding.Key = e.Key.ToString();
+                _app!.Host.SaveSettings();
+
+                captureButton.IsChecked = false;
+                captureButton.Content = binding.HotkeyDisplayText;
+            };
+            grid.Children.Add(captureButton);
+
+            var devicePicker = new ComboBox
+            {
+                MinWidth = 170,
+                Margin = new Thickness(12, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ItemsSource = deviceChoices,
+                SelectedItem = deviceChoices.FirstOrDefault(c => c.Type == binding.DeviceType && c.Id == binding.DeviceId),
+            };
+            devicePicker.SelectionChanged += (_, _) =>
+            {
+                if (devicePicker.SelectedItem is HotkeyDeviceChoice choice)
+                {
+                    binding.DeviceType = choice.Type;
+                    binding.DeviceId = choice.Id;
+                    _app!.Host.SaveSettings();
+                }
+            };
+            Grid.SetColumn(devicePicker, 1);
+            grid.Children.Add(devicePicker);
+
+            var profilePicker = new ComboBox
+            {
+                MinWidth = 150,
+                Margin = new Thickness(12, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ItemsSource = _app!.Host.Profiles,
+                SelectedItem = _app.Host.Profiles.FirstOrDefault(p => p.Guid == binding.ProfileGuid),
+                DisplayMemberBinding = new Avalonia.Data.Binding(nameof(Profile.Name)),
+            };
+            profilePicker.SelectionChanged += (_, _) =>
+            {
+                if (profilePicker.SelectedItem is Profile p)
+                {
+                    binding.ProfileGuid = p.Guid;
+                    _app.Host.SaveSettings();
+                }
+            };
+            Grid.SetColumn(profilePicker, 2);
+            grid.Children.Add(profilePicker);
+
+            var removeButton = new Button { Content = "✕", VerticalAlignment = VerticalAlignment.Center };
+            ToolTip.SetTip(removeButton, "Remove hotkey");
+            removeButton.Click += (_, _) =>
+            {
+                settings.HotkeyBindings.Remove(binding);
+                _app.Host.SaveSettings();
+                RebuildRows();
+            };
+            Grid.SetColumn(removeButton, 3);
+            grid.Children.Add(removeButton);
+
+            border.Child = grid;
+            DeviceRows.Children.Add(border);
         }
 
         private void AddThermalrightAdvanced(ThermalrightPanelDevice device)

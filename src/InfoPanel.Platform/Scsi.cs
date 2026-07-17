@@ -38,5 +38,7 @@ namespace InfoPanel.Platform
         public static IScsiTransportProvider? ScsiTransport { get; set; }
 
         public static IAutostartService? Autostart { get; set; }
+
+        public static IGlobalHotkeyService? Hotkeys { get; set; }
     }
 }
