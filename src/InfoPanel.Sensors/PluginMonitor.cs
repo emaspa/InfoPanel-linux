@@ -149,7 +149,7 @@ namespace InfoPanel.Monitors
 
         // Whitelisted bundled plugin folder names (v1 compared full paths with a
         // Windows separator, so bundled plugins never matched on Linux)
-        private static readonly string[] _bundledPlugins = ["InfoPanel.Extras"];
+        private static readonly string[] _bundledPlugins = ["InfoPanel.Extras", "InfoPanel.AudioSpectrum"];
         internal void FindPlugins()
         {
             UnzipPluginArchives();

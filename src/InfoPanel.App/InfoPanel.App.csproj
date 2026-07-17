@@ -70,6 +70,34 @@
     <Copy SourceFiles="@(ExtrasPublishFiles)" DestinationFolder="$(PublishDir)plugins/InfoPanel.Extras" SkipUnchangedFiles="true" />
   </Target>
 
+  <!-- Bundle the Audio Spectrum plugin the same way; also excludes the shared
+       InfoPanel.Plugins.Graphics/SkiaSharp assemblies (resolved from the host). -->
+  <Target Name="BuildAudioSpectrum" BeforeTargets="Build">
+    <MSBuild Projects="..\InfoPanel.AudioSpectrum\InfoPanel.AudioSpectrum.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0;SelfContained=false" RemoveProperties="RuntimeIdentifier;PublishDir;SelfContained" />
+    <MSBuild Projects="..\InfoPanel.AudioSpectrum\InfoPanel.AudioSpectrum.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);TargetFramework=net8.0" RemoveProperties="RuntimeIdentifier;PublishDir;SelfContained">
+      <Output TaskParameter="TargetOutputs" PropertyName="_AudioSpectrumAssemblyPath" />
+    </MSBuild>
+    <PropertyGroup>
+      <AudioSpectrumOutputDir>$([System.IO.Path]::GetDirectoryName('$(_AudioSpectrumAssemblyPath)'))</AudioSpectrumOutputDir>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="CopyAudioSpectrumToBuildOutput" AfterTargets="BuildAudioSpectrum">
+    <ItemGroup>
+      <AudioSpectrumFiles Include="$(AudioSpectrumOutputDir)\**\*.*"
+                          Exclude="$(AudioSpectrumOutputDir)\InfoPanel.Plugins.dll;$(AudioSpectrumOutputDir)\InfoPanel.Plugins.Graphics.dll;$(AudioSpectrumOutputDir)\SkiaSharp.dll;$(AudioSpectrumOutputDir)\libSkiaSharp.*;$(AudioSpectrumOutputDir)\runtimes\**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AudioSpectrumFiles)" DestinationFolder="$(OutputPath)plugins/InfoPanel.AudioSpectrum" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyAudioSpectrumToPublishOutput" AfterTargets="Publish">
+    <ItemGroup>
+      <AudioSpectrumPublishFiles Include="$(AudioSpectrumOutputDir)\**\*.*"
+                                 Exclude="$(AudioSpectrumOutputDir)\InfoPanel.Plugins.dll;$(AudioSpectrumOutputDir)\InfoPanel.Plugins.Graphics.dll;$(AudioSpectrumOutputDir)\SkiaSharp.dll;$(AudioSpectrumOutputDir)\libSkiaSharp.*;$(AudioSpectrumOutputDir)\runtimes\**" />
+    </ItemGroup>
+    <Copy SourceFiles="@(AudioSpectrumPublishFiles)" DestinationFolder="$(PublishDir)plugins/InfoPanel.AudioSpectrum" SkipUnchangedFiles="true" />
+  </Target>
+
   <Target Name="CleanPluginsDirectory" BeforeTargets="Clean">
     <RemoveDir Directories="$(OutputPath)plugins" />
   </Target>

@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/InfoPanel.App/InfoPanel.App.csproj" />
+    <Project Path="src/InfoPanel.AudioSpectrum/InfoPanel.AudioSpectrum.csproj" />
     <Project Path="src/InfoPanel.Core/InfoPanel.Core.csproj" />
     <Project Path="src/InfoPanel.Devices.BeadaPanel/InfoPanel.Devices.BeadaPanel.csproj" />
     <Project Path="src/InfoPanel.Devices.JlPanel/InfoPanel.Devices.JlPanel.csproj" />
