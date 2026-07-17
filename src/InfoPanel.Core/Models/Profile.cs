@@ -258,6 +258,15 @@ namespace InfoPanel.Models
             set { SetProperty(ref _strictWindowMatching, value); }
         }
 
+        /// <summary>Comma-separated process names (e.g. "Cyberpunk2077.exe, steam"). When set, the overlay for this profile is shown only while one of these apps is foreground. Empty means always-on when Active.</summary>
+        private string? _triggerProcessNames;
+
+        public string? TriggerProcessNames
+        {
+            get { return _triggerProcessNames; }
+            set { SetProperty(ref _triggerProcessNames, value); }
+        }
+
         public object Clone()
         {
             return MemberwiseClone();

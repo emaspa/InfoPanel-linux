@@ -30,6 +30,16 @@
             </StackPanel>
 
             <StackPanel Spacing="8">
+                <TextBlock Text="Program-specific profiles" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Text="Shows an overlay only while its trigger program is in the foreground. Set trigger programs per profile in the Designer."
+                           FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                <ToggleSwitch x:Name="ProgramProfilesToggle" OnContent="Enabled" OffContent="Disabled" />
+                <ToggleSwitch x:Name="HideOthersToggle" OnContent="Hide other overlays while a trigger profile is shown" OffContent="Hide other overlays while a trigger profile is shown" />
+                <TextBlock x:Name="ProgramProfilesLimitation" FontSize="12" IsVisible="False"
+                           Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
                 <TextBlock Text="Web server" FontSize="18" FontWeight="SemiBold" />
                 <TextBlock Text="Serves live profile images to browsers on your network."
                            FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />

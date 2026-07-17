@@ -72,6 +72,22 @@ namespace InfoPanel.Designer
                         _root.Children.Add(Label($"{session.Profile.Name} - {session.Profile.Width}×{session.Profile.Height}"));
                         _root.Children.Add(Label($"{session.Items.Count} items"));
                         _root.Children.Add(Label("Select an item to edit its properties."));
+
+                        var profile = session.Profile;
+                        var triggers = new TextBox
+                        {
+                            Text = profile.TriggerProcessNames ?? "",
+                            Watermark = "e.g. Cyberpunk2077.exe, steam",
+                        };
+                        triggers.LostFocus += (_, _) =>
+                        {
+                            var value = string.IsNullOrWhiteSpace(triggers.Text) ? null : triggers.Text.Trim();
+                            if (value == profile.TriggerProcessNames) return;
+                            profile.TriggerProcessNames = value;
+                            (Avalonia.Application.Current as App)?.Host.SaveProfiles();
+                        };
+                        _root.Children.Add(Field("Trigger programs", triggers));
+                        _root.Children.Add(Label("Comma-separated process names. When program-specific profiles are enabled in Settings, this overlay only shows while one of these apps is in the foreground."));
                     }
 
                     return;

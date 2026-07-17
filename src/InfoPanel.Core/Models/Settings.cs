@@ -29,6 +29,12 @@ namespace InfoPanel.Models
         private bool _startMinimized = false;
 
         [ObservableProperty]
+        private bool _programSpecificPanelsEnabled = false;
+
+        [ObservableProperty]
+        private bool _hideOtherProfilesWhenProgramSpecificShown = true;
+
+        [ObservableProperty]
         private bool _minimizeToTray = true;
 
         [ObservableProperty]

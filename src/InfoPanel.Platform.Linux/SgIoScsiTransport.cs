@@ -211,6 +211,7 @@ namespace InfoPanel.Platform.Linux
             PlatformServices.ScsiTransport = new SgIoScsiTransportProvider();
             PlatformServices.Autostart = new XdgAutostartService();
             PlatformServices.Hotkeys = new X11GlobalHotkeyService();
+            PlatformServices.ForegroundApp = new X11ForegroundAppService();
         }
     }
 }

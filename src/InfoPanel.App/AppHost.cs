@@ -20,6 +20,7 @@ namespace InfoPanel
         public Settings Settings { get; private set; } = new();
         public ObservableCollection<Profile> Profiles { get; } = [];
         public HotkeyManager? Hotkeys { get; private set; }
+        public Services.ForegroundAppMonitor? ForegroundApps { get; private set; }
 
         public void Initialize()
         {
@@ -44,6 +45,9 @@ namespace InfoPanel
 
             Hotkeys = new HotkeyManager(Settings, SaveSettings);
             Hotkeys.Start();
+
+            ForegroundApps = new Services.ForegroundAppMonitor(this);
+            ForegroundApps.Start();
 
             // React to settings toggles like v1's ConfigModel did: restart the affected
             // service when a mode changes, keep render pacing and autostart in sync.
@@ -180,6 +184,7 @@ namespace InfoPanel
         public async Task StopDevicesAsync()
         {
             try { Hotkeys?.Stop(); } catch { }
+            try { ForegroundApps?.Dispose(); } catch { }
             try { await WebServerTask.Instance.StopAsync(shutdown: true); } catch { }
             await BeadaPanelTask.Instance.StopAsync(shutdown: true);
             await TuringPanelTask.Instance.StopAsync(shutdown: true);

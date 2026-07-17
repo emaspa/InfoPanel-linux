@@ -40,5 +40,7 @@ namespace InfoPanel.Platform
         public static IAutostartService? Autostart { get; set; }
 
         public static IGlobalHotkeyService? Hotkeys { get; set; }
+
+        public static IForegroundAppService? ForegroundApp { get; set; }
     }
 }

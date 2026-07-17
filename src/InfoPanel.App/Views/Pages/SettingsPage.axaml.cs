@@ -20,6 +20,8 @@ namespace InfoPanel.Views.Pages
             AutoStartDelay.ValueChanged += (_, _) => Apply(s => s.AutoStartDelay = (int)(AutoStartDelay.Value ?? 5));
             StartMinimizedToggle.IsCheckedChanged += (_, _) => Apply(s => s.StartMinimized = StartMinimizedToggle.IsChecked == true);
             MinimizeToTrayToggle.IsCheckedChanged += (_, _) => Apply(s => s.MinimizeToTray = MinimizeToTrayToggle.IsChecked == true);
+            ProgramProfilesToggle.IsCheckedChanged += (_, _) => Apply(s => s.ProgramSpecificPanelsEnabled = ProgramProfilesToggle.IsChecked == true);
+            HideOthersToggle.IsCheckedChanged += (_, _) => Apply(s => s.HideOtherProfilesWhenProgramSpecificShown = HideOthersToggle.IsChecked == true);
             FrameRate.ValueChanged += (_, _) => Apply(s => s.TargetFrameRate = (int)(FrameRate.Value ?? 15));
             GraphRate.ValueChanged += (_, _) => Apply(s => s.TargetGraphUpdateRate = (int)(GraphRate.Value ?? 1000));
             WebServerToggle.IsCheckedChanged += (_, _) => Apply(s => s.WebServer = WebServerToggle.IsChecked == true);
@@ -42,6 +44,15 @@ namespace InfoPanel.Views.Pages
                 AutoStartDelay.Value = settings.AutoStartDelay;
                 StartMinimizedToggle.IsChecked = settings.StartMinimized;
                 MinimizeToTrayToggle.IsChecked = settings.MinimizeToTray;
+                ProgramProfilesToggle.IsChecked = settings.ProgramSpecificPanelsEnabled;
+                HideOthersToggle.IsChecked = settings.HideOtherProfilesWhenProgramSpecificShown;
+                if (Platform.PlatformServices.ForegroundApp is { } fg && (!fg.IsAvailable || fg.Limitation != null))
+                {
+                    ProgramProfilesLimitation.Text = fg.IsAvailable
+                        ? fg.Limitation
+                        : "Unavailable: no X display detected.";
+                    ProgramProfilesLimitation.IsVisible = true;
+                }
                 FrameRate.Value = settings.TargetFrameRate;
                 GraphRate.Value = settings.TargetGraphUpdateRate;
                 WebServerToggle.IsChecked = settings.WebServer;
