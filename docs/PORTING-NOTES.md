@@ -21,10 +21,12 @@ the items below.
    task rebinds and persists the new id. (The Turing task carries the v1
    port's first-match variant of the same idea.)
 
-3. **Model database beats device-reported resolution.** TrofeoBulk init
-   responses have been seen reporting wrong sizes (599 rows on a 480-row
-   panel); TRCC ignores the field entirely. Reported values are accepted
-   only when they match the database.
+3. **(Retired)** ~~Model database beats device-reported resolution.~~ This
+   was our workaround for 5408 units reporting 1920x599. The fork later
+   solved it properly (June 2026): the reported height plus init-response
+   byte[20] re-identify the exact variant — 9.16" v1 (reports 480),
+   9.16" v2 (reports 599, renders 480 + opt-in flicker fix), 11.3"
+   (byte[20]=0x05, renders 1920x400). We now carry that logic verbatim.
 
 4. **BackgroundTask: per-instance start/stop lock, 5 s stop grace.**
    The fork used one process-wide static lock (a wedged device stalled

@@ -24,6 +24,8 @@ namespace InfoPanel.Models
         partial void OnModelChanged(ThermalrightPanelModel value)
         {
             OnPropertyChanged(nameof(ModelInfo));
+            OnPropertyChanged(nameof(DisplayWidth));
+            OnPropertyChanged(nameof(DisplayHeight));
             OnPropertyChanged(nameof(IsJpegQualityConfigurable));
             OnPropertyChanged(nameof(HasDisplayMask));
             OnPropertyChanged(nameof(HasFlickerFix));
@@ -31,7 +33,7 @@ namespace InfoPanel.Models
 
         partial void OnDeviceLocationChanged(string value)
         {
-            OnPropertyChanged(DevicePort);
+            OnPropertyChanged(nameof(DevicePort));
         }
 
         public string DevicePort => DeviceLocation.Split('.').FirstOrDefault() ?? string.Empty;
@@ -84,7 +86,9 @@ namespace InfoPanel.Models
             get
             {
                 return Model == ThermalrightPanelModel.WonderVision360
-                    || Model == ThermalrightPanelModel.RainbowVision360;
+                    || Model == ThermalrightPanelModel.WonderVision360V2
+                    || Model == ThermalrightPanelModel.RainbowVision360
+                    || Model == ThermalrightPanelModel.LevitaVision360;
             }
         }
 
@@ -102,10 +106,12 @@ namespace InfoPanel.Models
         }
 
         /// <summary>
-        /// TrofeoBulk 5408 panels may need a flicker fix (crop JPEG to 462 rows).
-        /// Show the toggle only for that model.
+        /// TrofeoBulk 5408 9.16" panels may need a flicker fix (crop JPEG to 462 rows).
+        /// Both v1 (reports 480) and v2 (reports 599) render at 480 by default and offer
+        /// the 462 crop as an opt-in. The 11.3" has its own 400-row target and is excluded.
         /// </summary>
-        public bool HasFlickerFix => Model == ThermalrightPanelModel.TrofeoVision916;
+        public bool HasFlickerFix => Model == ThermalrightPanelModel.TrofeoVision916
+            || Model == ThermalrightPanelModel.TrofeoVision916V2;
 
         /// <summary>
         /// Effective display height accounting for flicker fix crop.
@@ -151,8 +157,8 @@ namespace InfoPanel.Models
                     matchRule = "DeviceId+Location";
                     matched = true;
                 }
-                // fallback: match by deviceId only
-                else if (DeviceId.Equals(deviceId))
+                // fallback: match by deviceId and model (but NOT for HID devices with shared VID/PID)
+                else if (DeviceId.Equals(deviceId) && !deviceId.StartsWith("HID\\", StringComparison.OrdinalIgnoreCase))
                 {
                     matchRule = "DeviceId";
                     matched = true;
@@ -240,6 +246,12 @@ namespace InfoPanel.Models
 
             [ObservableProperty]
             private string _serialNumber = string.Empty;
+
+            [ObservableProperty]
+            private byte _deviceFlags = 0;
+
+            [ObservableProperty]
+            private string _deviceInfo = string.Empty;
         }
     }
 }

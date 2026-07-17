@@ -7,8 +7,12 @@ namespace InfoPanel.ThermalrightPanel
         PeerlessVision360,
         // Wonder Vision 360 - 6.67" (2400x1080) - responds with SSCRM-V3, SUB=0x01
         WonderVision360,
+        // Wonder Vision 360 v2 - 6.67" (2400x1080) - responds with SSCRM-V3, SUB=0x20, PM=0x07. Same panel, newer firmware batch.
+        WonderVision360V2,
         // Rainbow Vision 360 - 6.67" (2400x1080) - responds with SSCRM-V3, SUB=0x02
         RainbowVision360,
+        // Levita Vision 360 - 6.67" (2400x1080) - responds with SSCRM-V3, SUB=0x03
+        LevitaVision360,
         // TL-M10 Vision - 9.16" (1920x462) - responds with SSCRM-V4
         TLM10Vision,
         // Trofeo Vision 6.86" - HID (VID 0x0416 / PID 0x5302)
@@ -16,6 +20,10 @@ namespace InfoPanel.ThermalrightPanel
         TrofeoVision,
         // Trofeo Vision 9.16" - USB bulk (VID 0x0416 / PID 0x5408, LY chipset)
         TrofeoVision916,
+        // Trofeo Vision 9.16" v2 - USB bulk (VID 0x0416 / PID 0x5408, reports 1920x599, renders at 1920x480 + optional 462 flicker-fix crop, same as v1)
+        TrofeoVision916V2,
+        // Trofeo Vision 11.3" - USB bulk (VID 0x0416 / PID 0x5408, byte[20]=0x05, reports 1920x480 but renders at 1920x400)
+        TrofeoVision113,
         // Trofeo Vision 9.16" - USB bulk (VID 0x0416 / PID 0x5409, LY1 chipset)
         TrofeoVision916LY1,
 
@@ -49,8 +57,14 @@ namespace InfoPanel.ThermalrightPanel
         // ChiZhu bulk (87AD:70DB) PM=0x20 variant — 320x320, RGB565
         ChiZhuVision320x320,
 
-        // SCSI pass-through (VID 0x0402 / PID 0x3922) — Elite Vision 360 2.73", resolution detected at runtime from poll response
-        EliteVisionScsi,
+        // ChiZhu bulk (87AD:70DB) responding with SPISCRM-V2 identifier — Elite Vision 360 ARGB Black
+        // SPI-driven 320x320 panel, RGB565 little-endian (unlike the generic PM=0x20 entry which is BE)
+        EliteVision360,
+
+        // SCSI pass-through — resolution detected at runtime from poll response
+        EliteVisionScsi,      // VID 0x0402 / PID 0x3922 — Frozen Warframe, Elite Vision 360
+        ThermalrightScsi,     // VID 0x87CD / PID 0x70DB — Frozen Horizon Pro, Core Vision, Elite Vision, Wonder Vision
+        WinbondScsi,          // VID 0x0416 / PID 0x5406 — LC1, LC2, LC3, LC5 AIO pump heads
 
         // ALi chipset (VID 0x0416 / PID 0x5406) — F5 protocol, raw RGB565 pixels
         AliVision320x240,    // Device type 54 -> 320x240
@@ -64,13 +78,16 @@ namespace InfoPanel.ThermalrightPanel
         LM16SE,               // PM 4, sub 3 -> 480x480
         LF10V,                // PM 4, sub 4 -> 480x480
         LM19SE,               // PM 4, sub 5 -> 480x480
+        PhantomSpirit120Vision, // PM 4, sub 0x2E (46) -> 480x480
         GrandVisionBulk,      // PM 129 -> 480x480
+        // 320x240
+        MjolnirVision,        // PM 5 -> 320x240
+        // 480x480 (PM 6)
+        FrozenWarframeUltra,  // PM 6, sub 1 -> 480x480
+        FrozenVisionV2,       // PM 6, sub 2 -> 480x480
         // 640x480
-        MjolnirVision,        // PM 5 -> 640x480
-        FrozenWarframeUltra,  // PM 6, sub 1 -> 640x480
-        FrozenVisionV2,       // PM 6, sub 2 -> 640x480
-        StreamVision,         // PM 7, sub 1 -> 640x480
-        MjolnirVisionPro,     // PM 7, sub 2 -> 640x480
+        StreamVision,         // PM 7/14, sub 1 or other -> 640x480
+        MjolnirVisionPro,     // PM 7/14, sub 2 -> 640x480
         // 854x480
         LC2JD,                // PM 9, sub <5 -> 854x480
         LF19,                 // PM 9, sub >=5 -> 854x480
@@ -93,12 +110,12 @@ namespace InfoPanel.ThermalrightPanel
         LM24,                 // PM 68 -> 1280x480
         LM24B,                // PM 128 -> 1280x480
         // 1600x720
-        LM22,                 // PM 1, sub 48 or PM 64, sub 1 -> 1600x720
-        LM27,                 // PM 64, sub 2 -> 1600x720
-        LM30,                 // PM 64, sub 3 -> 1600x720
+        LM22,                 // PM 1, sub 48 or PM 63/64, sub 1 -> 1600x720
+        LM27,                 // PM 63/64, sub 2 -> 1600x720
+        LM30,                 // PM 63/64, sub 3 -> 1600x720
         // 1920x462
-        LF14,                 // PM 1, sub 49 or PM 65, sub 1-2 -> 1920x462
-        LD7,                  // PM 65, sub 3 or PM 66, sub 3-4 -> 1920x462
+        LF14,                 // PM 1, sub 49 or PM 65/66, sub 1-2 -> 1920x462
+        LD7,                  // PM 65, sub 3/5 or PM 66, sub 3+ -> 1920x462
         LD10,                 // PM 65, sub 4 -> 1920x462
         // 1920x440
         LD9,                  // PM 69, sub 2 -> 1920x440

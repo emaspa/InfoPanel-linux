@@ -20,9 +20,16 @@ namespace InfoPanel.ThermalrightPanel
         public const int TROFEO_PRODUCT_ID_5303 = 0x5303;  // 64-byte HID reports
         public const int TROFEO_PRODUCT_ID_5304 = 0x5304;  // 512-byte HID reports
 
-        // SCSI pass-through panels (Elite Vision 360 / Frozen Warframe SCSI variant)
-        public const int SCSI_VENDOR_ID = 0x0402;
-        public const int SCSI_PRODUCT_ID = 0x3922;
+        // SCSI pass-through panels — multiple VID/PID combos present as USB Mass Storage
+        // 0x87CD:0x70DB — Frozen Horizon Pro, Frozen Magic Pro, Frozen Vision V2, Core Vision, Elite Vision, AK120, AX120, PA120 Digital, Wonder Vision
+        // 0x0416:0x5406 — LC1, LC2, LC3, LC5 (AIO pump heads)
+        // 0x0402:0x3922 — Frozen Warframe, Frozen Warframe 360, Frozen Warframe SE, Elite Vision 360
+        public const int SCSI_THERMALRIGHT_VID = 0x87CD;
+        public const int SCSI_THERMALRIGHT_PID = 0x70DB;
+        public const int SCSI_WINBOND_VID = 0x0416;
+        public const int SCSI_WINBOND_PID = 0x5406;
+        public const int SCSI_ALI_VID = 0x0402;
+        public const int SCSI_ALI_PID = 0x3922;
 
         // HID identifier string reported by Trofeo HID panels (init response bytes 20-27)
         // Both 6.86" and 2.4" report "BP21940" — PM byte distinguishes them
@@ -41,7 +48,7 @@ namespace InfoPanel.ThermalrightPanel
         public const byte TROFEO_FW49_PM_BYTE        = 0x31;  //  49 -> 240x320, RGB565 (SPI, "Frozen Warframe")
         public const byte TROFEO_AS120_PM_BYTE       = 0x32;  //  50 -> 320x320, Jpeg ("Frozen Warframe")
         public const byte TROFEO_AS120B_PM_BYTE      = 0x33;  //  51 -> 320x320, Jpeg ("Frozen Warframe")
-        public const byte TROFEO_BA120_PM_BYTE       = 0x34;  //  52 -> 320x240, RGB565 (SPI, "BA120 Vision")
+        public const byte TROFEO_BA120_PM_BYTE       = 0x34;  //  52 -> 240x320, RGB565 (SPI, "BA120 Vision")
         public const byte TROFEO_BA120B_PM_BYTE      = 0x35;  //  53 -> 320x320, Jpeg ("LF20/LF21/LF22")
         public const byte TROFEO_LC5_PM_BYTE         = 0x36;  //  54 -> 360x360, Jpeg ("LC5" fan LCD)
         public const byte TROFEO_ELITE_1920_PM_BYTE  = 0x41;  //  65 -> 1920x462, Jpeg ("Elite Vision 9.16\"")
@@ -61,7 +68,9 @@ namespace InfoPanel.ThermalrightPanel
             (TROFEO_VENDOR_ID, ALI_PRODUCT_ID),
             (TROFEO_VENDOR_ID_2, TROFEO_PRODUCT_ID_5303),
             (TROFEO_VENDOR_ID_2, TROFEO_PRODUCT_ID_5304),
-            (SCSI_VENDOR_ID, SCSI_PRODUCT_ID)
+            (SCSI_THERMALRIGHT_VID, SCSI_THERMALRIGHT_PID),
+            (SCSI_WINBOND_VID, SCSI_WINBOND_PID),
+            (SCSI_ALI_VID, SCSI_ALI_PID)
         };
 
         // Device identifiers returned in init response
@@ -69,9 +78,12 @@ namespace InfoPanel.ThermalrightPanel
         public const string IDENTIFIER_V3 = "SSCRM-V3"; // Wonder / Rainbow Vision 360 (2400x1080) — SUB byte differentiates
 
         // SUB byte (init response byte[28]) for SSCRM-V3 models
-        public const byte WONDER_360_SUB_BYTE  = 0x01; // Wonder Vision 360
-        public const byte RAINBOW_360_SUB_BYTE = 0x02; // Rainbow Vision 360
+        public const byte WONDER_360_SUB_BYTE    = 0x01; // Wonder Vision 360
+        public const byte RAINBOW_360_SUB_BYTE   = 0x02; // Rainbow Vision 360
+        public const byte LEVITA_360_SUB_BYTE    = 0x03; // Levita Vision 360
+        public const byte WONDER_360_V2_SUB_BYTE = 0x20; // Wonder Vision 360 v2 (newer firmware batch, PM=0x07)
         public const string IDENTIFIER_V4 = "SSCRM-V4"; // TL-M10 Vision (1920x462)
+        public const string IDENTIFIER_SPI_V2 = "SPISCRM-V2"; // Elite Vision 360 ARGB Black (SPI 320x320, RGB565 LE)
 
         public static readonly Dictionary<ThermalrightPanelModel, ThermalrightPanelModelInfo> Models = new()
         {
@@ -100,6 +112,22 @@ namespace InfoPanel.ThermalrightPanel
                 ProductId = THERMALRIGHT_PRODUCT_ID,
                 SubByte = WONDER_360_SUB_BYTE
             },
+            // Wonder Vision 360 v2: same physical 6.67" 2400x1080 panel, newer firmware reports
+            // SSCRM-V3 with SUB=0x20 (and PM=0x07). The strict identifier+SUB detection pass picks
+            // this up before the PM+SUB table would mis-route PM=7 to the 640x480 Stream Vision entry.
+            [ThermalrightPanelModel.WonderVision360V2] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.WonderVision360V2,
+                Name = "Wonder Vision 360 6.67\" v2",
+                DeviceIdentifier = IDENTIFIER_V3,
+                Width = 2400,
+                Height = 1080,
+                RenderWidth = 1600,  // Same panel/render size as Wonder Vision 360
+                RenderHeight = 720,
+                VendorId = THERMALRIGHT_VENDOR_ID,
+                ProductId = THERMALRIGHT_PRODUCT_ID,
+                SubByte = WONDER_360_V2_SUB_BYTE
+            },
             [ThermalrightPanelModel.RainbowVision360] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.RainbowVision360,
@@ -112,6 +140,19 @@ namespace InfoPanel.ThermalrightPanel
                 VendorId = THERMALRIGHT_VENDOR_ID,
                 ProductId = THERMALRIGHT_PRODUCT_ID,
                 SubByte = RAINBOW_360_SUB_BYTE
+            },
+            [ThermalrightPanelModel.LevitaVision360] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.LevitaVision360,
+                Name = "Levita Vision 360 6.67\"",
+                DeviceIdentifier = IDENTIFIER_V3,
+                Width = 2400,
+                Height = 1080,
+                RenderWidth = 1600,
+                RenderHeight = 720,
+                VendorId = THERMALRIGHT_VENDOR_ID,
+                ProductId = THERMALRIGHT_PRODUCT_ID,
+                SubByte = LEVITA_360_SUB_BYTE
             },
             [ThermalrightPanelModel.TLM10Vision] = new ThermalrightPanelModelInfo
             {
@@ -186,6 +227,37 @@ namespace InfoPanel.ThermalrightPanel
                 ProductId = TROFEO_PRODUCT_ID_916,
                 TransportType = ThermalrightTransportType.WinUsb,
                 ProtocolType = ThermalrightProtocolType.TrofeoBulk  // 02 FF init, 4096-byte JPEG frames
+            },
+            // v2 is NOT in the VID/PID lookup (same PID as v1 would break GetModelByVidPid).
+            // Detected at runtime after init when device reports height != 480.
+            [ThermalrightPanelModel.TrofeoVision916V2] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.TrofeoVision916V2,
+                Name = "Trofeo Vision 9.16\" v2",
+                DeviceIdentifier = "",
+                // Same physical 9.16" panel as v1; firmware just reports 599 instead of 480.
+                // Render at the v1 default (480), Flicker Fix crops to 462 if the unit needs it.
+                Width = 1920,
+                Height = 480,
+                RenderWidth = 1920,
+                RenderHeight = 480,
+                TransportType = ThermalrightTransportType.WinUsb,
+                ProtocolType = ThermalrightProtocolType.TrofeoBulk
+            },
+            // 11.3" is NOT in the VID/PID lookup (same PID 0x5408 as 9.16").
+            // Detected at runtime by byte[20]=0x05 in the TrofeoBulk init response.
+            // Device firmware still reports 1920x480 but the actual panel is 1920x400.
+            [ThermalrightPanelModel.TrofeoVision113] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.TrofeoVision113,
+                Name = "Trofeo Vision 11.3\"",
+                DeviceIdentifier = "",
+                Width = 1920,
+                Height = 400,
+                RenderWidth = 1920,
+                RenderHeight = 400,
+                TransportType = ThermalrightTransportType.WinUsb,
+                ProtocolType = ThermalrightProtocolType.TrofeoBulk
             },
             [ThermalrightPanelModel.TrofeoVision320] = new ThermalrightPanelModelInfo
             {
@@ -280,20 +352,21 @@ namespace InfoPanel.ThermalrightPanel
                 ProtocolType = ThermalrightProtocolType.Trofeo,
                 PmByte = TROFEO_AS120_PM_BYTE
             },
-            // PM 0x33 (51): TRCC bulk table = "Frozen Warframe" 320x320 Jpeg
+            // PM 0x33 (51): TRCC FBL 51 = 320x240 RGB565 with 90° rotation → 240x320 physical
             [ThermalrightPanelModel.AS120VisionB] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.AS120VisionB,
                 Name = "Frozen Warframe",
                 DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
-                Width = 320,
+                Width = 240,
                 Height = 320,
-                RenderWidth = 320,
+                RenderWidth = 240,
                 RenderHeight = 320,
                 VendorId = TROFEO_VENDOR_ID,
                 ProductId = TROFEO_PRODUCT_ID_686,
                 TransportType = ThermalrightTransportType.Hid,
                 ProtocolType = ThermalrightProtocolType.Trofeo,
+                PixelFormat = ThermalrightPixelFormat.Rgb565,
                 PmByte = TROFEO_AS120B_PM_BYTE
             },
             [ThermalrightPanelModel.BA120Vision] = new ThermalrightPanelModelInfo
@@ -301,10 +374,10 @@ namespace InfoPanel.ThermalrightPanel
                 Model = ThermalrightPanelModel.BA120Vision,
                 Name = "BA120 Vision 2.4\"",
                 DeviceIdentifier = TROFEO_686_HID_IDENTIFIER,
-                Width = 320,
-                Height = 240,
-                RenderWidth = 320,
-                RenderHeight = 240,
+                Width = 240,
+                Height = 320,
+                RenderWidth = 240,
+                RenderHeight = 320,
                 VendorId = TROFEO_VENDOR_ID,
                 ProductId = TROFEO_PRODUCT_ID_686,
                 TransportType = ThermalrightTransportType.Hid,
@@ -423,6 +496,27 @@ namespace InfoPanel.ThermalrightPanel
                 ProtocolType = ThermalrightProtocolType.ChiZhu,
                 PixelFormat = ThermalrightPixelFormat.Rgb565BigEndian
             },
+            // SPISCRM-V2 identifier: Elite Vision 360 ARGB Black, Frozen Warframe PRO 360, etc.
+            // PM=0x20 / SUB=0x20. TRCC FormCZTV.cs maps PM=32 to myDeviceMode=4, which
+            // sends RGB565 big-endian frames (cmd=3 at offset 4) and packs RGB565 with
+            // high byte first (RRRRRGGG / GGGBBBBB). The matching frame-type byte at
+            // offset 56 is always 2 (SSCRM_CMD_TYPE_PICTURE) — see BuildDisplayHeader.
+            [ThermalrightPanelModel.EliteVision360] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.EliteVision360,
+                Name = "Thermalright 320x320 (SPISCRM-V2)",
+                DeviceIdentifier = IDENTIFIER_SPI_V2,
+                Width = 320,
+                Height = 320,
+                RenderWidth = 320,
+                RenderHeight = 320,
+                VendorId = THERMALRIGHT_VENDOR_ID,
+                ProductId = THERMALRIGHT_PRODUCT_ID,
+                ProtocolType = ThermalrightProtocolType.ChiZhu,
+                PixelFormat = ThermalrightPixelFormat.Rgb565BigEndian,
+                SubByte = 0x20  // Required for the strict identifier+SUB lookup to win over the
+                                // generic PM=0x20 ChiZhuVision320x320 PM+SUB entry.
+            },
             [ThermalrightPanelModel.EliteVisionScsi] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.EliteVisionScsi,
@@ -432,8 +526,40 @@ namespace InfoPanel.ThermalrightPanel
                 Height = 320,
                 RenderWidth = 320,
                 RenderHeight = 320,
-                VendorId = SCSI_VENDOR_ID,
-                ProductId = SCSI_PRODUCT_ID,
+                VendorId = SCSI_ALI_VID,
+                ProductId = SCSI_ALI_PID,
+                TransportType = ThermalrightTransportType.Scsi,
+                PixelFormat = ThermalrightPixelFormat.Rgb565BigEndian
+            },
+
+            // SCSI 87CD:70DB — Frozen Horizon Pro, Core Vision, Elite Vision, Wonder Vision, etc.
+            // Resolution detected at runtime from poll response FBL byte.
+            [ThermalrightPanelModel.ThermalrightScsi] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.ThermalrightScsi,
+                Name = "Thermalright LCD (SCSI)",
+                DeviceIdentifier = "",
+                Width = 320,
+                Height = 320,
+                RenderWidth = 320,
+                RenderHeight = 320,
+                VendorId = SCSI_THERMALRIGHT_VID,
+                ProductId = SCSI_THERMALRIGHT_PID,
+                TransportType = ThermalrightTransportType.Scsi,
+                PixelFormat = ThermalrightPixelFormat.Rgb565BigEndian
+            },
+            // SCSI 0416:5406 — LC1, LC2, LC3, LC5 AIO pump heads
+            [ThermalrightPanelModel.WinbondScsi] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.WinbondScsi,
+                Name = "Thermalright AIO LCD (SCSI)",
+                DeviceIdentifier = "",
+                Width = 320,
+                Height = 320,
+                RenderWidth = 320,
+                RenderHeight = 320,
+                VendorId = SCSI_WINBOND_VID,
+                ProductId = SCSI_WINBOND_PID,
                 TransportType = ThermalrightTransportType.Scsi,
                 PixelFormat = ThermalrightPixelFormat.Rgb565BigEndian
             },
@@ -540,6 +666,14 @@ namespace InfoPanel.ThermalrightPanel
                 VendorId = THERMALRIGHT_VENDOR_ID, ProductId = THERMALRIGHT_PRODUCT_ID,
                 ProtocolType = ThermalrightProtocolType.ChiZhu
             },
+            [ThermalrightPanelModel.PhantomSpirit120Vision] = new ThermalrightPanelModelInfo
+            {
+                Model = ThermalrightPanelModel.PhantomSpirit120Vision,
+                Name = "Phantom Spirit 120 Vision EVO",
+                Width = 480, Height = 480, RenderWidth = 480, RenderHeight = 480,
+                VendorId = THERMALRIGHT_VENDOR_ID, ProductId = THERMALRIGHT_PRODUCT_ID,
+                ProtocolType = ThermalrightProtocolType.ChiZhu
+            },
             [ThermalrightPanelModel.GrandVisionBulk] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.GrandVisionBulk,
@@ -549,12 +683,12 @@ namespace InfoPanel.ThermalrightPanel
                 ProtocolType = ThermalrightProtocolType.ChiZhu
             },
 
-            // --- 640x480 ---
+            // --- 320x240 ---
             [ThermalrightPanelModel.MjolnirVision] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.MjolnirVision,
                 Name = "Mjolnir Vision",
-                Width = 640, Height = 480, RenderWidth = 640, RenderHeight = 480,
+                Width = 320, Height = 240, RenderWidth = 320, RenderHeight = 240,
                 VendorId = THERMALRIGHT_VENDOR_ID, ProductId = THERMALRIGHT_PRODUCT_ID,
                 ProtocolType = ThermalrightProtocolType.ChiZhu
             },
@@ -562,7 +696,7 @@ namespace InfoPanel.ThermalrightPanel
             {
                 Model = ThermalrightPanelModel.FrozenWarframeUltra,
                 Name = "Frozen Warframe Ultra",
-                Width = 640, Height = 480, RenderWidth = 640, RenderHeight = 480,
+                Width = 480, Height = 480, RenderWidth = 480, RenderHeight = 480,
                 VendorId = THERMALRIGHT_VENDOR_ID, ProductId = THERMALRIGHT_PRODUCT_ID,
                 ProtocolType = ThermalrightProtocolType.ChiZhu
             },
@@ -570,7 +704,7 @@ namespace InfoPanel.ThermalrightPanel
             {
                 Model = ThermalrightPanelModel.FrozenVisionV2,
                 Name = "Frozen Vision V2",
-                Width = 640, Height = 480, RenderWidth = 640, RenderHeight = 480,
+                Width = 480, Height = 480, RenderWidth = 480, RenderHeight = 480,
                 VendorId = THERMALRIGHT_VENDOR_ID, ProductId = THERMALRIGHT_PRODUCT_ID,
                 ProtocolType = ThermalrightProtocolType.ChiZhu
             },
@@ -820,7 +954,7 @@ namespace InfoPanel.ThermalrightPanel
                 TROFEO_FW49_PM_BYTE        => (240,  320,  "240x320"),
                 TROFEO_AS120_PM_BYTE       => (320,  320,  "320x320"),
                 TROFEO_AS120B_PM_BYTE      => (320,  320,  "320x320"),
-                TROFEO_BA120_PM_BYTE       => (320,  240,  "320x240"),
+                TROFEO_BA120_PM_BYTE       => (240,  320,  "240x320"),
                 TROFEO_BA120B_PM_BYTE      => (320,  320,  "320x320"),
                 TROFEO_LC5_PM_BYTE         => (360,  360,  "360x360"),
                 TROFEO_FWPRO_PM_BYTE       => (320,  320,  "320x320"),
@@ -874,23 +1008,34 @@ namespace InfoPanel.ThermalrightPanel
         }
 
         /// <summary>
-        /// Get model info by device identifier string (e.g., "SSCRM-V1", "SSCRM-V3", "SSCRM-V4")
-        /// and optional SUB byte for disambiguation (e.g., SSCRM-V3 + SUB=0x01 = Wonder, SUB=0x02 = Rainbow).
+        /// Strict identifier+SUB lookup: only returns entries whose DeviceIdentifier matches AND
+        /// whose SubByte equals the device's SUB. Used as the first detection pass for ChiZhu
+        /// devices where the identifier alone isn't enough (e.g. SSCRM-V1 firmware ships on
+        /// both 480x480 Grand-family and 640x480 Stream Vision; only PM byte distinguishes them).
+        /// </summary>
+        public static ThermalrightPanelModelInfo? GetModelByIdentifierAndSub(string identifier, byte subByte)
+        {
+            foreach (var model in Models.Values)
+            {
+                if (model.DeviceIdentifier == identifier && model.SubByte.HasValue && model.SubByte.Value == subByte)
+                    return model;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Identifier-only fallback for legacy panels not covered by the PM+SUB switch
+        /// (e.g. PM=1 SUB=0 Grand Vision is not in GetModelByChiZhuPM). First match wins.
+        /// Callers should attempt PM+SUB first; only fall back to this when PM+SUB returns null.
         /// </summary>
         public static ThermalrightPanelModelInfo? GetModelByIdentifier(string identifier, byte? subByte = null)
         {
-            // If SUB byte provided, try exact match first (identifier + SUB)
             if (subByte.HasValue)
             {
-                foreach (var model in Models.Values)
-                {
-                    if (model.DeviceIdentifier == identifier && model.SubByte.HasValue && model.SubByte.Value == subByte.Value)
-                        return model;
-                }
+                var strict = GetModelByIdentifierAndSub(identifier, subByte.Value);
+                if (strict != null) return strict;
             }
 
-            // Fallback: match by identifier only (first match wins — for unique identifiers like V1/V4,
-            // or when SUB byte is unknown/not in database)
             foreach (var model in Models.Values)
             {
                 if (model.DeviceIdentifier == identifier)
@@ -921,17 +1066,19 @@ namespace InfoPanel.ThermalrightPanel
                 (4, 3) => Models[ThermalrightPanelModel.LM16SE],
                 (4, 4) => Models[ThermalrightPanelModel.LF10V],
                 (4, 5) => Models[ThermalrightPanelModel.LM19SE],
+                (4, 0x2E) => Models[ThermalrightPanelModel.PhantomSpirit120Vision],
 
-                // PM 5: Mjolnir Vision 640x480
+                // PM 5: Mjolnir Vision 320x240
                 (5, _) => Models[ThermalrightPanelModel.MjolnirVision],
 
-                // PM 6: 640x480 variants
+                // PM 6: 480x480 variants
                 (6, 1) => Models[ThermalrightPanelModel.FrozenWarframeUltra],
                 (6, _) => Models[ThermalrightPanelModel.FrozenVisionV2],
 
                 // PM 7: 640x480 variants
                 (7, 1) => Models[ThermalrightPanelModel.StreamVision],
-                (7, _) => Models[ThermalrightPanelModel.MjolnirVisionPro],
+                (7, 2) => Models[ThermalrightPanelModel.MjolnirVisionPro],
+                (7, _) => Models[ThermalrightPanelModel.StreamVision],
 
                 // PM 9: 854x480
                 (9, >= 5) => Models[ThermalrightPanelModel.LF19],
@@ -945,12 +1092,18 @@ namespace InfoPanel.ThermalrightPanel
 
                 // PM 11: 854x480
                 (11, 6) => Models[ThermalrightPanelModel.LD8],
+                (11, _) => Models[ThermalrightPanelModel.LF19],
 
                 // PM 12: 800x480
                 (12, _) => Models[ThermalrightPanelModel.LF17],
 
                 // PM 13: 960x320
                 (13, _) => Models[ThermalrightPanelModel.PC1],
+
+                // PM 14: 640x480 (alias for PM=7)
+                (14, 1) => Models[ThermalrightPanelModel.StreamVision],
+                (14, 2) => Models[ThermalrightPanelModel.MjolnirVisionPro],
+                (14, _) => Models[ThermalrightPanelModel.StreamVision],
 
                 // PM 15: 640x172
                 (15, 1) => Models[ThermalrightPanelModel.LC7],
@@ -961,9 +1114,15 @@ namespace InfoPanel.ThermalrightPanel
 
                 // PM 17: 960x320
                 (17, 2) => Models[ThermalrightPanelModel.LC9],
+                (17, _) => Models[ThermalrightPanelModel.PC1],
 
                 // PM 32 (0x20): 320x320 RGB565 big-endian
                 (0x20, _) => Models[ThermalrightPanelModel.ChiZhuVision320x320],
+
+                // PM 63: 1600x720 (alias for PM=64)
+                (63, 1) => Models[ThermalrightPanelModel.LM22],
+                (63, 2) => Models[ThermalrightPanelModel.LM27],
+                (63, 3) => Models[ThermalrightPanelModel.LM30],
 
                 // PM 64: 1600x720 variants
                 (64, 1) => Models[ThermalrightPanelModel.LM22],
@@ -972,10 +1131,11 @@ namespace InfoPanel.ThermalrightPanel
 
                 // PM 65: 1920x462 variants
                 (65, 1) or (65, 2) => Models[ThermalrightPanelModel.LF14],
-                (65, 3) => Models[ThermalrightPanelModel.LD7],
+                (65, 3) or (65, 5) => Models[ThermalrightPanelModel.LD7],
                 (65, 4) => Models[ThermalrightPanelModel.LD10],
 
                 // PM 66: 1920x462 variants
+                (66, 1) or (66, 2) => Models[ThermalrightPanelModel.LF14],
                 (66, 3) or (66, 4) => Models[ThermalrightPanelModel.LD7],
 
                 // PM 68: 1280x480
