@@ -51,7 +51,11 @@
             <ui:FANavigationView.MenuItems>
                 <ui:FANavigationViewItem Content="Dashboard" Tag="dashboard" IconSource="Home" />
                 <ui:FANavigationViewItem Content="Designer" Tag="designer" IconSource="Edit" />
-                <ui:FANavigationViewItem Content="Devices" Tag="devices" IconSource="Video" />
+                <ui:FANavigationViewItem Content="Devices" Tag="devices">
+                    <ui:FANavigationViewItem.IconSource>
+                        <ui:FAPathIconSource Data="M3,4 L21,4 C21.55,4 22,4.45 22,5 L22,15 C22,15.55 21.55,16 21,16 L13,16 L13,18 L16,18 L16,20 L8,20 L8,18 L11,18 L11,16 L3,16 C2.45,16 2,15.55 2,15 L2,5 C2,4.45 2.45,4 3,4 Z M4,6 L4,14 L20,14 L20,6 Z" />
+                    </ui:FANavigationViewItem.IconSource>
+                </ui:FANavigationViewItem>
                 <ui:FANavigationViewItem Content="Sensors &amp; Plugins" Tag="sensors" IconSource="Library" />
             </ui:FANavigationView.MenuItems>
 

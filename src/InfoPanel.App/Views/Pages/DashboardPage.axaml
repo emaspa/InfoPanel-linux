@@ -38,7 +38,7 @@
                 </Border.Background>
                 <StackPanel VerticalAlignment="Center" Margin="32,0" Spacing="4">
                     <TextBlock Text="Welcome to InfoPanel Linux" FontSize="30" FontWeight="Bold" />
-                    <TextBlock Text="Level up your desktop." FontSize="15" Opacity="0.75" />
+                    <TextBlock Text="Level UP your Dashboards" FontSize="15" Opacity="0.75" />
                 </StackPanel>
             </Border>
 
@@ -58,7 +58,9 @@
                     </Button>
                     <Button Classes="navcard" Click="NavCard_Click" Tag="devices">
                         <DockPanel>
-                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Video" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <!-- FASymbol has no monitor glyph; simple screen-with-stand path (24x24) -->
+                            <PathIcon DockPanel.Dock="Left" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,14,0"
+                                      Data="M3,4 L21,4 C21.55,4 22,4.45 22,5 L22,15 C22,15.55 21.55,16 21,16 L13,16 L13,18 L16,18 L16,20 L8,20 L8,18 L11,18 L11,16 L3,16 C2.45,16 2,15.55 2,15 L2,5 C2,4.45 2.45,4 3,4 Z M4,6 L4,14 L20,14 L20,6 Z" />
                             <TextBlock DockPanel.Dock="Right" Text="›" FontSize="18" Opacity="0.5" VerticalAlignment="Center" />
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Devices" FontWeight="SemiBold" />
