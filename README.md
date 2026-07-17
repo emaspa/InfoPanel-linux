@@ -148,8 +148,8 @@ Key design points:
   `IForegroundAppService`, `IAutostartService`), with Linux
   implementations in `InfoPanel.Platform.Linux`. Windows backends can slot
   in later without touching the app.
-- **Plugin isolation**: plugins load in collectible
-  `AssemblyLoadContext`s; the SDK stays net8.0 so assemblies built against
+- **Plugin isolation**: each plugin package loads in its own collectible
+  `AssemblyLoadContext`; the SDK stays net8.0 so assemblies built against
   the Windows app load on the net10 host unchanged. Shared contracts
   (`InfoPanel.Plugins.Graphics`, SkiaSharp) resolve to the host copies for
   type identity.
