@@ -342,6 +342,12 @@ installs to `~/.local/opt/infopanel` with a launcher in `~/.local/bin`, a
 desktop entry, the udev rules (sudo) and, when `smartmontools` is present,
 a root systemd timer that feeds the SMART drive health sensors.
 
+**Updating** works the same way: quit InfoPanel, extract the new tarball
+and run `./install.sh` again - it overwrites the app in place and leaves
+your profiles and settings in `~/.local/share/InfoPanel/` untouched. The
+app checks for new releases at startup and notifies you when one is out;
+the About page shows what changed and links the download.
+
 Requirements and optional dependencies:
 
 - **USB panels**: the bundled udev rules plus membership in the `plugdev`
