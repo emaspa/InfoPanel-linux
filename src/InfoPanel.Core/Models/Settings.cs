@@ -110,6 +110,29 @@ namespace InfoPanel.Models
             get { return _hotkeyBindings; }
         }
 
+        /// <summary>
+        /// Optional global hotkeys for the bundled Stopwatch plugin. Stored as WPF
+        /// enum text ("Control, Alt" / "F5") for settings.xml compatibility with the
+        /// Windows build; "None" = disabled.
+        /// </summary>
+        [ObservableProperty]
+        private string _stopwatchHotkeyStartModifiers = "None";
+
+        [ObservableProperty]
+        private string _stopwatchHotkeyStartKey = "None";
+
+        [ObservableProperty]
+        private string _stopwatchHotkeyStopModifiers = "None";
+
+        [ObservableProperty]
+        private string _stopwatchHotkeyStopKey = "None";
+
+        [ObservableProperty]
+        private string _stopwatchHotkeyResetModifiers = "None";
+
+        [ObservableProperty]
+        private string _stopwatchHotkeyResetKey = "None";
+
         [ObservableProperty]
         private bool _webServer = false;
 

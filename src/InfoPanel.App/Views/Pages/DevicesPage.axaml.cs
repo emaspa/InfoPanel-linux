@@ -238,6 +238,100 @@ namespace InfoPanel.Views.Pages
             {
                 AddHotkeyRow(settings, binding, deviceChoices);
             }
+
+            AddStopwatchHotkeyRow(settings);
+        }
+
+        /// <summary>Hotkeys for the bundled Stopwatch plugin (start/stop/reset actions).</summary>
+        private void AddStopwatchHotkeyRow(Settings settings)
+        {
+            var border = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(16, 10),
+                Background = ThemeBrush("CardBackgroundFillColorDefaultBrush"),
+                BorderBrush = ThemeBrush("CardStrokeColorDefaultBrush"),
+                BorderThickness = new Thickness(1),
+            };
+
+            var panel = new DockPanel();
+            var captures = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            DockPanel.SetDock(captures, Dock.Right);
+
+            captures.Children.Add(MakeStopwatchCapture("Start", settings.StopwatchHotkeyStartModifiers, settings.StopwatchHotkeyStartKey,
+                (m, k) => { settings.StopwatchHotkeyStartModifiers = m; settings.StopwatchHotkeyStartKey = k; _app!.Host.SaveSettings(); }));
+            captures.Children.Add(MakeStopwatchCapture("Stop", settings.StopwatchHotkeyStopModifiers, settings.StopwatchHotkeyStopKey,
+                (m, k) => { settings.StopwatchHotkeyStopModifiers = m; settings.StopwatchHotkeyStopKey = k; _app!.Host.SaveSettings(); }));
+            captures.Children.Add(MakeStopwatchCapture("Reset", settings.StopwatchHotkeyResetModifiers, settings.StopwatchHotkeyResetKey,
+                (m, k) => { settings.StopwatchHotkeyResetModifiers = m; settings.StopwatchHotkeyResetKey = k; _app!.Host.SaveSettings(); }));
+
+            panel.Children.Add(captures);
+
+            var info = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
+            info.Children.Add(new TextBlock { Text = "Stopwatch", FontWeight = Avalonia.Media.FontWeight.SemiBold });
+            info.Children.Add(new TextBlock { Text = "Global start/stop/reset for the bundled Stopwatch plugin.", FontSize = 11, Opacity = 0.6 });
+            panel.Children.Add(info);
+
+            border.Child = panel;
+            DeviceRows.Children.Add(border);
+        }
+
+        private static string StopwatchHotkeyText(string action, string modifiers, string key)
+        {
+            if (string.IsNullOrEmpty(key) || key == "None")
+            {
+                return $"{action}: (not set)";
+            }
+
+            var parts = modifiers.Split(',').Select(m => m.Trim()).Where(m => m.Length > 0 && m != "None").ToList();
+            parts.Add(key);
+            return $"{action}: {string.Join("+", parts)}";
+        }
+
+        private Control MakeStopwatchCapture(string action, string modifiers, string key, Action<string, string> apply)
+        {
+            var button = new ToggleButton { Content = StopwatchHotkeyText(action, modifiers, key), FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            ToolTip.SetTip(button, "Click, then press the key combination. Escape clears the binding.");
+
+            button.IsCheckedChanged += (_, _) =>
+            {
+                if (button.IsChecked == true) button.Content = "Press keys…";
+            };
+            button.KeyDown += (_, e) =>
+            {
+                if (button.IsChecked != true) return;
+                e.Handled = true;
+
+                if (e.Key is Avalonia.Input.Key.LeftCtrl or Avalonia.Input.Key.RightCtrl
+                    or Avalonia.Input.Key.LeftAlt or Avalonia.Input.Key.RightAlt
+                    or Avalonia.Input.Key.LeftShift or Avalonia.Input.Key.RightShift
+                    or Avalonia.Input.Key.LWin or Avalonia.Input.Key.RWin)
+                {
+                    return;
+                }
+
+                if (e.Key == Avalonia.Input.Key.Escape)
+                {
+                    modifiers = "None";
+                    key = "None";
+                }
+                else
+                {
+                    var parts = new List<string>();
+                    if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Control)) parts.Add("Control");
+                    if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Alt)) parts.Add("Alt");
+                    if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Shift)) parts.Add("Shift");
+                    if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Meta)) parts.Add("Windows");
+                    modifiers = parts.Count > 0 ? string.Join(", ", parts) : "None";
+                    key = e.Key.ToString();
+                }
+
+                apply(modifiers, key);
+                button.IsChecked = false;
+                button.Content = StopwatchHotkeyText(action, modifiers, key);
+            };
+
+            return button;
         }
 
         private void AddHotkeyRow(Settings settings, HotkeyBinding binding, List<HotkeyDeviceChoice> deviceChoices)

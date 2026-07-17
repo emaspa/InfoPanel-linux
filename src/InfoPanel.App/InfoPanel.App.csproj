@@ -99,6 +99,32 @@
     <Copy SourceFiles="@(AudioSpectrumPublishFiles)" DestinationFolder="$(PublishDir)plugins/InfoPanel.AudioSpectrum" SkipUnchangedFiles="true" />
   </Target>
 
+
+  <!-- Bundle the Stopwatch plugin (upstream PR #134) -->
+  <Target Name="BuildStopWatch" BeforeTargets="Build">
+    <MSBuild Projects="..\InfoPanel.StopWatch\InfoPanel.StopWatch.csproj" Targets="Build" Properties="Configuration=$(Configuration);TargetFramework=net8.0;SelfContained=false" RemoveProperties="RuntimeIdentifier;PublishDir;SelfContained" />
+    <MSBuild Projects="..\InfoPanel.StopWatch\InfoPanel.StopWatch.csproj" Targets="GetTargetPath" Properties="Configuration=$(Configuration);TargetFramework=net8.0" RemoveProperties="RuntimeIdentifier;PublishDir;SelfContained">
+      <Output TaskParameter="TargetOutputs" PropertyName="_StopWatchAssemblyPath" />
+    </MSBuild>
+    <PropertyGroup>
+      <StopWatchOutputDir>$([System.IO.Path]::GetDirectoryName('$(_StopWatchAssemblyPath)'))</StopWatchOutputDir>
+    </PropertyGroup>
+  </Target>
+
+  <Target Name="CopyStopWatchToBuildOutput" AfterTargets="BuildStopWatch">
+    <ItemGroup>
+      <StopWatchFiles Include="$(StopWatchOutputDir)\**\*.*" Exclude="$(StopWatchOutputDir)\InfoPanel.Plugins.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(StopWatchFiles)" DestinationFolder="$(OutputPath)plugins/InfoPanel.StopWatch" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyStopWatchToPublishOutput" AfterTargets="Publish">
+    <ItemGroup>
+      <StopWatchPublishFiles Include="$(StopWatchOutputDir)\**\*.*" Exclude="$(StopWatchOutputDir)\InfoPanel.Plugins.dll" />
+    </ItemGroup>
+    <Copy SourceFiles="@(StopWatchPublishFiles)" DestinationFolder="$(PublishDir)plugins/InfoPanel.StopWatch" SkipUnchangedFiles="true" />
+  </Target>
+
   <Target Name="CleanPluginsDirectory" BeforeTargets="Clean">
     <RemoveDir Directories="$(OutputPath)plugins" />
   </Target>

@@ -43,6 +43,7 @@ namespace InfoPanel.Services
                 return;
             }
 
+            _settings.PropertyChanged += OnSettingsPropertyChanged;
             _settings.HotkeyBindings.CollectionChanged += OnBindingsChanged;
             foreach (var binding in _settings.HotkeyBindings)
             {
@@ -57,6 +58,7 @@ namespace InfoPanel.Services
             if (!_started) return;
             _started = false;
 
+            _settings.PropertyChanged -= OnSettingsPropertyChanged;
             _settings.HotkeyBindings.CollectionChanged -= OnBindingsChanged;
             foreach (var binding in _settings.HotkeyBindings)
             {
@@ -64,6 +66,14 @@ namespace InfoPanel.Services
             }
 
             PlatformServices.Hotkeys?.UnregisterAll();
+        }
+
+        private void OnSettingsPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName is string name && name.StartsWith("StopwatchHotkey", StringComparison.Ordinal))
+            {
+                RegisterAll();
+            }
         }
 
         private void OnBindingsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -124,6 +134,73 @@ namespace InfoPanel.Services
                 {
                     Logger.Warning("HotkeyManager: failed to register {Hotkey}", binding.HotkeyDisplayText);
                 }
+            }
+
+            RegisterStopwatchHotkey(service, _settings.StopwatchHotkeyStartModifiers, _settings.StopwatchHotkeyStartKey, "Start");
+            RegisterStopwatchHotkey(service, _settings.StopwatchHotkeyStopModifiers, _settings.StopwatchHotkeyStopKey, "Stop");
+            RegisterStopwatchHotkey(service, _settings.StopwatchHotkeyResetModifiers, _settings.StopwatchHotkeyResetKey, "Reset");
+        }
+
+        /// <summary>Plugin id of the bundled Stopwatch plugin (upstream PR #134).</summary>
+        public const string StopwatchPluginId = "infopanel-stopwatch";
+
+        private static HotkeyModifierMask ParseModifiers(string modifiers)
+        {
+            var mask = HotkeyModifierMask.None;
+            foreach (var part in modifiers.Split(','))
+            {
+                switch (part.Trim().ToLowerInvariant())
+                {
+                    case "control" or "ctrl": mask |= HotkeyModifierMask.Control; break;
+                    case "alt": mask |= HotkeyModifierMask.Alt; break;
+                    case "shift": mask |= HotkeyModifierMask.Shift; break;
+                    case "windows" or "win": mask |= HotkeyModifierMask.Super; break;
+                }
+            }
+
+            return mask;
+        }
+
+        private void RegisterStopwatchHotkey(IGlobalHotkeyService service, string modifiers, string key, string methodName)
+        {
+            if (string.IsNullOrEmpty(key) || key == "None")
+            {
+                return;
+            }
+
+            var mask = ParseModifiers(modifiers);
+            if (mask == HotkeyModifierMask.None)
+            {
+                Logger.Warning("HotkeyManager: skipping stopwatch {Action} hotkey - at least one modifier is required", methodName);
+                return;
+            }
+
+            if (service.Register(mask, key, () => UiThread.Post(() => InvokeStopwatchAction(methodName))))
+            {
+                Logger.Debug("HotkeyManager: registered stopwatch {Action} hotkey {Modifiers}+{Key}", methodName, modifiers, key);
+            }
+        }
+
+        private static void InvokeStopwatchAction(string methodName)
+        {
+            try
+            {
+                var wrapper = Monitors.PluginMonitor.Instance.Plugins
+                    .SelectMany(p => p.PluginWrappers.Values)
+                    .FirstOrDefault(w => w.Id == StopwatchPluginId);
+
+                if (wrapper == null || !wrapper.IsRunning)
+                {
+                    Logger.Warning("HotkeyManager: stopwatch plugin not running, ignoring {Action}", methodName);
+                    return;
+                }
+
+                wrapper.Plugin.GetType().GetMethod(methodName)?.Invoke(wrapper.Plugin, null);
+                Logger.Information("HotkeyManager: stopwatch {Action} triggered via hotkey", methodName);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "HotkeyManager: stopwatch {Action} failed", methodName);
             }
         }
 

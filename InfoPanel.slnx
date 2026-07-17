@@ -20,6 +20,7 @@
     <Project Path="src/InfoPanel.Rendering/InfoPanel.Rendering.csproj" />
     <Project Path="src/InfoPanel.Sensors.Linux/InfoPanel.Sensors.Linux.csproj" />
     <Project Path="src/InfoPanel.Sensors/InfoPanel.Sensors.csproj" />
+    <Project Path="src/InfoPanel.StopWatch/InfoPanel.StopWatch.csproj" />
     <Project Path="src/InfoPanel.Web/InfoPanel.Web.csproj" />
     <Project Path="src/TuringSmartScreenLib.Helpers.SkiaSharp/TuringSmartScreenLib.Helpers.SkiaSharp.csproj" />
     <Project Path="src/TuringSmartScreenLib/TuringSmartScreenLib.csproj" />
