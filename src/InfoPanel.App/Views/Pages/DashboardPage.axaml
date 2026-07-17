@@ -1,19 +1,150 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="using:FluentAvalonia.UI.Controls"
              xmlns:vm="using:InfoPanel.ViewModels"
              xmlns:utils="using:InfoPanel.Utils"
              x:Class="InfoPanel.Views.Pages.DashboardPage">
 
+    <UserControl.Styles>
+        <Style Selector="Button.navcard">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+        <Style Selector="Border.communityrow">
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="16,14" />
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
+    </UserControl.Styles>
+
     <ScrollViewer>
         <StackPanel Margin="24" Spacing="16">
-            <DockPanel>
+
+            <!-- Hero banner (v1.4 Home look, minus the artwork) -->
+            <Border CornerRadius="8" Height="150" ClipToBounds="True">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                        <GradientStop Color="#FF10222B" Offset="0" />
+                        <GradientStop Color="#FF0E2E2C" Offset="0.55" />
+                        <GradientStop Color="#FF241B33" Offset="1" />
+                    </LinearGradientBrush>
+                </Border.Background>
+                <StackPanel VerticalAlignment="Center" Margin="32,0" Spacing="4">
+                    <TextBlock Text="Welcome to InfoPanel." FontSize="30" FontWeight="Bold" />
+                    <TextBlock Text="Level up your desktop." FontSize="15" Opacity="0.75" />
+                </StackPanel>
+            </Border>
+
+            <!-- Left: navigation cards · Right: community actions -->
+            <Grid ColumnDefinitions="340,24,*">
+
+                <StackPanel Grid.Column="0" Spacing="10">
+                    <Button Classes="navcard" Click="NavCard_Click" Tag="designer">
+                        <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Edit" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <TextBlock DockPanel.Dock="Right" Text="›" FontSize="18" Opacity="0.5" VerticalAlignment="Center" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Designer" FontWeight="SemiBold" />
+                                <TextBlock Text="Customisation and design." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Button>
+                    <Button Classes="navcard" Click="NavCard_Click" Tag="devices">
+                        <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Video" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <TextBlock DockPanel.Dock="Right" Text="›" FontSize="18" Opacity="0.5" VerticalAlignment="Center" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Devices" FontWeight="SemiBold" />
+                                <TextBlock Text="USB panels, outputs and hotkeys." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Button>
+                    <Button Classes="navcard" Click="NavCard_Click" Tag="sensors">
+                        <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Library" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <TextBlock DockPanel.Dock="Right" Text="›" FontSize="18" Opacity="0.5" VerticalAlignment="Center" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Sensors &amp; Plugins" FontWeight="SemiBold" />
+                                <TextBlock Text="Live sensors and plugin management." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Button>
+                    <Button Classes="navcard" Click="NavCard_Click" Tag="settings">
+                        <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Settings" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <TextBlock DockPanel.Dock="Right" Text="›" FontSize="18" Opacity="0.5" VerticalAlignment="Center" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Settings" FontWeight="SemiBold" />
+                                <TextBlock Text="Manage settings, updates and about." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Spacing="10">
+                    <Border Classes="communityrow">
+                        <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Star" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <Button DockPanel.Dock="Right" Content="Donate" VerticalAlignment="Center"
+                                    Click="OpenLink_Click" Tag="https://buymeacoffee.com/emaspa" />
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Support Development" FontWeight="SemiBold" />
+                                <TextBlock Text="Show your appreciation and buy me a coffee." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Classes="communityrow">
+                        <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="People" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <Button DockPanel.Dock="Right" Content="Join" VerticalAlignment="Center"
+                                    Click="OpenLink_Click" Tag="https://discord.gg/cQnjdMC7Qc" />
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Discord" FontWeight="SemiBold" />
+                                <TextBlock Text="Join in conversations with others regarding InfoPanel." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Classes="communityrow">
+                        <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Comment" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <Button DockPanel.Dock="Right" Content="Launch" VerticalAlignment="Center"
+                                    Click="OpenLink_Click" Tag="https://www.reddit.com/r/InfoPanel/" />
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="Reddit" FontWeight="SemiBold" />
+                                <TextBlock Text="Help grow the /r/InfoPanel community." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Classes="communityrow">
+                        <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Code" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <Button DockPanel.Dock="Right" Content="Open" VerticalAlignment="Center"
+                                    Click="OpenLink_Click" Tag="https://github.com/emaspa/InfoPanel-linux" />
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="GitHub" FontWeight="SemiBold" />
+                                <TextBlock Text="Star the project, report issues and contribute." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <!-- Profiles -->
+            <DockPanel Margin="0,8,0,0">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
                     <Button Content="Import…" Click="Import_Click" />
                     <Button Content="+ New profile" Click="NewProfile_Click" />
                 </StackPanel>
                 <StackPanel Spacing="4">
-                    <TextBlock Text="Dashboard" FontSize="28" FontWeight="SemiBold" />
-                    <TextBlock Text="Your profiles and where they are shown."
+                    <TextBlock Text="Profiles" FontSize="22" FontWeight="SemiBold" />
+                    <TextBlock Text="Create and manage your profiles and where they are shown."
                                Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </DockPanel>

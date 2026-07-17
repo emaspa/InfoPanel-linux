@@ -15,6 +15,29 @@ namespace InfoPanel.Views.Pages
         private DispatcherTimer? _thumbnailTimer;
         private App? _app;
 
+        private void NavCard_Click(object? sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is string tag && TopLevel.GetTopLevel(this) is Views.MainWindow window)
+            {
+                window.NavigateTo(tag);
+            }
+        }
+
+        private void OpenLink_Click(object? sender, RoutedEventArgs e)
+        {
+            if ((sender as Button)?.Tag is string url)
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("xdg-open", url) { UseShellExecute = false });
+                }
+                catch
+                {
+                    // no handler registered; nothing sensible to do
+                }
+            }
+        }
+
         public DashboardPage()
         {
             InitializeComponent();
