@@ -393,6 +393,24 @@ namespace InfoPanel.Drawing
                         break;
                     }
 
+                case GuideDisplayItem guideDisplayItem:
+                    {
+                        // Guides are designer chrome only: never sent to panels/web outputs
+                        if (preview && SKColor.TryParse(guideDisplayItem.Color, out _))
+                        {
+                            var centerX = guideDisplayItem.X * scale;
+                            var centerY = guideDisplayItem.Y * scale;
+                            var halfLength = guideDisplayItem.Length * scale / 2f;
+                            var radians = guideDisplayItem.Rotation * Math.PI / 180.0;
+                            var dx = (float)(Math.Cos(radians) * halfLength);
+                            var dy = (float)(Math.Sin(radians) * halfLength);
+
+                            g.DrawLine(centerX - dx, centerY - dy, centerX + dx, centerY + dy, guideDisplayItem.Color, 1);
+                        }
+
+                        break;
+                    }
+
                 case ShapeDisplayItem shapeDisplayItem:
                     {
                         var width = scale == 1 ? (int)shapeDisplayItem.Width : (int)Math.Floor(shapeDisplayItem.Width * scale);

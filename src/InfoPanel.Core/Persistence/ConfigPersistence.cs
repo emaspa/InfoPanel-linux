@@ -30,7 +30,7 @@ namespace InfoPanel.Persistence
             typeof(DonutDisplayItem), typeof(TableSensorDisplayItem), typeof(SensorDisplayItem),
             typeof(TextDisplayItem), typeof(ClockDisplayItem), typeof(CalendarDisplayItem),
             typeof(SensorImageDisplayItem), typeof(ImageDisplayItem), typeof(HttpImageDisplayItem),
-            typeof(GaugeDisplayItem), typeof(ShapeDisplayItem)
+            typeof(GaugeDisplayItem), typeof(ShapeDisplayItem), typeof(GuideDisplayItem)
         ];
 
         /// <summary>Overrides the data directory (tests, portable mode). Null = default XDG location.</summary>
