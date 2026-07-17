@@ -37,7 +37,7 @@
                     </LinearGradientBrush>
                 </Border.Background>
                 <StackPanel VerticalAlignment="Center" Margin="32,0" Spacing="4">
-                    <TextBlock Text="Welcome to InfoPanel." FontSize="30" FontWeight="Bold" />
+                    <TextBlock Text="Welcome to InfoPanel Linux" FontSize="30" FontWeight="Bold" />
                     <TextBlock Text="Level up your desktop." FontSize="15" Opacity="0.75" />
                 </StackPanel>
             </Border>
