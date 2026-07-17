@@ -70,7 +70,7 @@
                     </Button>
                     <Button Classes="navcard" Click="NavCard_Click" Tag="sensors">
                         <DockPanel>
-                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Library" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <PathIcon DockPanel.Dock="Left" Width="18" Height="18" VerticalAlignment="Center" Margin="0,0,14,0" Data="M3,14.5 A9,9 0 0 1 21,14.5 L19.5,14.5 A7.5,7.5 0 0 0 4.5,14.5 Z M10.9,12.48 L7.66,9.24 L6.74,10.16 L9.98,13.4 Z M10.4,14.5 A1.6,1.6 0 1 0 13.6,14.5 A1.6,1.6 0 1 0 10.4,14.5 Z" />
                             <TextBlock DockPanel.Dock="Right" Text="›" FontSize="18" Opacity="0.5" VerticalAlignment="Center" />
                             <StackPanel Spacing="2">
                                 <TextBlock Text="Sensors" FontWeight="SemiBold" />

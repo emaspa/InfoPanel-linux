@@ -58,7 +58,11 @@
                         <ui:FAPathIconSource Data="M0,1 L0.01,1.01 M23.99,22.99 L24,23 M3.75,4 H20.25 C21.216,4 22,4.784 22,5.75 V14.75 C22,15.716 21.216,16.5 20.25,16.5 H3.75 C2.784,16.5 2,15.716 2,14.75 V5.75 C2,4.784 2.784,4 3.75,4 Z M3.5,5.75 V14.75 C3.5,14.888 3.612,15 3.75,15 H20.25 C20.388,15 20.5,14.888 20.5,14.75 V5.75 C20.5,5.612 20.388,5.5 20.25,5.5 H3.75 C3.612,5.5 3.5,5.612 3.5,5.75 Z M11.25,16.5 H12.75 V18.5 H16.75 C17.164,18.5 17.5,18.836 17.5,19.25 C17.5,19.664 17.164,20 16.75,20 H7.25 C6.836,20 6.5,19.664 6.5,19.25 C6.5,18.836 6.836,18.5 7.25,18.5 H11.25 Z" />
                     </ui:FANavigationViewItem.IconSource>
                 </ui:FANavigationViewItem>
-                <ui:FANavigationViewItem Content="Sensors" Tag="sensors" IconSource="Library" />
+                <ui:FANavigationViewItem Content="Sensors" Tag="sensors">
+                    <ui:FANavigationViewItem.IconSource>
+                        <ui:FAPathIconSource Data="M0,1 L0.01,1.01 M23.99,22.99 L24,23 M3,14.5 A9,9 0 0 1 21,14.5 L19.5,14.5 A7.5,7.5 0 0 0 4.5,14.5 Z M10.9,12.48 L7.66,9.24 L6.74,10.16 L9.98,13.4 Z M10.4,14.5 A1.6,1.6 0 1 0 13.6,14.5 A1.6,1.6 0 1 0 10.4,14.5 Z" />
+                    </ui:FANavigationViewItem.IconSource>
+                </ui:FANavigationViewItem>
                 <ui:FANavigationViewItem Content="Plugins" Tag="plugins" IconSource="AllApps" />
             </ui:FANavigationView.MenuItems>
 
