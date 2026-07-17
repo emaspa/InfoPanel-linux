@@ -210,6 +210,51 @@ namespace InfoPanel.Monitors
                 }
 
                 await wrapper.StopAsync();
+                TeardownImageProvider(wrapper);
+            }
+        }
+
+        // ================= plugin image providers (in-proc) =================
+
+        /// <summary>Live image writers per plugin id, for future display-item consumption.</summary>
+        public static readonly ConcurrentDictionary<string, Dictionary<string, InfoPanel.Plugins.Graphics.InProcPluginImageWriter>> IMAGEWRITERS = new();
+
+        private static void SetupImageProvider(PluginWrapper wrapper)
+        {
+            if (wrapper.Plugin is not InfoPanel.Plugins.Graphics.IPluginImageProvider provider)
+            {
+                return;
+            }
+
+            try
+            {
+                var writers = new Dictionary<string, InfoPanel.Plugins.Graphics.InProcPluginImageWriter>();
+                var forPlugin = new Dictionary<string, InfoPanel.Plugins.Graphics.IPluginImageWriter>();
+                foreach (var descriptor in provider.ImageDescriptors)
+                {
+                    var writer = new InfoPanel.Plugins.Graphics.InProcPluginImageWriter(descriptor.Width, descriptor.Height);
+                    writers[descriptor.Id] = writer;
+                    forPlugin[descriptor.Id] = writer;
+                }
+
+                IMAGEWRITERS[wrapper.Id] = writers;
+                provider.OnImageBuffersReady(forPlugin);
+                Log.Information("Plugin {PluginName}: {Count} image buffer(s) ready", wrapper.Name, writers.Count);
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, "Plugin {PluginName}: image provider setup failed", wrapper.Name);
+            }
+        }
+
+        private static void TeardownImageProvider(PluginWrapper wrapper)
+        {
+            if (IMAGEWRITERS.TryRemove(wrapper.Id, out var writers))
+            {
+                foreach (var writer in writers.Values)
+                {
+                    writer.Dispose();
+                }
             }
         }
 
@@ -221,6 +266,9 @@ namespace InfoPanel.Monitors
                 {
                     await wrapper.Initialize();
                     Log.Information("Plugin {PluginName} loaded successfully", wrapper.Name);
+
+                    PluginConfigStore.LoadAndApply(wrapper);
+                    SetupImageProvider(wrapper);
 
                     int indexOrder = 0;
                     foreach (var container in wrapper.PluginContainers)
@@ -263,11 +311,15 @@ namespace InfoPanel.Monitors
             }
 
             await wrapper.StopAsync();
+            TeardownImageProvider(wrapper);
 
             try
             {
                 await wrapper.Initialize();
                 Log.Information("Plugin {PluginName} reloaded successfully", wrapper.Name);
+
+                PluginConfigStore.LoadAndApply(wrapper);
+                SetupImageProvider(wrapper);
 
                 int indexOrder = 0;
                 foreach (var container in wrapper.PluginContainers)

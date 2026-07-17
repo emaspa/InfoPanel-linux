@@ -47,6 +47,7 @@ namespace InfoPanel.Views
             _pages["designer"] = new DesignerPage();
             _pages["devices"] = new DevicesPage();
             _pages["sensors"] = new SensorsPage();
+            _pages["plugins"] = new PluginsPage();
             _pages["settings"] = new SettingsPage();
 
             Loaded += (_, _) =>

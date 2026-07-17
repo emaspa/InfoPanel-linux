@@ -140,6 +140,10 @@ namespace InfoPanel.ViewModels
             await PluginMonitor.Instance.ReloadPluginModule(_wrapper);
         }
 
+        public bool IsConfigurable => _wrapper.Plugin is IPluginConfigurable;
+
+        public ObservableCollection<PluginConfigEntryViewModel> ConfigEntries { get; } = [];
+
         public PluginModuleViewModel(PluginWrapper wrapper)
         {
             _wrapper = wrapper;
@@ -158,6 +162,8 @@ namespace InfoPanel.ViewModels
                 var command = new RelayCommand(() => method.Invoke(wrapper.Plugin, null));
                 Actions.Add(new PluginActionCommand { DisplayName = displayName, Command = command });
             }
+
+            RebuildConfigEntries();
         }
 
         public void Refresh()
@@ -166,6 +172,137 @@ namespace InfoPanel.ViewModels
             Name = _wrapper.Name;
             Description = _wrapper.Description;
             ConfigFilePath = _wrapper.ConfigFilePath;
+        }
+
+        /// <summary>
+        /// Re-reads ConfigProperties (plugins rebuild the list with current values
+        /// after ApplyConfig) and syncs the editor rows.
+        /// </summary>
+        public void RebuildConfigEntries()
+        {
+            if (_wrapper.Plugin is not IPluginConfigurable configurable)
+            {
+                return;
+            }
+
+            var props = configurable.ConfigProperties;
+
+            // keep row objects stable so focus isn't lost while typing
+            while (ConfigEntries.Count > props.Count) ConfigEntries.RemoveAt(ConfigEntries.Count - 1);
+            for (int i = 0; i < props.Count; i++)
+            {
+                if (i < ConfigEntries.Count)
+                {
+                    ConfigEntries[i].Sync(props[i]);
+                }
+                else
+                {
+                    ConfigEntries.Add(new PluginConfigEntryViewModel(_wrapper, props[i], RebuildConfigEntries));
+                }
+            }
+        }
+    }
+
+    /// <summary>One editable config property; applies + persists on change (autosave, like 1.4.x).</summary>
+    public partial class PluginConfigEntryViewModel : ObservableObject
+    {
+        private readonly PluginWrapper _wrapper;
+        private readonly Action _refreshAll;
+        private bool _syncing;
+
+        public PluginConfigEntryViewModel(PluginWrapper wrapper, PluginConfigProperty property, Action refreshAll)
+        {
+            _wrapper = wrapper;
+            _refreshAll = refreshAll;
+            Property = property;
+            Sync(property);
+        }
+
+        public PluginConfigProperty Property { get; private set; }
+
+        public string DisplayName => Property.DisplayName;
+        public string? Description => Property.Description;
+        public bool HasDescription => !string.IsNullOrEmpty(Property.Description);
+
+        public bool IsString => Property.Type == PluginConfigType.String;
+        public bool IsInteger => Property.Type == PluginConfigType.Integer;
+        public bool IsDouble => Property.Type == PluginConfigType.Double;
+        public bool IsNumeric => IsInteger || IsDouble;
+        public bool IsBoolean => Property.Type == PluginConfigType.Boolean;
+        public bool IsChoice => Property.Type == PluginConfigType.Choice;
+
+        public string[] Options => Property.Options ?? [];
+        public decimal Minimum => (decimal)(Property.MinValue ?? -1_000_000_000);
+        public decimal Maximum => (decimal)(Property.MaxValue ?? 1_000_000_000);
+        public decimal Increment => (decimal)(Property.Step ?? (IsInteger ? 1 : 0.1));
+        public string NumberFormat => IsInteger ? "0" : "0.###";
+
+        [ObservableProperty]
+        private string? _stringValue;
+
+        [ObservableProperty]
+        private decimal? _numberValue;
+
+        [ObservableProperty]
+        private bool _boolValue;
+
+        [ObservableProperty]
+        private string? _choiceValue;
+
+        public void Sync(PluginConfigProperty property)
+        {
+            _syncing = true;
+            try
+            {
+                Property = property;
+                StringValue = property.Value?.ToString();
+                ChoiceValue = property.Value?.ToString();
+                BoolValue = property.Value is bool b ? b : bool.TryParse(property.Value?.ToString(), out var pb) && pb;
+                NumberValue = property.Value switch
+                {
+                    int i => i,
+                    double d => (decimal)d,
+                    float f => (decimal)f,
+                    long l => l,
+                    _ => decimal.TryParse(property.Value?.ToString(), System.Globalization.NumberStyles.Float,
+                        System.Globalization.CultureInfo.InvariantCulture, out var parsed) ? parsed : null,
+                };
+
+                OnPropertyChanged(string.Empty); // refresh computed properties
+            }
+            finally
+            {
+                _syncing = false;
+            }
+        }
+
+        partial void OnStringValueChanged(string? value)
+        {
+            if (!_syncing && IsString) Apply(value);
+        }
+
+        partial void OnNumberValueChanged(decimal? value)
+        {
+            if (!_syncing && IsNumeric && value.HasValue)
+            {
+                Apply(IsInteger ? (object)(int)value.Value : (object)(double)value.Value);
+            }
+        }
+
+        partial void OnBoolValueChanged(bool value)
+        {
+            if (!_syncing && IsBoolean) Apply(value);
+        }
+
+        partial void OnChoiceValueChanged(string? value)
+        {
+            if (!_syncing && IsChoice && value != null) Apply(value);
+        }
+
+        private void Apply(object? value)
+        {
+            PluginConfigStore.Apply(_wrapper, Property.Key, value);
+            _refreshAll();
         }
     }
 

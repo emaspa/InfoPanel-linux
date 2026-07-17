@@ -21,7 +21,7 @@ namespace InfoPanel.Extras
     /// org.freedesktop.Platform.VulkanLayer.MangoHud extension and, if the app
     /// overrides XDG_DATA_DIRS, an override appending /usr/lib/extensions/vulkan/share.
     /// </summary>
-    public partial class MangoHudPlugin : BasePlugin
+    public partial class MangoHudPlugin : BasePlugin, IPluginConfigurable
     {
         private readonly PluginSensor _fps = new("FPS", 0, " FPS");
         private readonly PluginSensor _fpsAverage = new("FPS Average", 0, " FPS");
@@ -30,12 +30,50 @@ namespace InfoPanel.Extras
         private readonly PluginText _game = new("Game", "-");
         private readonly PluginText _status = new("Status", "Waiting for MangoHud log");
 
-        public override string? ConfigFilePath => Config.FilePath;
         public override TimeSpan UpdateInterval => TimeSpan.FromSeconds(1);
 
         private string _logFolder = "";
-        private const int FreshnessSeconds = 10;
-        private const int AverageWindow = 120; // samples used for average / 1% low
+        private int _freshnessSeconds = 10;
+        private int _averageWindow = 120; // samples used for average / 1% low
+
+        private List<PluginConfigProperty>? _configProperties;
+
+        public IReadOnlyList<PluginConfigProperty> ConfigProperties
+        {
+            get
+            {
+                _configProperties ??=
+                [
+                    new() { Key = "LogFolder", DisplayName = "Log folder", Type = PluginConfigType.String,
+                            Description = "MangoHud output_folder where metrics CSVs are written.", Value = _logFolder },
+                    new() { Key = "FreshnessSeconds", DisplayName = "Freshness timeout", Type = PluginConfigType.Integer,
+                            Description = "Seconds without new samples before the game counts as stopped.",
+                            MinValue = 2, MaxValue = 120, Step = 1, Value = _freshnessSeconds },
+                    new() { Key = "AverageWindow", DisplayName = "Average window", Type = PluginConfigType.Integer,
+                            Description = "Samples used for the average and 1% low.",
+                            MinValue = 10, MaxValue = 1000, Step = 10, Value = _averageWindow },
+                ];
+                return _configProperties;
+            }
+        }
+
+        public void ApplyConfig(string key, object? value)
+        {
+            switch (key)
+            {
+                case "LogFolder":
+                    if (value is string folder && !string.IsNullOrWhiteSpace(folder)) _logFolder = folder;
+                    break;
+                case "FreshnessSeconds":
+                    if (value is int fresh) _freshnessSeconds = Math.Clamp(fresh, 2, 120);
+                    break;
+                case "AverageWindow":
+                    if (value is int window) _averageWindow = Math.Clamp(window, 10, 1000);
+                    break;
+            }
+
+            _configProperties = null; // rebuild with current values on next read
+        }
 
         // per-file cached column indices
         private string? _mappedFile;
@@ -88,7 +126,7 @@ namespace InfoPanel.Extras
                     .OrderByDescending(f => f.LastWriteTimeUtc)
                     .FirstOrDefault();
 
-                if (newest == null || (DateTime.UtcNow - newest.LastWriteTimeUtc).TotalSeconds > FreshnessSeconds)
+                if (newest == null || (DateTime.UtcNow - newest.LastWriteTimeUtc).TotalSeconds > _freshnessSeconds)
                 {
                     SetIdle("Waiting for game (MangoHud logging)");
                     return Task.CompletedTask;
@@ -105,7 +143,7 @@ namespace InfoPanel.Extras
                 _fps.Value = (float)fps;
                 _frametime.Value = (float)frametime;
 
-                var window = samples.Count > AverageWindow ? samples.Skip(samples.Count - AverageWindow).ToList() : samples;
+                var window = samples.Count > _averageWindow ? samples.Skip(samples.Count - _averageWindow).ToList() : samples;
                 _fpsAverage.Value = (float)window.Average(s => s.Fps);
 
                 var sorted = window.Select(s => s.Fps).OrderBy(v => v).ToList();

@@ -11,6 +11,7 @@
     <Project Path="src/InfoPanel.Extras/InfoPanel.Extras.csproj" />
     <Project Path="src/InfoPanel.Platform.Linux/InfoPanel.Platform.Linux.csproj" />
     <Project Path="src/InfoPanel.Platform/InfoPanel.Platform.csproj" />
+    <Project Path="src/InfoPanel.Plugins.Graphics/InfoPanel.Plugins.Graphics.csproj" />
     <Project Path="src/InfoPanel.Plugins.Loader/InfoPanel.Plugins.Loader.csproj" />
     <Project Path="src/InfoPanel.Plugins.Simulator/InfoPanel.Plugins.Simulator.csproj" />
     <Project Path="src/InfoPanel.Plugins/InfoPanel.Plugins.csproj" />

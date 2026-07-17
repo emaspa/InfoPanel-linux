@@ -22,7 +22,6 @@ namespace InfoPanel.Views.Pages
                     Tree.ItemsSource = _tree.Roots;
                 }
 
-                DataContext ??= new PluginsPageViewModel();
                 UpdateCount();
 
                 _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };

@@ -73,8 +73,18 @@
                             <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Library" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
                             <TextBlock DockPanel.Dock="Right" Text="›" FontSize="18" Opacity="0.5" VerticalAlignment="Center" />
                             <StackPanel Spacing="2">
-                                <TextBlock Text="Sensors &amp; Plugins" FontWeight="SemiBold" />
-                                <TextBlock Text="Live sensors and plugin management." FontSize="12" Opacity="0.6" />
+                                <TextBlock Text="Sensors" FontWeight="SemiBold" />
+                                <TextBlock Text="Browse live hardware and plugin sensors." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Button>
+                    <Button Classes="navcard" Click="NavCard_Click" Tag="plugins">
+                        <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="AllApps" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <TextBlock DockPanel.Dock="Right" Text="›" FontSize="18" Opacity="0.5" VerticalAlignment="Center" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Plugins" FontWeight="SemiBold" />
+                                <TextBlock Text="Manage plugins and their configuration." FontSize="12" Opacity="0.6" />
                             </StackPanel>
                         </DockPanel>
                     </Button>

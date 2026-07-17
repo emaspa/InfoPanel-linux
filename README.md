@@ -21,6 +21,11 @@ natively for Linux on .NET 10 and Avalonia 12. Based on
 - **Sensors**: Linux hwmon, Intel iGPU (sysfs + PMU), AMD (ROCm SMI),
   NVIDIA (NVML), plus the .NET plugin system — existing InfoPanel plugin
   binaries load unchanged.
+- **Plugins**: dedicated management page with the 1.4.x configuration
+  framework — `IPluginConfigurable` plugins get an auto-generated settings UI
+  with host-managed persistence (`plugins/<id>.config.json`), and the
+  `InfoPanel.Plugins.Graphics` image-provider contract is available for
+  plugins that render their own visuals.
 - **Outputs**: transparent desktop overlays (X11/XWayland), USB panels, and a
   built-in web server serving live profile images.
 - **Profile hotkeys**: system-wide shortcuts (X11 `XGrabKey`) that switch a
