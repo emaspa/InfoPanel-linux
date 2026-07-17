@@ -48,19 +48,21 @@ namespace InfoPanel.Views
             _pages["devices"] = new DevicesPage();
             _pages["sensors"] = new SensorsPage();
             _pages["plugins"] = new PluginsPage();
+            _pages["about"] = new AboutPage();
             _pages["settings"] = new SettingsPage();
 
             Loaded += (_, _) =>
             {
                 // Dev/testing hook: INFOPANEL_START_PAGE=designer opens that page directly
                 var startPage = Environment.GetEnvironmentVariable("INFOPANEL_START_PAGE");
-                if (startPage == "settings")
+                if (startPage is "settings" or "about")
                 {
-                    PageHost.Content = _pages["settings"]; // dev hook; footer item resolves lazily
+                    PageHost.Content = _pages[startPage]; // dev hook; footer items resolve lazily
                 }
                 else
                 {
                     NavView.SelectedItem = NavView.MenuItems.OfType<FANavigationViewItem>()
+                        .Concat(NavView.FooterMenuItems.OfType<FANavigationViewItem>())
                         .FirstOrDefault(item => (string?)item.Tag == startPage)
                         ?? NavView.MenuItems.OfType<FANavigationViewItem>().First();
                 }
@@ -101,7 +103,9 @@ namespace InfoPanel.Views
                 return;
             }
 
-            var item = NavView.MenuItems.OfType<FANavigationViewItem>().FirstOrDefault(i => (string?)i.Tag == tag);
+            var item = NavView.MenuItems.OfType<FANavigationViewItem>()
+                .Concat(NavView.FooterMenuItems.OfType<FANavigationViewItem>())
+                .FirstOrDefault(i => (string?)i.Tag == tag);
             if (item != null)
             {
                 NavView.SelectedItem = item;

@@ -26,7 +26,7 @@ namespace InfoPanel.Drawing
 
         // Expand the auto-scale range immediately on new extremes; contract it gradually so
         // the scale doesn't yo-yo when a transient spike falls out of the sample window.
-        // 0.05 per frame ≈ 14 frames to halfway convergence at 40fps — responsive but stable.
+        // 0.05 per frame ≈ 14 frames to halfway convergence at 40fps - responsive but stable.
         private const double AutoRangeContract = 0.05;
         private const double AutoRangeMinSpan = 1e-6;
         private static readonly TimeSpan AutoRangeTtl = TimeSpan.FromSeconds(30);

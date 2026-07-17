@@ -116,7 +116,7 @@ namespace InfoPanel.Services
             // Bytes 16-55: Zero padding (already zeroed)
 
             // Bytes 56-59: Frame type (SSCRM_CMD_TYPE_PICTURE = 2). Constant regardless
-            // of pixel format — TRCC writes 2 here even when the data-format byte at offset
+            // of pixel format - TRCC writes 2 here even when the data-format byte at offset
             // 4 is 3 (RGB565). Without this, RGB565 panels (PM=0x20 / SPISCRM-V2) reject frames.
             BitConverter.GetBytes(0x02).CopyTo(header, 56);
 
@@ -199,7 +199,7 @@ namespace InfoPanel.Services
                 }
             }
 
-            // No profile — black JPEG as keepalive
+            // No profile - black JPEG as keepalive
             return _blackFrame ??= GenerateBlackJpeg();
         }
 
@@ -235,7 +235,7 @@ namespace InfoPanel.Services
                 }
             }
 
-            // No profile — black RGB565 as keepalive (0x0000 is black in both endiannesses)
+            // No profile - black RGB565 as keepalive (0x0000 is black in both endiannesses)
             return _blackFrame ??= new byte[_panelWidth * _panelHeight * 2];
         }
 
@@ -343,7 +343,7 @@ namespace InfoPanel.Services
                             byte g = srcRow[x * 4 + 1];
                             byte b = srcRow[x * 4 + 2];
 
-                            // Truncate to 5/6/5 — exact match to TRCC FormCZTV.ImageTo565
+                            // Truncate to 5/6/5 - exact match to TRCC FormCZTV.ImageTo565
                             byte hi = (byte)((r & 0xF8) | (g >> 5));        // RRRRR_GGG
                             byte lo = (byte)(((g & 0x1C) << 3) | (b >> 3)); // GGG_BBBBB
 
@@ -449,7 +449,7 @@ namespace InfoPanel.Services
             if (vidPidMatches.Count > 1)
             {
                 Logger.Warning(
-                    "ThermalrightPanelDevice {Device}: saved id {Saved} not present and {Count} devices share VID/PID — not rebinding (ambiguous). Rescan devices to update.",
+                    "ThermalrightPanelDevice {Device}: saved id {Saved} not present and {Count} devices share VID/PID - not rebinding (ambiguous). Rescan devices to update.",
                     _device, _device.DeviceId, vidPidMatches.Count);
             }
 
@@ -712,7 +712,7 @@ namespace InfoPanel.Services
             // Send initialization command (magic + zeros + 0x01 at offset 56)
             var initCommand = BuildInitCommand();
 
-            // Boot detection: device responds A1A2A3A4 while still booting — retry up to 5 times
+            // Boot detection: device responds A1A2A3A4 while still booting - retry up to 5 times
             ErrorCode ec = ErrorCode.None;
             int bytesRead = 0;
             var responseBuffer = new byte[1024]; // ChiZhu init response is up to 1024 bytes (PM at [24], SUB at [28])
@@ -748,7 +748,7 @@ namespace InfoPanel.Services
                     continue;
                 }
 
-                break; // Not booting — proceed
+                break; // Not booting - proceed
             }
 
             if (ec == ErrorCode.None && bytesRead > 0)
@@ -903,7 +903,7 @@ namespace InfoPanel.Services
             bool initSent = ec == ErrorCode.None;
             if (!initSent)
             {
-                Logger.Warning("ThermalrightPanelDevice {Device}: Trofeo init command failed: {Error} — continuing without init", _device, ec);
+                Logger.Warning("ThermalrightPanelDevice {Device}: Trofeo init command failed: {Error} - continuing without init", _device, ec);
             }
             else
             {
@@ -981,7 +981,7 @@ namespace InfoPanel.Services
             const int RESPONSE_SIZE = 512;
 
             // TRCC does NOT abort/reset pipes before init. Some device units react badly
-            // to pipe reset, causing persistent flicker. Skip the abort/reset — if stale IRPs
+            // to pipe reset, causing persistent flicker. Skip the abort/reset - if stale IRPs
             // cause issues on restart, the init timeout will handle it.
 
             // TRCC: Thread.Sleep(50) before init (DCReadWriteAsync.cs line 768)
@@ -1061,7 +1061,7 @@ namespace InfoPanel.Services
 
                     if (reportedWidth > 0 && reportedWidth <= 4096 && reportedHeight > 0 && reportedHeight <= 4096)
                     {
-                        // Keep the raw reported values here — the byte[20] re-identify block
+                        // Keep the raw reported values here - the byte[20] re-identify block
                         // below needs them to distinguish 9.16" v1 (480) / v2 (599) / 11.3"
                         // and then applies the model's render size. (This replaces the earlier
                         // "model database wins" workaround, which forced 480 before variant
@@ -1080,8 +1080,8 @@ namespace InfoPanel.Services
 
             // Re-identify model variant based on byte[20] discriminator + reported resolution.
             // All 0x5408 panels share the same VID/PID but report different byte[20] values:
-            //   byte[20]=0x01: 9.16" v1   (firmware reports 480, framebuffer is 462 — flicker fix crops)
-            //   byte[20]<=3:   9.16" v2   (firmware reports 599 — see TRCC pm=65 path)
+            //   byte[20]=0x01: 9.16" v1   (firmware reports 480, framebuffer is 462 - flicker fix crops)
+            //   byte[20]<=3:   9.16" v2   (firmware reports 599 - see TRCC pm=65 path)
             //   byte[20]=0x05: 11.3"      (firmware reports 480, actual panel is 1920x400)
             byte? trofeoB20 = readBytes >= 21 ? (byte?)responseBuffer[20] : null;
 
@@ -1105,7 +1105,7 @@ namespace InfoPanel.Services
             // different heights. They are the same physical 9.16" panel, so v2 renders at
             // the same 1920x480 default as v1 (overriding the bogus 599 the firmware reports;
             // sending 599-height JPEGs is stretched). Flicker fix then crops to 462 if the
-            // user's unit needs it — identical opt-in behavior to v1.
+            // user's unit needs it - identical opt-in behavior to v1.
             else if (_panelHeight != 480 && _device.Model == ThermalrightPanelModel.TrofeoVision916
                 && ThermalrightPanelModelDatabase.Models.TryGetValue(ThermalrightPanelModel.TrofeoVision916V2, out var v2Model))
             {
@@ -1123,11 +1123,11 @@ namespace InfoPanel.Services
 
             // Both 9.16" v1 and v2 render at 1920x480 by default. Some units have a 462-row
             // framebuffer; sending 480-height JPEGs overflows by 18 rows and wraps to the top
-            // of the display (TRCC works around this by always sending 462 — JPEG SOF0 in USB
+            // of the display (TRCC works around this by always sending 462 - JPEG SOF0 in USB
             // captures confirms height=0x01CE=462). We default to the full 480 and let the user
             // enable the Flicker Fix toggle to crop to 462 if their unit shows the overflow.
             // Flicker fix is checked live each frame in GenerateJpegBuffer.
-            // Skip for 11.3" — that panel has its own 400-row target, not a 462 crop.
+            // Skip for 11.3" - that panel has its own 400-row target, not a 462 crop.
             if (_panelHeight == 480 && _device.Model != ThermalrightPanelModel.TrofeoVision113)
             {
                 _flickerFixCropHeight = 462;

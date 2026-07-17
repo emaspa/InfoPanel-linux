@@ -28,9 +28,9 @@ namespace InfoPanel.ThermalrightPanel
 
     public enum ThermalrightPixelFormat
     {
-        Jpeg,          // JPEG compressed — header byte[6]=0x00, width at [8-9], height at [10-11]
-        Rgb565,        // Raw 16-bit pixels LE — header byte[6]=0x01, height at [8-9], width at [10-11]
-        Rgb565BigEndian // Raw 16-bit pixels BE (byte-swapped) — used by 320x320 panels
+        Jpeg,          // JPEG compressed - header byte[6]=0x00, width at [8-9], height at [10-11]
+        Rgb565,        // Raw 16-bit pixels LE - header byte[6]=0x01, height at [8-9], width at [10-11]
+        Rgb565BigEndian // Raw 16-bit pixels BE (byte-swapped) - used by 320x320 panels
     }
 
     public class ThermalrightPanelModelInfo

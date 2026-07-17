@@ -15,15 +15,15 @@ namespace InfoPanel.ThermalrightPanel
         public const int TROFEO_PRODUCT_ID_LY1 = 0x5409;  // 9.16" - WinUSB bulk (LY1 chipset)
         public const int ALI_PRODUCT_ID = 0x5406;          // ALi chipset - WinUSB bulk, raw RGB565
 
-        // Alternate Trofeo vendor ID (0x0418) — same HID protocol as 0x0416
+        // Alternate Trofeo vendor ID (0x0418) - same HID protocol as 0x0416
         public const int TROFEO_VENDOR_ID_2 = 0x0418;
         public const int TROFEO_PRODUCT_ID_5303 = 0x5303;  // 64-byte HID reports
         public const int TROFEO_PRODUCT_ID_5304 = 0x5304;  // 512-byte HID reports
 
-        // SCSI pass-through panels — multiple VID/PID combos present as USB Mass Storage
-        // 0x87CD:0x70DB — Frozen Horizon Pro, Frozen Magic Pro, Frozen Vision V2, Core Vision, Elite Vision, AK120, AX120, PA120 Digital, Wonder Vision
-        // 0x0416:0x5406 — LC1, LC2, LC3, LC5 (AIO pump heads)
-        // 0x0402:0x3922 — Frozen Warframe, Frozen Warframe 360, Frozen Warframe SE, Elite Vision 360
+        // SCSI pass-through panels - multiple VID/PID combos present as USB Mass Storage
+        // 0x87CD:0x70DB - Frozen Horizon Pro, Frozen Magic Pro, Frozen Vision V2, Core Vision, Elite Vision, AK120, AX120, PA120 Digital, Wonder Vision
+        // 0x0416:0x5406 - LC1, LC2, LC3, LC5 (AIO pump heads)
+        // 0x0402:0x3922 - Frozen Warframe, Frozen Warframe 360, Frozen Warframe SE, Elite Vision 360
         public const int SCSI_THERMALRIGHT_VID = 0x87CD;
         public const int SCSI_THERMALRIGHT_PID = 0x70DB;
         public const int SCSI_WINBOND_VID = 0x0416;
@@ -32,7 +32,7 @@ namespace InfoPanel.ThermalrightPanel
         public const int SCSI_ALI_PID = 0x3922;
 
         // HID identifier string reported by Trofeo HID panels (init response bytes 20-27)
-        // Both 6.86" and 2.4" report "BP21940" — PM byte distinguishes them
+        // Both 6.86" and 2.4" report "BP21940" - PM byte distinguishes them
         public const string TROFEO_686_HID_IDENTIFIER = "BP21940";
 
         // PM byte (init response byte[5]) for Trofeo HID panels
@@ -75,7 +75,7 @@ namespace InfoPanel.ThermalrightPanel
 
         // Device identifiers returned in init response
         public const string IDENTIFIER_V1 = "SSCRM-V1"; // Grand / Hydro / Hyper / Peerless Vision 240/360 (480x480)
-        public const string IDENTIFIER_V3 = "SSCRM-V3"; // Wonder / Rainbow Vision 360 (2400x1080) — SUB byte differentiates
+        public const string IDENTIFIER_V3 = "SSCRM-V3"; // Wonder / Rainbow Vision 360 (2400x1080) - SUB byte differentiates
 
         // SUB byte (init response byte[28]) for SSCRM-V3 models
         public const byte WONDER_360_SUB_BYTE    = 0x01; // Wonder Vision 360
@@ -433,7 +433,7 @@ namespace InfoPanel.ThermalrightPanel
                 ProtocolType = ThermalrightProtocolType.Trofeo,
                 PmByte = TROFEO_ELITE_PM_BYTE
             },
-            // PM 0x31 (49): TRCC HID table = "Frozen Warframe" — SPI device, not in bulk table
+            // PM 0x31 (49): TRCC HID table = "Frozen Warframe" - SPI device, not in bulk table
             [ThermalrightPanelModel.FrozenWarframe49] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.FrozenWarframe49,
@@ -500,7 +500,7 @@ namespace InfoPanel.ThermalrightPanel
             // PM=0x20 / SUB=0x20. TRCC FormCZTV.cs maps PM=32 to myDeviceMode=4, which
             // sends RGB565 big-endian frames (cmd=3 at offset 4) and packs RGB565 with
             // high byte first (RRRRRGGG / GGGBBBBB). The matching frame-type byte at
-            // offset 56 is always 2 (SSCRM_CMD_TYPE_PICTURE) — see BuildDisplayHeader.
+            // offset 56 is always 2 (SSCRM_CMD_TYPE_PICTURE) - see BuildDisplayHeader.
             [ThermalrightPanelModel.EliteVision360] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.EliteVision360,
@@ -532,7 +532,7 @@ namespace InfoPanel.ThermalrightPanel
                 PixelFormat = ThermalrightPixelFormat.Rgb565BigEndian
             },
 
-            // SCSI 87CD:70DB — Frozen Horizon Pro, Core Vision, Elite Vision, Wonder Vision, etc.
+            // SCSI 87CD:70DB - Frozen Horizon Pro, Core Vision, Elite Vision, Wonder Vision, etc.
             // Resolution detected at runtime from poll response FBL byte.
             [ThermalrightPanelModel.ThermalrightScsi] = new ThermalrightPanelModelInfo
             {
@@ -548,7 +548,7 @@ namespace InfoPanel.ThermalrightPanel
                 TransportType = ThermalrightTransportType.Scsi,
                 PixelFormat = ThermalrightPixelFormat.Rgb565BigEndian
             },
-            // SCSI 0416:5406 — LC1, LC2, LC3, LC5 AIO pump heads
+            // SCSI 0416:5406 - LC1, LC2, LC3, LC5 AIO pump heads
             [ThermalrightPanelModel.WinbondScsi] = new ThermalrightPanelModelInfo
             {
                 Model = ThermalrightPanelModel.WinbondScsi,
@@ -613,7 +613,7 @@ namespace InfoPanel.ThermalrightPanel
             },
 
             // =========================================================================
-            // ChiZhu bulk (87AD:70DB) models — identified by PM byte[24] and SUB byte[28]
+            // ChiZhu bulk (87AD:70DB) models - identified by PM byte[24] and SUB byte[28]
             // From TRCC USB_ID1_1=257 table (ThreadSendDeviceData)
             // =========================================================================
 
@@ -928,7 +928,7 @@ namespace InfoPanel.ThermalrightPanel
                 if (model.VendorId == vid && model.ProductId == pid)
                 {
                     if (match != null)
-                        return null; // Multiple models share this VID/PID — can't determine at scan time
+                        return null; // Multiple models share this VID/PID - can't determine at scan time
                     match = model;
                 }
             }

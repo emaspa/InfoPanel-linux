@@ -8,7 +8,7 @@ namespace InfoPanel.App.Tests
 {
     /// <summary>
     /// Covers the designer's editing model (selection, gestures, undo/redo, clipboard,
-    /// z-order) — the logic the canvas drives from pointer/keyboard input.
+    /// z-order) - the logic the canvas drives from pointer/keyboard input.
     /// </summary>
     public class DesignerSessionTests : IDisposable
     {

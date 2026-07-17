@@ -85,7 +85,7 @@ namespace InfoPanel.Platform.Linux
 
         /// <summary>
         /// Linux sg_io_hdr_t structure for SG_IO ioctl (x64 layout).
-        /// See linux/sg.h — total size 88 bytes on x86_64.
+        /// See linux/sg.h - total size 88 bytes on x86_64.
         /// </summary>
         [StructLayout(LayoutKind.Explicit, Size = 88)]
         private struct sg_io_hdr_t

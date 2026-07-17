@@ -8,7 +8,7 @@ namespace InfoPanel.Video
     /// <summary>
     /// Video frame source backed by the system ffmpeg binary: decodes to raw BGRA over
     /// a pipe at native speed (-re) with infinite loop for files, and exposes the most
-    /// recent frame. Chosen over LibVLCSharp so no extra native library is required —
+    /// recent frame. Chosen over LibVLCSharp so no extra native library is required -
     /// v1 already depended on the ffmpeg binary for video conversion.
     /// </summary>
     public sealed class FfmpegVideoDecoder : IDisposable
@@ -52,7 +52,7 @@ namespace InfoPanel.Video
         {
             if (!IsAvailable)
             {
-                Logger.Warning("ffmpeg/ffprobe not found on PATH — video playback disabled");
+                Logger.Warning("ffmpeg/ffprobe not found on PATH - video playback disabled");
                 return null;
             }
 

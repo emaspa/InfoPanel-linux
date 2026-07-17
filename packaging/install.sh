@@ -34,7 +34,7 @@ if command -v smartctl >/dev/null 2>&1; then
     sudo systemctl daemon-reload
     sudo systemctl enable --now infopanel-smart.timer
 else
-    echo "smartmontools not found — skipping SMART sensors (install it and re-run for drive health sensors)"
+    echo "smartmontools not found - skipping SMART sensors (install it and re-run for drive health sensors)"
 fi
 
 echo

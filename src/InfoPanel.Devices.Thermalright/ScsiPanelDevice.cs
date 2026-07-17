@@ -13,7 +13,7 @@ namespace InfoPanel.ThermalrightPanel
     {
         private static readonly ILogger Logger = Log.ForContext<ScsiPanelDevice>();
 
-        private const int POLL_BUFFER_SIZE = 0xE100;        // 57,600 bytes — poll/init buffer size
+        private const int POLL_BUFFER_SIZE = 0xE100;        // 57,600 bytes - poll/init buffer size
         private const int FRAME_CHUNK_SIZE_LARGE = 0x10000; // 65,536 bytes (for displays > 76,800 pixels)
         private const int FRAME_CHUNK_SIZE_SMALL = 0xE100;  // 57,600 bytes (for displays <= 76,800 pixels)
         private const int SMALL_DISPLAY_PIXELS = 76800;     // 320x240 threshold

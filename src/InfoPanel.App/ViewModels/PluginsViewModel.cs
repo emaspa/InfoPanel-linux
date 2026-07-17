@@ -394,10 +394,10 @@ namespace InfoPanel.ViewModels
 
         public ObservableCollection<PluginModuleViewModel> Plugins { get; set; } = [];
 
-        /// <summary>Modules without a config panel — listed inside the package card.</summary>
+        /// <summary>Modules without a config panel - listed inside the package card.</summary>
         public ObservableCollection<PluginModuleViewModel> SimpleModules { get; } = [];
 
-        /// <summary>Modules with a config panel — each rendered as its own tile.</summary>
+        /// <summary>Modules with a config panel - each rendered as its own tile.</summary>
         public ObservableCollection<PluginModuleViewModel> ConfigurableModules { get; } = [];
 
         [ObservableProperty]
@@ -438,7 +438,7 @@ namespace InfoPanel.ViewModels
         }
 
         /// <summary>
-        /// True when the package's only module is configurable — the package card is
+        /// True when the package's only module is configurable - the package card is
         /// hidden and the module tile carries the package identity/toggle instead.
         /// </summary>
         public bool ShowPackageCard => !(Plugins.Count == 1 && Plugins[0].IsConfigurable);

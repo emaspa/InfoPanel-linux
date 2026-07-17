@@ -88,7 +88,7 @@ namespace InfoPanel.ThermalrightPanel
                             {
                                 modelInfo = ProbeWinUsbModel(deviceReg);
                             }
-                            // Trofeo 0x0416:0x5408 is also ambiguous — same PID for 9.16" v1, 9.16" v2, and 11.3".
+                            // Trofeo 0x0416:0x5408 is also ambiguous - same PID for 9.16" v1, 9.16" v2, and 11.3".
                             // Refine the VID/PID result by probing byte[20] of the TrofeoBulk init response.
                             else if (vendorId == ThermalrightPanelModelDatabase.TROFEO_VENDOR_ID
                                   && productId == ThermalrightPanelModelDatabase.TROFEO_PRODUCT_ID_916)
@@ -99,7 +99,7 @@ namespace InfoPanel.ThermalrightPanel
                         }
                         else
                         {
-                            Logger.Warning("ThermalrightPanelHelper: Skipping probe for device at {Location} — wrong driver: {Driver}",
+                            Logger.Warning("ThermalrightPanelHelper: Skipping probe for device at {Location} - wrong driver: {Driver}",
                                 deviceLocation, driverIssue);
                         }
 
@@ -215,7 +215,7 @@ namespace InfoPanel.ThermalrightPanel
         /// <summary>
         /// Windows checks the registry here for a wrong driver binding (libusb0/libusbK
         /// instead of WinUSB). On Linux libusb talks to the device directly, so there is
-        /// no driver-service concept — access problems surface as udev permission errors
+        /// no driver-service concept - access problems surface as udev permission errors
         /// instead. Always reports the driver as correct.
         /// </summary>
         private static string? CheckDriverService(UsbRegistry deviceReg)
@@ -324,7 +324,7 @@ namespace InfoPanel.ThermalrightPanel
                 return null;
             }
 
-            // Boot indicator: A1A2A3A4 — device not ready
+            // Boot indicator: A1A2A3A4 - device not ready
             if (bytesRead >= 8 &&
                 response[4] == 0xA1 && response[5] == 0xA2 &&
                 response[6] == 0xA3 && response[7] == 0xA4)

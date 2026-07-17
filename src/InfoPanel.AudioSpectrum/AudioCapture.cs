@@ -75,7 +75,7 @@ namespace InfoPanel.AudioSpectrum
             }
             catch (System.ComponentModel.Win32Exception)
             {
-                _lastError = "parec not found — install pulseaudio-utils";
+                _lastError = "parec not found - install pulseaudio-utils";
                 Logger.Warning("AudioCapture: {Error}", _lastError);
                 _process = null;
             }

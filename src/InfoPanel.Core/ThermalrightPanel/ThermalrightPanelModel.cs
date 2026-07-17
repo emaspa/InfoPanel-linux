@@ -54,19 +54,19 @@ namespace InfoPanel.ThermalrightPanel
         FrozenWarframePro,        // PM 0x64 (100) -> 320x320, Jpeg  (TRCC: "Frozen Warframe Pro/LM22")
         EliteVisionHid,           // PM 0x65 (101) -> 320x320, Jpeg  (TRCC: "Elite Vision/LF14")
 
-        // ChiZhu bulk (87AD:70DB) PM=0x20 variant — 320x320, RGB565
+        // ChiZhu bulk (87AD:70DB) PM=0x20 variant - 320x320, RGB565
         ChiZhuVision320x320,
 
-        // ChiZhu bulk (87AD:70DB) responding with SPISCRM-V2 identifier — Elite Vision 360 ARGB Black
+        // ChiZhu bulk (87AD:70DB) responding with SPISCRM-V2 identifier - Elite Vision 360 ARGB Black
         // SPI-driven 320x320 panel, RGB565 little-endian (unlike the generic PM=0x20 entry which is BE)
         EliteVision360,
 
-        // SCSI pass-through — resolution detected at runtime from poll response
-        EliteVisionScsi,      // VID 0x0402 / PID 0x3922 — Frozen Warframe, Elite Vision 360
-        ThermalrightScsi,     // VID 0x87CD / PID 0x70DB — Frozen Horizon Pro, Core Vision, Elite Vision, Wonder Vision
-        WinbondScsi,          // VID 0x0416 / PID 0x5406 — LC1, LC2, LC3, LC5 AIO pump heads
+        // SCSI pass-through - resolution detected at runtime from poll response
+        EliteVisionScsi,      // VID 0x0402 / PID 0x3922 - Frozen Warframe, Elite Vision 360
+        ThermalrightScsi,     // VID 0x87CD / PID 0x70DB - Frozen Horizon Pro, Core Vision, Elite Vision, Wonder Vision
+        WinbondScsi,          // VID 0x0416 / PID 0x5406 - LC1, LC2, LC3, LC5 AIO pump heads
 
-        // ALi chipset (VID 0x0416 / PID 0x5406) — F5 protocol, raw RGB565 pixels
+        // ALi chipset (VID 0x0416 / PID 0x5406) - F5 protocol, raw RGB565 pixels
         AliVision320x240,    // Device type 54 -> 320x240
         AliVision320x320,    // Device type 101/102 -> 320x320
 

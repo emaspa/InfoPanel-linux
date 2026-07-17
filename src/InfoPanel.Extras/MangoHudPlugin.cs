@@ -15,7 +15,7 @@ namespace InfoPanel.Extras
     ///   log_interval=1000
     ///   output_folder=/home/USER/mangohud_logs
     /// Notes: the folder key is 'output_folder' (not 'log_folder') on 0.8.x, and
-    /// 'no_display' silently disables autostart_log — use fps_only to minimize the
+    /// 'no_display' silently disables autostart_log - use fps_only to minimize the
     /// overlay instead. Enable per game with 'mangohud %command%' or globally for
     /// Vulkan titles with MANGOHUD=1. Flatpak games additionally need the
     /// org.freedesktop.Platform.VulkanLayer.MangoHud extension and, if the app

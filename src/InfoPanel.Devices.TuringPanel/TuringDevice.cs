@@ -140,7 +140,7 @@ namespace InfoPanel.TuringPanel
                 if (_device == null)
                 {
                     var error = OperatingSystem.IsLinux()
-                        ? "Failed to open USB device. Check permissions — you may need a udev rule. See infopanel-udev.rules."
+                        ? "Failed to open USB device. Check permissions - you may need a udev rule. See infopanel-udev.rules."
                         : "Failed to open device from registry.";
                     Logger.Error(error);
                     throw new TuringDeviceException(error);
@@ -388,7 +388,7 @@ namespace InfoPanel.TuringPanel
                 }
 
                 // For large payloads (image data), read the device response as flow
-                // control — the device ACKs each frame before accepting the next.
+                // control - the device ACKs each frame before accepting the next.
                 // Without this, frames queue up faster than the device can process
                 // them, eventually overflowing its USB receive buffer.
                 // For small command packets, skip the read (fire-and-forget).
@@ -694,7 +694,7 @@ namespace InfoPanel.TuringPanel
                         _device = null;
                     }
 
-                    // Note: Do NOT call UsbDevice.Exit() here — it destroys the global
+                    // Note: Do NOT call UsbDevice.Exit() here - it destroys the global
                     // libusb context and breaks other USB devices still running.
                 }
                 catch (Exception ex)

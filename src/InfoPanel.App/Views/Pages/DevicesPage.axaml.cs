@@ -247,7 +247,7 @@ namespace InfoPanel.Views.Pages
                 if (captureButton.IsChecked != true) return;
                 e.Handled = true;
 
-                // Ignore presses of bare modifier keys — wait for the real key
+                // Ignore presses of bare modifier keys - wait for the real key
                 if (e.Key is Avalonia.Input.Key.LeftCtrl or Avalonia.Input.Key.RightCtrl
                     or Avalonia.Input.Key.LeftAlt or Avalonia.Input.Key.RightAlt
                     or Avalonia.Input.Key.LeftShift or Avalonia.Input.Key.RightShift
@@ -268,7 +268,7 @@ namespace InfoPanel.Views.Pages
                 if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Shift)) parts.Add("Shift");
                 if (e.KeyModifiers.HasFlag(Avalonia.Input.KeyModifiers.Meta)) parts.Add("Windows");
 
-                // Avalonia's Key enum uses the same member names as WPF's — the settings vocabulary
+                // Avalonia's Key enum uses the same member names as WPF's - the settings vocabulary
                 binding.ModifierKeys = parts.Count > 0 ? string.Join(", ", parts) : "None";
                 binding.Key = e.Key.ToString();
                 _app!.Host.SaveSettings();

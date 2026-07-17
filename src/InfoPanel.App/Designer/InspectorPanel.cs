@@ -47,7 +47,7 @@ namespace InfoPanel.Designer
             }
         }
 
-        /// <summary>Raised when the user clicks "Bind selected sensor" — the page supplies the sensor tree selection.</summary>
+        /// <summary>Raised when the user clicks "Bind selected sensor" - the page supplies the sensor tree selection.</summary>
         public event EventHandler<DisplayItem>? BindSensorRequested;
 
         private void OnSelectionChanged(object? sender, EventArgs e) => Rebuild();
@@ -69,7 +69,7 @@ namespace InfoPanel.Designer
                     _root.Children.Add(Header("Profile"));
                     if (session != null)
                     {
-                        _root.Children.Add(Label($"{session.Profile.Name} — {session.Profile.Width}×{session.Profile.Height}"));
+                        _root.Children.Add(Label($"{session.Profile.Name} - {session.Profile.Width}×{session.Profile.Height}"));
                         _root.Children.Add(Label($"{session.Items.Count} items"));
                         _root.Children.Add(Label("Select an item to edit its properties."));
                     }
@@ -590,7 +590,7 @@ namespace InfoPanel.Designer
                 if (reading?.ValueNow is double value && gauge.MaxValue > gauge.MinValue)
                 {
                     var percent = Math.Clamp((value - gauge.MinValue) / (gauge.MaxValue - gauge.MinValue) * 100, 0, 100);
-                    previewCaption.Text = $"Frame {index + 1}/{gauge.Images.Count} — {value:0.#}{reading.Value.Unit} ({percent:0}%)";
+                    previewCaption.Text = $"Frame {index + 1}/{gauge.Images.Count} - {value:0.#}{reading.Value.Unit} ({percent:0}%)";
                 }
                 else
                 {

@@ -20,7 +20,7 @@ namespace InfoPanel.Utils
                 return;
             }
 
-            // the chevron's ToggleButton already toggles — don't undo it
+            // the chevron's ToggleButton already toggles - don't undo it
             if (source.FindAncestorOfType<Avalonia.Controls.Primitives.ToggleButton>(includeSelf: true) != null)
             {
                 return;

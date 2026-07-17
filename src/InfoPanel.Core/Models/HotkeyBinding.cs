@@ -12,7 +12,7 @@ namespace InfoPanel.Models
     /// Wire-format note: the Windows build serializes WPF's ModifierKeys/Key enums,
     /// which XmlSerializer writes as their member names ("Control, Alt", "F5").
     /// Here both properties are strings carrying that exact text, so settings.xml
-    /// round-trips unchanged between platforms — including key names this build
+    /// round-trips unchanged between platforms - including key names this build
     /// doesn't recognize.
     /// </summary>
     public partial class HotkeyBinding : ObservableObject

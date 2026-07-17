@@ -53,5 +53,5 @@ KERNEL=="hidraw*", ATTRS{idVendor}=="264a", ATTRS{idProduct}=="2347", MODE="0666
 SUBSYSTEM=="usb", ATTR{idVendor}=="26ce", ATTR{idProduct}=="0a10", MODE="0666", GROUP="plugdev"
 KERNEL=="hidraw*", ATTRS{idVendor}=="26ce", ATTRS{idProduct}=="0a10", MODE="0666", GROUP="plugdev"
 
-# Jungle Leopard / Hongtai cooler displays (CDC serial — grants access without dialout membership)
+# Jungle Leopard / Hongtai cooler displays (CDC serial - grants access without dialout membership)
 SUBSYSTEM=="tty", ATTRS{idVendor}=="33c3", MODE="0666", GROUP="plugdev"

@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- NAudio.Core is pure managed (FFT via NAudio.Dsp) — cross-platform -->
+    <!-- NAudio.Core is pure managed (FFT via NAudio.Dsp) - cross-platform -->
     <PackageReference Include="NAudio.Core" Version="2.2.1" />
     <PackageReference Include="Serilog" Version="4.3.0" />
     <PackageReference Include="SkiaSharp" Version="3.119.2" />

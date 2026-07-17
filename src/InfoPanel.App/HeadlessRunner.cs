@@ -80,7 +80,7 @@ namespace InfoPanel
 
             await host.StartSensorsAsync();
             await host.StartDevicesAsync(cts.Token);
-            Log.Information("InfoPanel running headless — Ctrl+C to exit");
+            Log.Information("InfoPanel running headless - Ctrl+C to exit");
 
             try
             {

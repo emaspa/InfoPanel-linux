@@ -13,7 +13,7 @@ the items below.
    System.Drawing does not exist on Linux. libjpeg-turbo uses 4:2:0 chroma
    subsampling at all qualities (the property TRCC compatibility needs);
    the 230 KB adaptive-quality cap is unchanged. Byte output differs from
-   GDI+ at the same quality number — expected and harmless.
+   GDI+ at the same quality number - expected and harmless.
 
 2. **USB device-id self-heal.** libusb ids (`usbdevBUS.DEV`) change on
    every replug, so a saved id never matches again. When the saved id is
@@ -24,7 +24,7 @@ the items below.
 3. **(Retired)** ~~Model database beats device-reported resolution.~~ This
    was our workaround for 5408 units reporting 1920x599. The fork later
    solved it properly (June 2026): the reported height plus init-response
-   byte[20] re-identify the exact variant — 9.16" v1 (reports 480),
+   byte[20] re-identify the exact variant - 9.16" v1 (reports 480),
    9.16" v2 (reports 599, renders 480 + opt-in flicker fix), 11.3"
    (byte[20]=0x05, renders 1920x400). We now carry that logic verbatim.
 

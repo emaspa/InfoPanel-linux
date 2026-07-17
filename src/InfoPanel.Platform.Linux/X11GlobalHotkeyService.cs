@@ -11,7 +11,7 @@ namespace InfoPanel.Platform.Linux
     /// Win32 RegisterHotKey). Each combo is grabbed with all Caps/Num lock variants.
     ///
     /// Under a Wayland session this connects to XWayland, where root-window grabs
-    /// only deliver while an X11 window has focus — reported via Limitation.
+    /// only deliver while an X11 window has focus - reported via Limitation.
     /// A failed grab (combo taken by another client) is swallowed by a custom X
     /// error handler instead of killing the process.
     /// </summary>

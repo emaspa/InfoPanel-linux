@@ -55,7 +55,7 @@ namespace InfoPanel.Extras
             if (drives == null)
             {
                 var container = new PluginContainer("Drives");
-                _status.Value = "smart.json not found — install the infopanel-smart timer (see install.sh)";
+                _status.Value = "smart.json not found - install the infopanel-smart timer (see install.sh)";
                 container.Entries.Add(_status);
                 containers.Add(container);
                 return;

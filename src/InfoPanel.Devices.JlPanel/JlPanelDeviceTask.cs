@@ -182,7 +182,7 @@ namespace InfoPanel.Services
                         }
                         else
                         {
-                            // No frame in 1s — send a keep-alive so the live pipeline doesn't time out.
+                            // No frame in 1s - send a keep-alive so the live pipeline doesn't time out.
                             try { serial.SendKeepAlive(); }
                             catch (Exception ex)
                             {

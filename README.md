@@ -10,19 +10,19 @@ natively for Linux on .NET 10 and Avalonia 12. Based on
 
 ## Features
 
-- **Designer**: direct-manipulation editor — zoom/pan canvas, drag with grid
+- **Designer**: direct-manipulation editor - zoom/pan canvas, drag with grid
   snapping, resize handles, marquee selection, layers panel, live sensor tree
   (double-click to add), contextual inspector, full undo/redo, autosave.
-- **USB panels**: Thermalright/TRCC family (HID, TrofeoBulk, ChiZhu, ALi, SCSI —
+- **USB panels**: Thermalright/TRCC family (HID, TrofeoBulk, ChiZhu, ALi, SCSI -
   incl. Trofeo Vision 9.16" with flicker fix and display masks), Turing Smart
   Screen (USB + serial, CT13/CT21INCH companion detection), BeadaPanel.
   Devices self-heal their USB binding after replug. Full model list under
   [Supported USB panels](#supported-usb-panels).
 - **Sensors**: Linux hwmon, Intel iGPU (sysfs + PMU), AMD (ROCm SMI),
-  NVIDIA (NVML), plus the .NET plugin system — existing InfoPanel plugin
+  NVIDIA (NVML), plus the .NET plugin system - existing InfoPanel plugin
   binaries load unchanged.
 - **Plugins**: dedicated management page with the 1.4.x configuration
-  framework — `IPluginConfigurable` plugins get an auto-generated settings UI
+  framework - `IPluginConfigurable` plugins get an auto-generated settings UI
   with host-managed persistence (`plugins/<id>.config.json`), and the
   `InfoPanel.Plugins.Graphics` image-provider contract is available for
   plugins that render their own visuals. Bundled: the Extras superpack
@@ -43,11 +43,11 @@ natively for Linux on .NET 10 and Avalonia 12. Based on
 Panels are auto-detected when plugged in (udev rules required, see
 [Installing](#installing)). Models marked ✓ have been verified on real
 hardware under Linux; the rest use the same protocol implementations as the
-Windows build and are expected to work — reports welcome.
+Windows build and are expected to work - reports welcome.
 
 ### Thermalright (TRCC family)
 
-**Trofeo / HID protocol** — USB `0416:5302`, `0418:5303`, `0418:5304`:
+**Trofeo / HID protocol** - USB `0416:5302`, `0418:5303`, `0418:5304`:
 
 | Model | Resolution |
 |---|---|
@@ -66,20 +66,20 @@ Windows build and are expected to work — reports welcome.
 | LF20 / LF21 / LF22 | 320×320 |
 | LC5 (fan LCD) | 360×360 |
 
-**Trofeo bulk protocol** — USB `0416:5408` (LY), `0416:5409` (LY1):
+**Trofeo bulk protocol** - USB `0416:5408` (LY), `0416:5409` (LY1):
 
 | Model | Resolution |
 |---|---|
 | Trofeo Vision 9.16" (v1 and v2 firmware) ✓ | 1920×480 |
 | Trofeo Vision 11.3" | 1920×400 |
 
-**ALi bulk protocol** — USB `0416:5406`:
+**ALi bulk protocol** - USB `0416:5406`:
 
 | Model | Resolution |
 |---|---|
 | ALi Vision | 320×240 / 320×320 |
 
-**ChiZhu bulk protocol** — USB `87AD:70DB`:
+**ChiZhu bulk protocol** - USB `87AD:70DB`:
 
 | Model | Resolution |
 |---|---|
@@ -103,7 +103,7 @@ Windows build and are expected to work — reports welcome.
 | LD9 | 1920×440 |
 | ChiZhu Vision 320×320 | 320×320 |
 
-**SCSI protocol** — USB `0402:3922`, `87CD:70DB`, `0416:5406` (SG_IO pass-through):
+**SCSI protocol** - USB `0402:3922`, `87CD:70DB`, `0416:5406` (SG_IO pass-through):
 
 | Model | Resolution |
 |---|---|
@@ -187,14 +187,14 @@ need `sysctl kernel.perf_event_paranoid=-1` (see comments in
 ## Data
 
 Configuration lives in `~/.local/share/InfoPanel/` (XML, format-compatible
-with InfoPanel for Windows — profiles can be shared across platforms).
+with InfoPanel for Windows - profiles can be shared across platforms).
 Override with `INFOPANEL_DATA_DIR` for portable/test setups.
 
 ## Project layout
 
 | Project | Purpose |
 |---|---|
-| `InfoPanel.Core` | Models, XML persistence, stores — UI-free |
+| `InfoPanel.Core` | Models, XML persistence, stores - UI-free |
 | `InfoPanel.Rendering` | SkiaSharp render pipeline (PanelDraw, graphs, image cache) |
 | `InfoPanel.Platform(.Linux)` | OS abstractions: SCSI transport, autostart |
 | `InfoPanel.Sensors(.Linux)` | hwmon/GPU monitors, plugin monitor |

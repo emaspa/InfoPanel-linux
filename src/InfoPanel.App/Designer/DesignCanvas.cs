@@ -61,7 +61,7 @@ namespace InfoPanel.Designer
                 _session = value;
                 if (value != null)
                 {
-                    // keep re-fitting through layout passes until the user takes over —
+                    // keep re-fitting through layout passes until the user takes over -
                     // the first fit often runs before splitters settle the final bounds
                     _fitPending = true;
                     ZoomToFit();
@@ -74,7 +74,7 @@ namespace InfoPanel.Designer
         public float Zoom => _zoom;
         public event EventHandler? ZoomChanged;
 
-        /// <summary>Raised whenever pan, zoom, or control size changes — hosts sync scrollbars from this.</summary>
+        /// <summary>Raised whenever pan, zoom, or control size changes - hosts sync scrollbars from this.</summary>
         public event EventHandler? ViewportChanged;
 
         public SKPoint Pan

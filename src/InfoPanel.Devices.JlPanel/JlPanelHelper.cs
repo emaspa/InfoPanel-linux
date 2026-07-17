@@ -18,7 +18,7 @@ namespace InfoPanel.JlPanel
     /// <summary>
     /// Discovers Jungle Leopard / Hongtai CDC serial panels. The Windows build scans
     /// Win32_SerialPort via WMI; here we walk sysfs (/sys/class/tty/ttyACM*) up to the
-    /// owning USB device to read idVendor/idProduct — same approach as TuringPanelHelper.
+    /// owning USB device to read idVendor/idProduct - same approach as TuringPanelHelper.
     /// </summary>
     public static class JlPanelHelper
     {

@@ -17,7 +17,7 @@ namespace InfoPanel.Core.Tests
             // Stage a production-like plugin folder: deployed plugins ship WITHOUT
             // InfoPanel.Plugins.dll so the contract assembly resolves from the host's
             // load context (shared type identity). Copying it alongside would split
-            // IPlugin identity — exactly what this layout avoids.
+            // IPlugin identity - exactly what this layout avoids.
             var sourcePath = Path.Combine(AppContext.BaseDirectory, "InfoPanel.Extras.dll");
             Assert.True(File.Exists(sourcePath), $"InfoPanel.Extras.dll not found at {sourcePath}");
 

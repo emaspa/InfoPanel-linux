@@ -27,7 +27,7 @@ namespace InfoPanel.Utils
             var line = $"{logEvent.Timestamp:HH:mm:ss} {LevelLabel(logEvent.Level)} {logEvent.RenderMessage()}";
             if (logEvent.Exception != null)
             {
-                line += $" — {logEvent.Exception.GetType().Name}: {logEvent.Exception.Message}";
+                line += $" - {logEvent.Exception.GetType().Name}: {logEvent.Exception.Message}";
             }
 
             _post(() =>

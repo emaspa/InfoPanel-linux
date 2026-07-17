@@ -110,7 +110,7 @@ namespace InfoPanel.Services
                 // aren't intercepted system-wide.
                 if (modifiers == HotkeyModifierMask.None)
                 {
-                    Logger.Warning("HotkeyManager: skipping {Hotkey} — at least one modifier is required", binding.HotkeyDisplayText);
+                    Logger.Warning("HotkeyManager: skipping {Hotkey} - at least one modifier is required", binding.HotkeyDisplayText);
                     continue;
                 }
 
