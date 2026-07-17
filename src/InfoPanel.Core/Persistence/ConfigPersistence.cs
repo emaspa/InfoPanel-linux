@@ -227,7 +227,44 @@ namespace InfoPanel.Persistence
 
         public static List<DisplayItem> LoadDisplayItems(Profile profile)
         {
-            var fileName = Path.Combine(ProfilesFolder, profile.Guid + ".xml");
+            return LoadDisplayItemsFromFile(profile, Path.Combine(ProfilesFolder, profile.Guid + ".xml"));
+        }
+
+        // ---- autosave/profiles/{guid}.xml (session-start backups) ----
+
+        public static string AutosaveFolder => Path.Combine(BaseFolder, "autosave", "profiles");
+
+        /// <summary>
+        /// Copies the profile's current on-disk display items to the autosave backup.
+        /// Called once per profile per app run, before the first autosave overwrites
+        /// the file, so the backup preserves the layout as this session found it.
+        /// </summary>
+        public static void BackupDisplayItems(Profile profile)
+        {
+            var source = Path.Combine(ProfilesFolder, profile.Guid + ".xml");
+            if (!File.Exists(source))
+            {
+                return;
+            }
+
+            Directory.CreateDirectory(AutosaveFolder);
+            File.Copy(source, Path.Combine(AutosaveFolder, profile.Guid + ".xml"), overwrite: true);
+        }
+
+        /// <summary>Local timestamp of the profile's backup, or null when none exists.</summary>
+        public static DateTime? GetDisplayItemsBackupTime(Profile profile)
+        {
+            var fileName = Path.Combine(AutosaveFolder, profile.Guid + ".xml");
+            return File.Exists(fileName) ? File.GetLastWriteTime(fileName) : null;
+        }
+
+        public static List<DisplayItem> LoadDisplayItemsBackup(Profile profile)
+        {
+            return LoadDisplayItemsFromFile(profile, Path.Combine(AutosaveFolder, profile.Guid + ".xml"));
+        }
+
+        private static List<DisplayItem> LoadDisplayItemsFromFile(Profile profile, string fileName)
+        {
             if (File.Exists(fileName))
             {
                 var xs = new XmlSerializer(typeof(List<DisplayItem>), DisplayItemExtraTypes);

@@ -53,6 +53,7 @@
                 <Separator Width="1" Height="24" Background="{DynamicResource DividerStrokeColorDefaultBrush}" />
                 <Button Content="Save" Click="Save_Click" />
                 <Button Content="Reload" Click="Reload_Click" ToolTip.Tip="Discard unsaved changes and reload from disk" />
+                <Button Content="Restore" Click="Restore_Click" ToolTip.Tip="Roll back to the layout from before this editing session" />
                 <TextBlock x:Name="SelectionLabel" VerticalAlignment="Center"
                            Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
             </StackPanel>

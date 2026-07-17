@@ -676,5 +676,36 @@ namespace InfoPanel.Views.Pages
             _session.Undo.Clear();
             AfterListEdit();
         }
+
+        private async void Restore_Click(object? sender, RoutedEventArgs e)
+        {
+            if (_session == null) return;
+
+            var profile = _session.Profile;
+            var backupTime = Persistence.ConfigPersistence.GetDisplayItemsBackupTime(profile);
+
+            var dialog = new FluentAvalonia.UI.Controls.FAContentDialog
+            {
+                Title = "Restore backup",
+                Content = backupTime is { } time
+                    ? $"Roll back \"{profile.Name}\" to its layout from {time:g}? The backup is taken automatically before the first change of each session. The current layout will be kept as the new backup."
+                    : $"No backup exists yet for \"{profile.Name}\". One is taken automatically before the first change of each session.",
+                PrimaryButtonText = backupTime != null ? "Restore" : null,
+                CloseButtonText = backupTime != null ? "Cancel" : "OK",
+                DefaultButton = FluentAvalonia.UI.Controls.FAContentDialogButton.Close,
+            };
+
+            if (await dialog.ShowAsync() != FluentAvalonia.UI.Controls.FAContentDialogResult.Primary || backupTime == null)
+            {
+                return;
+            }
+
+            _session.ClearSelection();
+            if (Stores.DisplayItemStore.Instance.RestoreFromBackup(profile))
+            {
+                _session.Undo.Clear();
+                AfterListEdit();
+            }
+        }
     }
 }

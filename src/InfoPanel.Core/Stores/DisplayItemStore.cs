@@ -151,6 +151,42 @@ namespace InfoPanel.Stores
             }
         }
 
+        private readonly ConcurrentDictionary<Guid, bool> _sessionBackups = new();
+
+        /// <summary>
+        /// Restores the profile's display items from the session-start backup.
+        /// Returns false when no backup exists or it holds no items.
+        /// </summary>
+        public bool RestoreFromBackup(Profile profile)
+        {
+            var loaded = ConfigPersistence.LoadDisplayItemsBackup(profile);
+            if (loaded.Count == 0 || !_items.TryGetValue(profile.Guid, out var collection))
+            {
+                return false;
+            }
+
+            // Swap: the discarded layout becomes the new backup, so restoring twice
+            // toggles between the two states.
+            try
+            {
+                ConfigPersistence.BackupDisplayItems(profile);
+                _sessionBackups[profile.Guid] = true;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Failed to back up display items for {Profile}", profile.Name);
+            }
+
+            collection.Clear();
+            foreach (var item in loaded)
+            {
+                collection.Add(item);
+            }
+
+            Save(profile);
+            return true;
+        }
+
         /// <summary>Saves immediately (Ctrl+S, profile switch, shutdown).</summary>
         public void Save(Profile profile)
         {
@@ -158,6 +194,20 @@ namespace InfoPanel.Stores
             {
                 if (_snapshots.TryGetValue(profile.Guid, out var snapshot))
                 {
+                    // First write this session: preserve the layout as it was on disk
+                    // so a bad editing session can be rolled back after autosave.
+                    if (_sessionBackups.TryAdd(profile.Guid, true))
+                    {
+                        try
+                        {
+                            ConfigPersistence.BackupDisplayItems(profile);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.Warning(ex, "Failed to back up display items for {Profile}", profile.Name);
+                        }
+                    }
+
                     ConfigPersistence.SaveDisplayItems(profile, snapshot);
                     Logger.Debug("Saved {Count} display items for {Profile}", snapshot.Count, profile.Name);
                 }
