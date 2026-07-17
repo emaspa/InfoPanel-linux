@@ -73,6 +73,10 @@ namespace InfoPanel
                             await JlPanelTask.Instance.StopAsync();
                             if (Settings.JlPanelMultiDeviceMode) await JlPanelTask.Instance.StartAsync();
                             break;
+                        case nameof(Settings.VmaxPanelMultiDeviceMode):
+                            await VmaxPanelTask.Instance.StopAsync();
+                            if (Settings.VmaxPanelMultiDeviceMode) await VmaxPanelTask.Instance.StartAsync();
+                            break;
                         case nameof(Settings.WebServer):
                             if (Settings.WebServer) await WebServerTask.Instance.StartAsync();
                             else await WebServerTask.Instance.StopAsync();
@@ -160,6 +164,7 @@ namespace InfoPanel
             await ThermalrightPanelTask.Instance.StartAsync(token);
             await ThermaltakePanelTask.Instance.StartAsync(token);
             await JlPanelTask.Instance.StartAsync(token);
+            await VmaxPanelTask.Instance.StartAsync(token);
 
             if (Settings.WebServer)
             {
@@ -176,6 +181,7 @@ namespace InfoPanel
             await ThermalrightPanelTask.Instance.StopAsync(shutdown: true);
             await ThermaltakePanelTask.Instance.StopAsync(shutdown: true);
             await JlPanelTask.Instance.StopAsync(shutdown: true);
+            await VmaxPanelTask.Instance.StopAsync(shutdown: true);
 
             try { await Monitors.PluginMonitor.Instance.StopAsync().WaitAsync(TimeSpan.FromSeconds(3)); } catch { }
             try { HwmonMonitor.Instance.Stop(); } catch { }

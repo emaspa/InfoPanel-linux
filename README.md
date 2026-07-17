@@ -129,6 +129,12 @@ CDC serial JPEG protocol at 2 Mbaud (VID `33C3`):
 | JL Chill Arc 360 | 480×960 |
 | JL Strip Display (OEM SKUs, PID 7791–7810) | 1920×462 |
 
+### VMAX / AuyiHomu
+
+| Model | Resolution | USB ID |
+|---|---|---|
+| VMAX 4.6" LCD (AuyiHomu HY-001, HY-002) | 320×960 | `345F:9132` |
+
 ### Turing Smart Screen
 
 | Model | Resolution | Connection |

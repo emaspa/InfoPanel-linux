@@ -9,6 +9,7 @@ using InfoPanel.BeadaPanel;
 using InfoPanel.ThermalrightPanel;
 using InfoPanel.ThermaltakePanel;
 using InfoPanel.JlPanel;
+using InfoPanel.VmaxPanel;
 using LibUsbDotNet.Main;
 using InfoPanel.TuringPanel;
 using Serilog;
@@ -166,6 +167,27 @@ namespace InfoPanel.Views.Pages
                     setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
             }
 
+            AddFamilyHeader("VMAX / AuyiHomu", settings.VmaxPanelMultiDeviceMode,
+                v => { settings.VmaxPanelMultiDeviceMode = v; _app.Host.SaveSettings(); });
+            foreach (var device in settings.VmaxPanelDevices.ToList())
+            {
+                AddRow(
+                    title: device.ModelInfo?.Name ?? device.Model.ToString(),
+                    subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
+                    isEnabled: device.Enabled,
+                    setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
+                    profileGuid: device.ProfileGuid,
+                    setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
+                    status: () => device.RuntimeProperties.IsRunning
+                        ? $"running · {device.RuntimeProperties.FrameRate} fps"
+                        : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
+                    remove: () => { settings.VmaxPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
+                    rotation: device.Rotation,
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
+                    brightness: device.Brightness,
+                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
+            }
+
             AddHotkeysSection(settings);
         }
 
@@ -196,6 +218,7 @@ namespace InfoPanel.Views.Pages
             foreach (var d in settings.ThermalrightPanelDevices) deviceChoices.Add(new("Thermalright", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.ThermaltakePanelDevices) deviceChoices.Add(new("Thermaltake", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.JlPanelDevices) deviceChoices.Add(new("Jl", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
+            foreach (var d in settings.VmaxPanelDevices) deviceChoices.Add(new("Vmax", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
 
             addButton.IsEnabled = deviceChoices.Count > 0;
             addButton.Click += (_, _) =>
@@ -702,6 +725,28 @@ namespace InfoPanel.Views.Pages
                     if (existing == null)
                     {
                         settings.JlPanelDevices.Add(new JlPanelDevice
+                        {
+                            DeviceId = found.DeviceId,
+                            DeviceLocation = found.DeviceLocation,
+                            Model = found.Model,
+                        });
+                        added++;
+                    }
+                    else
+                    {
+                        existing.DeviceLocation = found.DeviceLocation;
+                        updated++;
+                    }
+                }
+
+                // VMAX / AuyiHomu
+                var vmax = await Task.Run(VmaxPanelHelper.ScanDevices);
+                foreach (var found in vmax)
+                {
+                    var existing = settings.VmaxPanelDevices.FirstOrDefault(d => d.DeviceId == found.DeviceId);
+                    if (existing == null)
+                    {
+                        settings.VmaxPanelDevices.Add(new VmaxPanelDevice
                         {
                             DeviceId = found.DeviceId,
                             DeviceLocation = found.DeviceLocation,
