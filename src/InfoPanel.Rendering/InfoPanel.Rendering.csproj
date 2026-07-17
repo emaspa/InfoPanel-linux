@@ -14,6 +14,7 @@
   <ItemGroup>
     <ProjectReference Include="..\InfoPanel.Core\InfoPanel.Core.csproj" />
     <ProjectReference Include="..\InfoPanel.Plugins\InfoPanel.Plugins.csproj" />
+    <ProjectReference Include="..\InfoPanel.Plugins.Graphics\InfoPanel.Plugins.Graphics.csproj" />
   </ItemGroup>
 
 </Project>

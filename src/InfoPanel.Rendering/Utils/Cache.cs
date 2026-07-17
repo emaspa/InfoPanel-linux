@@ -43,7 +43,9 @@ namespace InfoPanel
             {
                 var sensorReading = httpImageDisplayItem.GetValue();
 
-                if (sensorReading.HasValue && !string.IsNullOrEmpty(sensorReading.Value.ValueText) && sensorReading.Value.ValueText.IsUrl())
+                if (sensorReading.HasValue && !string.IsNullOrEmpty(sensorReading.Value.ValueText)
+                    && (sensorReading.Value.ValueText.IsUrl()
+                        || sensorReading.Value.ValueText.StartsWith(PluginImageSource.Scheme, StringComparison.Ordinal)))
                 {
                     result = GetLocalImage(sensorReading.Value.ValueText, initialiseIfMissing, imageDisplayItem);
                 }
@@ -126,7 +128,16 @@ namespace InfoPanel
                 return; // Already cached by another thread
             }
 
-            var cachedImage = new LockedImage(path, imageDisplayItem);
+            LockedImage cachedImage;
+            var isPluginImage = PluginImageSource.TryParseUri(path, out var pluginId, out var pluginImageId);
+            if (isPluginImage)
+            {
+                cachedImage = new LockedImage(path, pluginId, pluginImageId);
+            }
+            else
+            {
+                cachedImage = new LockedImage(path, imageDisplayItem);
+            }
 
             var cacheOptions = new MemoryCacheEntryOptions
             {
@@ -145,8 +156,9 @@ namespace InfoPanel
                 }
             };
 
-            // Only set expiration for non-persistent images
-            if (imageDisplayItem?.PersistentCache != true)
+            // Only set expiration for non-persistent images; plugin images are live
+            // buffers resolved per access, so keep their entry persistent.
+            if (imageDisplayItem?.PersistentCache != true && !isPluginImage)
             {
                 cacheOptions.SlidingExpiration = TimeSpan.FromSeconds(10);
             }

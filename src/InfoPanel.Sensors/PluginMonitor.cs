@@ -335,6 +335,21 @@ namespace InfoPanel.Monitors
 
                 IMAGEWRITERS[wrapper.Id] = writers;
                 provider.OnImageBuffersReady(forPlugin);
+
+                // Expose each image as a text sensor carrying its plugin-image:// URI so it
+                // appears in the sensor tree and can be added as a live image display item.
+                // Container/entry ids match the Windows host for profile compatibility.
+                if (provider.ImageDescriptors.Count > 0)
+                {
+                    var imagesContainer = new PluginContainer($"__images_{wrapper.Id}", "Images");
+                    foreach (var descriptor in provider.ImageDescriptors)
+                    {
+                        imagesContainer.Entries.Add(new PluginText(descriptor.Id, descriptor.Name,
+                            $"plugin-image://{wrapper.Id}/{descriptor.Id}"));
+                    }
+                    wrapper.PluginContainers.Add(imagesContainer);
+                }
+
                 Log.Information("Plugin {PluginName}: {Count} image buffer(s) ready", wrapper.Name, writers.Count);
             }
             catch (Exception ex)

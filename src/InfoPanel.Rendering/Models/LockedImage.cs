@@ -20,7 +20,7 @@ namespace InfoPanel.Models
         
         public enum ImageType
         {
-            SK, SVG, FFMPEG
+            SK, SVG, FFMPEG, PLUGIN
         }
 
         public readonly string ImagePath;
@@ -67,12 +67,37 @@ namespace InfoPanel.Models
         private readonly long[]? _cumulativeFrameTimes;
         private int _lastRenderedFrame = -1;
 
+        private readonly string? _pluginId;
+        private readonly string? _pluginImageId;
+
         private readonly object Lock = new();
         private bool IsDisposed = false;
 
         private readonly Stopwatch Stopwatch = new();
 
         public bool Loaded { get; private set; } = false;
+
+        /// <summary>
+        /// Creates a LockedImage backed by a live plugin image buffer. The writer is
+        /// resolved on every access so plugin reloads and resizes are picked up without
+        /// cache invalidation.
+        /// </summary>
+        public LockedImage(string imagePath, string pluginId, string pluginImageId)
+        {
+            ImagePath = imagePath;
+            _pluginId = pluginId;
+            _pluginImageId = pluginImageId;
+            Type = ImageType.PLUGIN;
+            Frames = 1;
+
+            if (PluginImageSource.Resolve(pluginId, pluginImageId) is { } writer)
+            {
+                Width = writer.Width;
+                Height = writer.Height;
+            }
+
+            Loaded = true;
+        }
 
         public LockedImage(string imagePath, ImageDisplayItem? sourceImageDisplayItem)
         {
@@ -529,6 +554,26 @@ namespace InfoPanel.Models
 
             lock (Lock)
             {
+                if (Type == ImageType.PLUGIN)
+                {
+                    var writer = PluginImageSource.Resolve(_pluginId!, _pluginImageId!);
+                    writer?.TryAccessFrame(frameBitmap =>
+                    {
+                        Width = writer.Width;
+                        Height = writer.Height;
+
+                        using var resized = frameBitmap.Resize(
+                            new SKImageInfo(targetWidth, targetHeight),
+                            new SKSamplingOptions(SKCubicResampler.Mitchell));
+                        if (resized != null)
+                        {
+                            using var image = SKImage.FromBitmap(resized);
+                            access(image);
+                        }
+                    });
+                    return;
+                }
+
                 if (Type == ImageType.FFMPEG)
                 {
                     // Video frames change every access: resize the latest decoded frame

@@ -2,8 +2,10 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
 using InfoPanel.Designer;
+using InfoPanel.Extensions;
 using InfoPanel.Models;
 using InfoPanel.ViewModels;
+using System;
 
 namespace InfoPanel.Views.Pages
 {
@@ -391,6 +393,37 @@ namespace InfoPanel.Views.Pages
         private void AddSensorAsImage_Click(object? sender, RoutedEventArgs e)
         {
             if (_session == null) return;
+
+            // Plugin text sensors carrying an image URL or a live plugin-image:// buffer
+            // (e.g. AudioSpectrum's Images entries) become sensor-driven image items.
+            if (SelectedSensorLeaf is { SensorType: Enums.SensorType.Plugin, SensorId: { } textSensorId } textLeaf
+                && SensorReader.ReadPluginSensor(textSensorId) is { ValueText: { } valueText }
+                && (valueText.StartsWith(PluginImageSource.Scheme, StringComparison.Ordinal)
+                    || valueText.IsUrl()))
+            {
+                var httpItem = new HttpImageDisplayItem(textLeaf.Name, _session.Profile)
+                {
+                    X = _session.Profile.Width / 3,
+                    Y = _session.Profile.Height / 3,
+                    Width = 100,
+                    Height = 100,
+                    SensorType = Enums.SensorType.Plugin,
+                    PluginSensorId = textSensorId,
+                    SensorName = textLeaf.Name,
+                };
+
+                // Live plugin buffers report their true size; use it as the initial box
+                if (PluginImageSource.TryParseUri(valueText, out var pluginId, out var imageId)
+                    && PluginImageSource.Resolve(pluginId, imageId) is { } writer)
+                {
+                    httpItem.Width = writer.Width;
+                    httpItem.Height = writer.Height;
+                }
+
+                AddBoundItem(httpItem);
+                return;
+            }
+
             var item = new SensorImageDisplayItem { Name = "New sensor image", X = _session.Profile.Width / 3, Y = _session.Profile.Height / 3 };
             if (SelectedSensorLeaf is { } leaf)
             {
@@ -451,6 +484,14 @@ namespace InfoPanel.Views.Pages
                         sensorImage, "Sensor binding",
                         v => { sensorImage.SensorType = v.Item1; sensorImage.LibreSensorId = v.Item2; sensorImage.PluginSensorId = v.Item3; sensorImage.SensorName = v.Item4; },
                         (sensorImage.SensorType, sensorImage.LibreSensorId, sensorImage.PluginSensorId, sensorImage.SensorName),
+                        (newType, newLibre, newPlugin, leaf.Name)));
+                    break;
+
+                case HttpImageDisplayItem httpImage:
+                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
+                        httpImage, "Sensor binding",
+                        v => { httpImage.SensorType = v.Item1; httpImage.LibreSensorId = v.Item2; httpImage.PluginSensorId = v.Item3; httpImage.SensorName = v.Item4; },
+                        (httpImage.SensorType, httpImage.LibreSensorId, httpImage.PluginSensorId, httpImage.SensorName),
                         (newType, newLibre, newPlugin, leaf.Name)));
                     break;
 

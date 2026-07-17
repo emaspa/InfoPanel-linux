@@ -126,6 +126,11 @@ namespace InfoPanel
             SensorReader.ConfigureHwmonSource(static id =>
                 HwmonMonitor.SENSORHASH.TryGetValue(id, out var reading) ? reading : null);
             SensorReader.ConfigurePluginSource(Sensors.PluginSensorReader.Read);
+
+            // Live plugin-rendered images (plugin-image:// display items)
+            PluginImageSource.Configure(static (pluginId, imageId) =>
+                Monitors.PluginMonitor.IMAGEWRITERS.TryGetValue(pluginId, out var writers)
+                    && writers.TryGetValue(imageId, out var writer) ? writer : null);
         }
 
         public void SaveProfiles() => ConfigPersistence.SaveProfiles([.. Profiles]);
