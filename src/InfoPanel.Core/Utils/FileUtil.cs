@@ -29,6 +29,12 @@ namespace InfoPanel.Utils
             return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel", "plugins.bin");
         }
 
+        /// <summary>Deactivated module ids (one per line) — module-level toggles within a package.</summary>
+        public static string GetPluginModuleStateFile()
+        {
+            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel", "plugin-modules.bin");
+        }
+
         public static string GetRelativeAssetPath(Profile profile, string fileName)
         {
             return GetRelativeAssetPath(profile.Guid, fileName);

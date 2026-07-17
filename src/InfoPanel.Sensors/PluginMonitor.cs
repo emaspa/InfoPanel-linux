@@ -200,18 +200,114 @@ namespace InfoPanel.Monitors
         {
             foreach (var wrapper in pluginDescriptor.PluginWrappers.Values)
             {
-                foreach (var container in wrapper.PluginContainers)
+                await ShutdownWrapperAsync(wrapper);
+            }
+        }
+
+        // ================= per-module enable/disable =================
+
+        private static HashSet<string>? _deactivatedModules;
+
+        private static HashSet<string> DeactivatedModules
+        {
+            get
+            {
+                if (_deactivatedModules == null)
                 {
-                    foreach (var entry in container.Entries)
+                    _deactivatedModules = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    try
                     {
-                        var id = BuildEntryId(wrapper, container, entry);
-                        SENSORHASH.TryRemove(id, out _);
+                        if (File.Exists(FileUtil.GetPluginModuleStateFile()))
+                        {
+                            foreach (var line in File.ReadAllLines(FileUtil.GetPluginModuleStateFile()))
+                            {
+                                if (line.Trim() is { Length: > 0 } id)
+                                {
+                                    _deactivatedModules.Add(id);
+                                }
+                            }
+                        }
                     }
+                    catch { }
                 }
 
-                await wrapper.StopAsync();
-                TeardownImageProvider(wrapper);
+                return _deactivatedModules;
             }
+        }
+
+        public bool IsModuleEnabled(PluginWrapper wrapper) => !DeactivatedModules.Contains(wrapper.Id);
+
+        private static void SaveModuleState()
+        {
+            try
+            {
+                File.WriteAllLines(FileUtil.GetPluginModuleStateFile(), DeactivatedModules);
+            }
+            catch { }
+        }
+
+        /// <summary>Starts or stops a single module within its package and persists the choice.</summary>
+        public async Task SetModuleEnabledAsync(PluginWrapper wrapper, bool enabled)
+        {
+            if (enabled)
+            {
+                DeactivatedModules.Remove(wrapper.Id);
+                SaveModuleState();
+                if (!wrapper.IsRunning)
+                {
+                    await InitializeWrapperAsync(wrapper);
+                }
+            }
+            else
+            {
+                DeactivatedModules.Add(wrapper.Id);
+                SaveModuleState();
+                await ShutdownWrapperAsync(wrapper);
+            }
+        }
+
+        private async Task InitializeWrapperAsync(PluginWrapper wrapper)
+        {
+            await wrapper.Initialize();
+            Log.Information("Plugin {PluginName} loaded successfully", wrapper.Name);
+
+            PluginConfigStore.LoadAndApply(wrapper);
+            SetupImageProvider(wrapper);
+
+            int indexOrder = 0;
+            foreach (var container in wrapper.PluginContainers)
+            {
+                foreach (var entry in container.Entries)
+                {
+                    var id = BuildEntryId(wrapper, container, entry);
+                    SENSORHASH[id] = new()
+                    {
+                        Id = id,
+                        Name = entry.Name,
+                        ContainerId = container.Id,
+                        ContainerName = container.Name,
+                        PluginId = wrapper.Id,
+                        PluginName = wrapper.Name,
+                        Data = entry,
+                        IndexOrder = indexOrder++
+                    };
+                }
+            }
+        }
+
+        private async Task ShutdownWrapperAsync(PluginWrapper wrapper)
+        {
+            foreach (var container in wrapper.PluginContainers)
+            {
+                foreach (var entry in container.Entries)
+                {
+                    var id = BuildEntryId(wrapper, container, entry);
+                    SENSORHASH.TryRemove(id, out _);
+                }
+            }
+
+            await wrapper.StopAsync();
+            TeardownImageProvider(wrapper);
         }
 
         // ================= plugin image providers (in-proc) =================
@@ -262,33 +358,15 @@ namespace InfoPanel.Monitors
         {
             foreach (var wrapper in pluginDescriptor.PluginWrappers.Values)
             {
+                if (!IsModuleEnabled(wrapper))
+                {
+                    Log.Information("Plugin {PluginName} is disabled, skipping", wrapper.Name);
+                    continue;
+                }
+
                 try
                 {
-                    await wrapper.Initialize();
-                    Log.Information("Plugin {PluginName} loaded successfully", wrapper.Name);
-
-                    PluginConfigStore.LoadAndApply(wrapper);
-                    SetupImageProvider(wrapper);
-
-                    int indexOrder = 0;
-                    foreach (var container in wrapper.PluginContainers)
-                    {
-                        foreach (var entry in container.Entries)
-                        {
-                            var id = BuildEntryId(wrapper, container, entry);
-                            SENSORHASH[id] = new()
-                            {
-                                Id = id,
-                                Name = entry.Name,
-                                ContainerId = container.Id,
-                                ContainerName = container.Name,
-                                PluginId = wrapper.Id,
-                                PluginName = wrapper.Name,
-                                Data = entry,
-                                IndexOrder = indexOrder++
-                            };
-                        }
-                    }
+                    await InitializeWrapperAsync(wrapper);
                 }
                 catch (Exception ex)
                 {

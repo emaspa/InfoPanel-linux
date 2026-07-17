@@ -57,9 +57,12 @@
                     BorderThickness="1">
                 <StackPanel Spacing="4">
                     <DockPanel>
-                        <Button DockPanel.Dock="Right" Content="Reload" FontSize="10" Padding="6,2"
-                                Command="{Binding ReloadCommand}" />
-                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Actions}" Margin="0,0,6,0">
+                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding ModuleEnabled, Mode=TwoWay}"
+                                      IsEnabled="{Binding ModuleControlEnabled}" OnContent="" OffContent="" MinWidth="0" />
+                        <Button DockPanel.Dock="Right" Content="Reload" FontSize="10" Padding="6,2" Margin="0,0,10,0"
+                                VerticalAlignment="Center" Command="{Binding ReloadCommand}" />
+                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Actions}" Margin="0,0,6,0"
+                                      VerticalAlignment="Center">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <StackPanel Orientation="Horizontal" Spacing="4" />
@@ -72,7 +75,11 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding PackageInfo}" FontSize="11" Opacity="0.6"
+                                       IsVisible="{Binding HasPackageInfo}" />
+                        </StackPanel>
                     </DockPanel>
                     <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
                     <Expander Header="Configuration" FontSize="12" Margin="0,4,0,0"
@@ -92,7 +99,8 @@
                 <Border CornerRadius="8" Padding="12,8" Margin="0,0,0,8"
                         Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                         BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
-                        BorderThickness="1">
+                        BorderThickness="1"
+                        IsVisible="{Binding ShowPackageCard}">
                     <StackPanel Spacing="4">
                         <DockPanel>
                             <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Activated, Mode=TwoWay}"

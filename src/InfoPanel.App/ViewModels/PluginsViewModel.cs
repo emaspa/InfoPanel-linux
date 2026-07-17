@@ -144,6 +144,49 @@ namespace InfoPanel.ViewModels
 
         public ObservableCollection<PluginConfigEntryViewModel> ConfigEntries { get; } = [];
 
+        /// <summary>Set on single-module packages so the merged tile can show version · author.</summary>
+        [ObservableProperty]
+        private string? _packageInfo;
+
+        public bool HasPackageInfo => !string.IsNullOrEmpty(PackageInfo);
+
+        partial void OnPackageInfoChanged(string? value) => OnPropertyChanged(nameof(HasPackageInfo));
+
+        [ObservableProperty]
+        private bool _moduleControlEnabled = true;
+
+        private bool _moduleEnabled;
+        public bool ModuleEnabled
+        {
+            get => _moduleEnabled;
+            set
+            {
+                if (SetProperty(ref _moduleEnabled, value) && !_syncingEnabled)
+                {
+                    _ = OnModuleEnabledChanged(value);
+                }
+            }
+        }
+
+        private bool _syncingEnabled;
+
+        private async Task OnModuleEnabledChanged(bool enabled)
+        {
+            ModuleControlEnabled = false;
+            try
+            {
+                await PluginMonitor.Instance.SetModuleEnabledAsync(_wrapper, enabled);
+                if (enabled)
+                {
+                    RebuildConfigEntries();
+                }
+            }
+            finally
+            {
+                ModuleControlEnabled = true;
+            }
+        }
+
         public PluginModuleViewModel(PluginWrapper wrapper)
         {
             _wrapper = wrapper;
@@ -162,6 +205,10 @@ namespace InfoPanel.ViewModels
                 var command = new RelayCommand(() => method.Invoke(wrapper.Plugin, null));
                 Actions.Add(new PluginActionCommand { DisplayName = displayName, Command = command });
             }
+
+            _syncingEnabled = true;
+            _moduleEnabled = PluginMonitor.Instance.IsModuleEnabled(wrapper);
+            _syncingEnabled = false;
 
             RebuildConfigEntries();
         }
@@ -390,10 +437,27 @@ namespace InfoPanel.ViewModels
             }
         }
 
+        /// <summary>
+        /// True when the package's only module is configurable — the package card is
+        /// hidden and the module tile carries the package identity/toggle instead.
+        /// </summary>
+        public bool ShowPackageCard => !(Plugins.Count == 1 && Plugins[0].IsConfigurable);
+
         private void AddModule(PluginModuleViewModel module)
         {
             Plugins.Add(module);
             (module.IsConfigurable ? ConfigurableModules : SimpleModules).Add(module);
+
+            if (Plugins.Count == 1 && module.IsConfigurable)
+            {
+                module.PackageInfo = $"{Version} · {Author}";
+            }
+            else if (Plugins.Count > 1)
+            {
+                foreach (var m in Plugins) m.PackageInfo = null;
+            }
+
+            OnPropertyChanged(nameof(ShowPackageCard));
         }
 
         public void Refresh()
