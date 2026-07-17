@@ -61,6 +61,14 @@ namespace InfoPanel
                             await BeadaPanelTask.Instance.StopAsync();
                             if (Settings.BeadaPanelMultiDeviceMode) await BeadaPanelTask.Instance.StartAsync();
                             break;
+                        case nameof(Settings.ThermaltakePanelMultiDeviceMode):
+                            await ThermaltakePanelTask.Instance.StopAsync();
+                            if (Settings.ThermaltakePanelMultiDeviceMode) await ThermaltakePanelTask.Instance.StartAsync();
+                            break;
+                        case nameof(Settings.JlPanelMultiDeviceMode):
+                            await JlPanelTask.Instance.StopAsync();
+                            if (Settings.JlPanelMultiDeviceMode) await JlPanelTask.Instance.StartAsync();
+                            break;
                         case nameof(Settings.WebServer):
                             if (Settings.WebServer) await WebServerTask.Instance.StartAsync();
                             else await WebServerTask.Instance.StopAsync();
@@ -146,6 +154,8 @@ namespace InfoPanel
             await BeadaPanelTask.Instance.StartAsync(token);
             await TuringPanelTask.Instance.StartAsync(token);
             await ThermalrightPanelTask.Instance.StartAsync(token);
+            await ThermaltakePanelTask.Instance.StartAsync(token);
+            await JlPanelTask.Instance.StartAsync(token);
 
             if (Settings.WebServer)
             {
@@ -159,6 +169,8 @@ namespace InfoPanel
             await BeadaPanelTask.Instance.StopAsync(shutdown: true);
             await TuringPanelTask.Instance.StopAsync(shutdown: true);
             await ThermalrightPanelTask.Instance.StopAsync(shutdown: true);
+            await ThermaltakePanelTask.Instance.StopAsync(shutdown: true);
+            await JlPanelTask.Instance.StopAsync(shutdown: true);
 
             try { await Monitors.PluginMonitor.Instance.StopAsync().WaitAsync(TimeSpan.FromSeconds(3)); } catch { }
             try { HwmonMonitor.Instance.Stop(); } catch { }

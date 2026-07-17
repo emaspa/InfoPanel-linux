@@ -6,6 +6,8 @@ using Avalonia.Threading;
 using InfoPanel.Models;
 using InfoPanel.BeadaPanel;
 using InfoPanel.ThermalrightPanel;
+using InfoPanel.ThermaltakePanel;
+using InfoPanel.JlPanel;
 using LibUsbDotNet.Main;
 using InfoPanel.TuringPanel;
 using Serilog;
@@ -115,6 +117,48 @@ namespace InfoPanel.Views.Pages
                         ? $"running · {device.RuntimeProperties.FrameRate} fps"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.BeadaPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
+                    rotation: device.Rotation,
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
+                    brightness: device.Brightness,
+                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
+            }
+
+            AddFamilyHeader("Thermaltake / ASRock LCD", settings.ThermaltakePanelMultiDeviceMode,
+                v => { settings.ThermaltakePanelMultiDeviceMode = v; _app.Host.SaveSettings(); });
+            foreach (var device in settings.ThermaltakePanelDevices.ToList())
+            {
+                AddRow(
+                    title: device.ModelInfo?.Name ?? device.Model.ToString(),
+                    subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
+                    isEnabled: device.Enabled,
+                    setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
+                    profileGuid: device.ProfileGuid,
+                    setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
+                    status: () => device.RuntimeProperties.IsRunning
+                        ? $"running · {device.RuntimeProperties.FrameRate} fps"
+                        : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
+                    remove: () => { settings.ThermaltakePanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
+                    rotation: device.Rotation,
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
+                    brightness: device.Brightness,
+                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
+            }
+
+            AddFamilyHeader("Jungle Leopard / Hongtai", settings.JlPanelMultiDeviceMode,
+                v => { settings.JlPanelMultiDeviceMode = v; _app.Host.SaveSettings(); });
+            foreach (var device in settings.JlPanelDevices.ToList())
+            {
+                AddRow(
+                    title: device.ModelInfo?.Name ?? device.Model.ToString(),
+                    subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
+                    isEnabled: device.Enabled,
+                    setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
+                    profileGuid: device.ProfileGuid,
+                    setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
+                    status: () => device.RuntimeProperties.IsRunning
+                        ? $"running · {device.RuntimeProperties.FrameRate} fps"
+                        : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
+                    remove: () => { settings.JlPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
                     setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
                     brightness: device.Brightness,
@@ -458,6 +502,50 @@ namespace InfoPanel.Views.Pages
                     catch (Exception ex)
                     {
                         Logger.Error(ex, "Error probing BeadaPanel device");
+                    }
+                }
+
+                // Thermaltake / ASRock (HID)
+                var thermaltake = await Task.Run(ThermaltakePanelHelper.ScanDevices);
+                foreach (var found in thermaltake)
+                {
+                    var existing = settings.ThermaltakePanelDevices.FirstOrDefault(d => d.DeviceId == found.DeviceId);
+                    if (existing == null)
+                    {
+                        settings.ThermaltakePanelDevices.Add(new ThermaltakePanelDevice
+                        {
+                            DeviceId = found.DeviceId,
+                            DeviceLocation = found.DeviceLocation,
+                            Model = found.Model,
+                        });
+                        added++;
+                    }
+                    else
+                    {
+                        existing.DeviceLocation = found.DeviceLocation;
+                        updated++;
+                    }
+                }
+
+                // Jungle Leopard / Hongtai (CDC serial)
+                var jl = await Task.Run(JlPanelHelper.ScanDevices);
+                foreach (var found in jl)
+                {
+                    var existing = settings.JlPanelDevices.FirstOrDefault(d => d.DeviceId == found.DeviceId);
+                    if (existing == null)
+                    {
+                        settings.JlPanelDevices.Add(new JlPanelDevice
+                        {
+                            DeviceId = found.DeviceId,
+                            DeviceLocation = found.DeviceLocation,
+                            Model = found.Model,
+                        });
+                        added++;
+                    }
+                    else
+                    {
+                        existing.DeviceLocation = found.DeviceLocation;
+                        updated++;
                     }
                 }
 

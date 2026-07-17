@@ -33,6 +33,8 @@
     <ProjectReference Include="..\InfoPanel.Devices\InfoPanel.Devices.csproj" />
     <ProjectReference Include="..\InfoPanel.Devices.BeadaPanel\InfoPanel.Devices.BeadaPanel.csproj" />
     <ProjectReference Include="..\InfoPanel.Devices.Thermalright\InfoPanel.Devices.Thermalright.csproj" />
+    <ProjectReference Include="..\InfoPanel.Devices.Thermaltake\InfoPanel.Devices.Thermaltake.csproj" />
+    <ProjectReference Include="..\InfoPanel.Devices.JlPanel\InfoPanel.Devices.JlPanel.csproj" />
     <ProjectReference Include="..\InfoPanel.Devices.TuringPanel\InfoPanel.Devices.TuringPanel.csproj" />
     <ProjectReference Include="..\InfoPanel.Platform.Linux\InfoPanel.Platform.Linux.csproj" />
     <ProjectReference Include="..\InfoPanel.Rendering\InfoPanel.Rendering.csproj" />

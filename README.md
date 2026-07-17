@@ -51,7 +51,7 @@ Windows build and are expected to work — reports welcome.
 | Frozen Warframe (SPI and JPEG variants) | 240×320 / 320×320 |
 | Frozen Warframe Pro / LM22 | 320×320 |
 | Assassin Spirit 120 Vision 1.54" | 240×240 |
-| BA120 Vision 2.4" | 320×240 |
+| BA120 Vision 2.4" | 240×320 |
 | LF20 / LF21 / LF22 | 320×320 |
 | LC5 (fan LCD) | 360×360 |
 
@@ -59,7 +59,8 @@ Windows build and are expected to work — reports welcome.
 
 | Model | Resolution |
 |---|---|
-| Trofeo Vision 9.16" ✓ | 1920×480 |
+| Trofeo Vision 9.16" (v1 and v2 firmware) ✓ | 1920×480 |
+| Trofeo Vision 11.3" | 1920×400 |
 
 **ALi bulk protocol** — USB `0416:5406`:
 
@@ -72,11 +73,14 @@ Windows build and are expected to work — reports welcome.
 | Model | Resolution |
 |---|---|
 | Grand / Hydro / Hyper / Peerless Vision 240/360 | 480×480 |
-| Wonder Vision 360 6.67" | 2400×1080 (renders 1600×720) |
+| Wonder Vision 360 6.67" (v1 and v2 firmware) | 2400×1080 (renders 1600×720) |
 | Rainbow Vision 360 6.67" | 2400×1080 (renders 1600×720) |
+| Levita Vision 360 6.67" | 2400×1080 (renders 1600×720) |
 | TL-M10 Vision | 1920×462 |
-| Core Vision, Hyper Vision, RP130 Vision, LM16 SE, LF10V, LM19 SE, Grand Vision | 480×480 |
-| Mjolnir Vision, Mjolnir Vision Pro, Frozen Warframe Ultra, Frozen Vision V2, Stream Vision | 640×480 |
+| Elite Vision 360 ARGB Black (SPISCRM-V2) | 320×320 |
+| Core Vision, Hyper Vision, RP130 Vision, LM16 SE, LF10V, LM19 SE, Grand Vision, Phantom Spirit 120 Vision EVO, Frozen Warframe Ultra, Frozen Vision V2 | 480×480 |
+| Mjolnir Vision | 320×240 |
+| Mjolnir Vision Pro, Stream Vision | 640×480 |
 | LC2JD, LF19, LD8 | 854×480 |
 | LC3, LF16, LF18, LD6, CZ2 | 960×540 |
 | LF17 | 800×480 |
@@ -88,11 +92,31 @@ Windows build and are expected to work — reports welcome.
 | LD9 | 1920×440 |
 | ChiZhu Vision 320×320 | 320×320 |
 
-**SCSI protocol** — USB `0402:3922` (SG_IO pass-through):
+**SCSI protocol** — USB `0402:3922`, `87CD:70DB`, `0416:5406` (SG_IO pass-through):
 
 | Model | Resolution |
 |---|---|
 | Elite Vision 360 2.73" (and Frozen Warframe SCSI variants) | 240×240 – 320×320 (auto-detected) |
+| Frozen Horizon Pro, Frozen Magic Pro, Core/Elite/Wonder Vision, AK120/AX120/PA120 Digital | auto-detected |
+| LC1 / LC2 / LC3 / LC5 AIO pump heads | auto-detected |
+
+### Thermaltake / ASRock
+
+BY-OEM HID protocol (JPEG over 1024-byte reports):
+
+| Model | Resolution | USB ID |
+|---|---|---|
+| Thermaltake 6" LCD (ToughLiquid Ultra) | 1480×720 | `264A:2347` |
+| ASRock Phantom Gaming 360 LCD | 480×480 | `26CE:0A10` |
+
+### Jungle Leopard / Hongtai
+
+CDC serial JPEG protocol at 2 Mbaud (VID `33C3`):
+
+| Model | Resolution |
+|---|---|
+| JL Chill Arc 360 | 480×960 |
+| JL Strip Display (OEM SKUs, PID 7791–7810) | 1920×462 |
 
 ### Turing Smart Screen
 

@@ -40,3 +40,17 @@ SUBSYSTEM=="usb", ATTR{idVendor}=="0418", ATTR{idProduct}=="5303", MODE="0666", 
 SUBSYSTEM=="usb", ATTR{idVendor}=="0418", ATTR{idProduct}=="5304", MODE="0666", GROUP="plugdev"
 # SCSI pass-through panels (Elite Vision 360)
 SUBSYSTEM=="usb", ATTR{idVendor}=="0402", ATTR{idProduct}=="3922", MODE="0666", GROUP="plugdev"
+
+# Thermalright SCSI pass-through panels (Frozen Horizon/Magic Pro, Core/Elite/Wonder Vision, AIO pump heads)
+SUBSYSTEM=="usb", ATTR{idVendor}=="87cd", ATTR{idProduct}=="70db", MODE="0666", GROUP="plugdev"
+# 0416:5406 already covered above (shared with ALi Vision)
+
+# Thermaltake 6" LCD (hidraw)
+SUBSYSTEM=="usb", ATTR{idVendor}=="264a", ATTR{idProduct}=="2347", MODE="0666", GROUP="plugdev"
+KERNEL=="hidraw*", ATTRS{idVendor}=="264a", ATTRS{idProduct}=="2347", MODE="0666", GROUP="plugdev"
+# ASRock Phantom Gaming 360 LCD (hidraw)
+SUBSYSTEM=="usb", ATTR{idVendor}=="26ce", ATTR{idProduct}=="0a10", MODE="0666", GROUP="plugdev"
+KERNEL=="hidraw*", ATTRS{idVendor}=="26ce", ATTRS{idProduct}=="0a10", MODE="0666", GROUP="plugdev"
+
+# Jungle Leopard / Hongtai cooler displays (CDC serial — grants access without dialout membership)
+SUBSYSTEM=="tty", ATTRS{idVendor}=="33c3", MODE="0666", GROUP="plugdev"
