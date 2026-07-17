@@ -53,7 +53,7 @@
                 <ui:FANavigationViewItem Content="Designer" Tag="designer" IconSource="Edit" />
                 <ui:FANavigationViewItem Content="Devices" Tag="devices">
                     <ui:FANavigationViewItem.IconSource>
-                        <ui:FAPathIconSource Data="M3,4 L21,4 C21.55,4 22,4.45 22,5 L22,15 C22,15.55 21.55,16 21,16 L13,16 L13,18 L16,18 L16,20 L8,20 L8,18 L11,18 L11,16 L3,16 C2.45,16 2,15.55 2,15 L2,5 C2,4.45 2.45,4 3,4 Z M4,6 L4,14 L20,14 L20,6 Z" />
+                        <ui:FAPathIconSource Data="M3.75,4 H20.25 C21.216,4 22,4.784 22,5.75 V14.75 C22,15.716 21.216,16.5 20.25,16.5 H3.75 C2.784,16.5 2,15.716 2,14.75 V5.75 C2,4.784 2.784,4 3.75,4 Z M3.5,5.75 V14.75 C3.5,14.888 3.612,15 3.75,15 H20.25 C20.388,15 20.5,14.888 20.5,14.75 V5.75 C20.5,5.612 20.388,5.5 20.25,5.5 H3.75 C3.612,5.5 3.5,5.612 3.5,5.75 Z M11.25,16.5 H12.75 V18.5 H16.75 C17.164,18.5 17.5,18.836 17.5,19.25 C17.5,19.664 17.164,20 16.75,20 H7.25 C6.836,20 6.5,19.664 6.5,19.25 C6.5,18.836 6.836,18.5 7.25,18.5 H11.25 Z" />
                     </ui:FANavigationViewItem.IconSource>
                 </ui:FANavigationViewItem>
                 <ui:FANavigationViewItem Content="Sensors &amp; Plugins" Tag="sensors" IconSource="Library" />
