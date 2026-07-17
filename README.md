@@ -8,11 +8,14 @@ natively for Linux on .NET 10 and Avalonia 12. Based on
 > The previous Linux port (v1.4.x) lives on the [`v1`](../../tree/v1) branch.
 > Profiles and settings are fully compatible in both directions.
 
+New here? Start with the [User Guide](docs/USER-GUIDE.md).
+
 ## Features
 
 - **Designer**: direct-manipulation editor - zoom/pan canvas, drag with grid
   snapping, resize handles, marquee selection, layers panel, live sensor tree
-  (double-click to add), contextual inspector, full undo/redo, autosave.
+  (double-click to add), contextual inspector, full undo/redo, autosave with
+  per-profile session backups (Restore swaps back to the pre-session layout).
 - **USB panels**: Thermalright/TRCC family (HID, TrofeoBulk, ChiZhu, ALi, SCSI -
   incl. Trofeo Vision 9.16" with flicker fix and display masks), Turing Smart
   Screen (USB + serial, CT13/CT21INCH companion detection), BeadaPanel.
@@ -24,8 +27,10 @@ natively for Linux on .NET 10 and Avalonia 12. Based on
 - **Plugins**: dedicated management page with the 1.4.x configuration
   framework - `IPluginConfigurable` plugins get an auto-generated settings UI
   with host-managed persistence (`plugins/<id>.config.json`), and the
-  `InfoPanel.Plugins.Graphics` image-provider contract is available for
-  plugins that render their own visuals. Bundled: the Extras superpack
+  `InfoPanel.Plugins.Graphics` image-provider contract lets plugins render
+  their own visuals: each image appears in the sensor tree as a
+  `plugin-image://` entry that can be placed on any profile as a live image
+  item. Bundled: the Extras superpack
   (system/network/drives/weather + MangoHud FPS + SMART drive health) and
   Audio Spectrum (real-time system-audio visualizer via PulseAudio/PipeWire).
 - **Outputs**: transparent desktop overlays (X11/XWayland), USB panels, and a
@@ -34,6 +39,11 @@ natively for Linux on .NET 10 and Avalonia 12. Based on
   panel to a profile, configured on the Devices page. On Wayland sessions the
   grab goes through XWayland, so hotkeys only fire while an X11 window has
   focus; on X11 sessions they are fully global.
+- **Program-specific profiles**: overlays that appear automatically while a
+  chosen application is in the foreground (X11 `_NET_ACTIVE_WINDOW` with an
+  XRes fallback; Proton/Wine games report their Windows executable names).
+  Set trigger programs per profile in the Designer and enable the feature in
+  Settings.
 - **Headless mode**: `infopanel --headless` runs sensors + panels without a UI;
   `--render-once <dir>` renders profiles to PNG; `--dump-sensors` lists all
   live sensor readings.

@@ -15,6 +15,7 @@
                     <Button Content="Open log folder" Click="OpenLogFolder_Click" />
                 </StackPanel>
                 <WrapPanel>
+                    <Button Content="User guide" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://github.com/emaspa/InfoPanel-linux/blob/main/docs/USER-GUIDE.md" />
                     <Button Content="Website" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://infopanel.net/" />
                     <Button Content="GitHub" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://github.com/emaspa/InfoPanel-linux" />
                     <Button Content="Discord" Margin="0,0,8,8" Click="OpenLink_Click" Tag="https://discord.gg/cQnjdMC7Qc" />

@@ -93,6 +93,17 @@
                 <StackPanel Grid.Column="2" Spacing="10">
                     <Border Classes="communityrow">
                         <DockPanel>
+                            <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Help" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
+                            <Button DockPanel.Dock="Right" Content="Read" VerticalAlignment="Center"
+                                    Click="OpenLink_Click" Tag="https://github.com/emaspa/InfoPanel-linux/blob/main/docs/USER-GUIDE.md" />
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="User Guide" FontWeight="SemiBold" />
+                                <TextBlock Text="Learn how to build profiles and set up your panels." FontSize="12" Opacity="0.6" />
+                            </StackPanel>
+                        </DockPanel>
+                    </Border>
+                    <Border Classes="communityrow">
+                        <DockPanel>
                             <ui:FASymbolIcon DockPanel.Dock="Left" Symbol="Star" FontSize="18" VerticalAlignment="Center" Margin="0,0,14,0" />
                             <Button DockPanel.Dock="Right" Content="Donate" VerticalAlignment="Center"
                                     Click="OpenLink_Click" Tag="https://buymeacoffee.com/emaspa" />
