@@ -4,14 +4,15 @@ InfoPanel turns hardware monitoring data into designable dashboards shown on des
 
 ## Installation
 
-1. Download the latest release archive from [GitHub Releases](https://github.com/emaspa/InfoPanel-linux/releases) and extract it anywhere.
-2. Install the udev rules so USB panels work without root:
+1. Download the latest `infopanel-<version>-linux-x64.tar.gz` from [GitHub Releases](https://github.com/emaspa/InfoPanel-linux/releases). It is self-contained: no .NET runtime or other packages are needed.
+2. Extract it and run the installer:
    ```bash
-   sudo cp infopanel-udev.rules /etc/udev/rules.d/99-infopanel.rules
-   sudo udevadm control --reload-rules && sudo udevadm trigger
+   tar xf infopanel-<version>-linux-x64.tar.gz
+   cd infopanel-<version>-linux-x64
+   ./install.sh
    ```
-   Replug the panel after installing the rules.
-3. Run `./infopanel`. Configuration is stored in `~/.local/share/InfoPanel/`.
+   The installer copies the app to `~/.local/opt/infopanel`, adds an `infopanel` launcher to `~/.local/bin`, creates a desktop entry, installs the udev rules for USB panel access (asks for sudo), and, if `smartmontools` is installed, sets up the systemd timer that feeds the SMART drive health sensors.
+3. Make sure your user is in the `plugdev` group and replug your panel once so the udev rules apply, then run `infopanel`. Configuration is stored in `~/.local/share/InfoPanel/`.
 
 Optional: enable "Start at login" in Settings to install an XDG autostart entry.
 

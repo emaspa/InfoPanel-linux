@@ -14,10 +14,11 @@ New here? Start with the [User Guide](docs/USER-GUIDE.md).
 - [Architecture](#architecture)
 - [Supported USB panels](#supported-usb-panels)
 - [Windows interoperability](#windows-interoperability)
-- [Building](#building)
 - [Installing](#installing)
+- [Building from source](#building-from-source)
 - [Data and paths](#data-and-paths)
 - [Command line](#command-line)
+- [Credits](#credits)
 - [License](#license)
 
 ## Features
@@ -319,24 +320,19 @@ directions:
   executable names, the same trigger lists work for the same games on
   both platforms.
 
-## Building
-
-Requires the .NET 10 SDK.
-
-```bash
-dotnet build InfoPanel.slnx -c Release
-dotnet run --project src/InfoPanel.App
-```
-
 ## Installing
 
+Download the latest `infopanel-<version>-linux-x64.tar.gz` from
+[Releases](https://github.com/emaspa/InfoPanel-linux/releases). The
+tarball is self-contained, so no .NET runtime is needed.
+
 ```bash
-packaging/publish.sh 2.0.0     # builds artifacts/infopanel-2.0.0-linux-x64.tar.gz
-# on the target machine:
-tar xf infopanel-2.0.0-linux-x64.tar.gz && cd infopanel-2.0.0-linux-x64 && ./install.sh
+tar xf infopanel-<version>-linux-x64.tar.gz
+cd infopanel-<version>-linux-x64
+./install.sh
 ```
 
-The tarball is self-contained (no .NET runtime needed). `install.sh`
+`install.sh`
 installs to `~/.local/opt/infopanel` with a launcher in `~/.local/bin`, a
 desktop entry, the udev rules (sudo) and, when `smartmontools` is present,
 a root systemd timer that feeds the SMART drive health sensors.
@@ -350,6 +346,21 @@ Requirements and optional dependencies:
 - **Video/RTSP display items**: a system `ffmpeg` binary.
 - **Audio Spectrum**: PulseAudio or PipeWire (uses `parec`/`pactl`).
 - **SMART sensors**: `smartmontools`.
+
+## Building from source
+
+Requires the .NET 10 SDK.
+
+```bash
+dotnet build InfoPanel.slnx -c Release
+dotnet run --project src/InfoPanel.App
+```
+
+To produce the same self-contained tarball as the published releases:
+
+```bash
+packaging/publish.sh 0.0.2     # builds artifacts/infopanel-0.0.2-linux-x64.tar.gz
+```
 
 ## Data and paths
 
@@ -375,6 +386,24 @@ A single instance is enforced via a lock file in the data directory.
 | `--render-once <dir>` | render every profile to PNG in `<dir>` and exit |
 | `--dump-sensors` | print all live sensor readings and exit |
 | `--verbose` | debug-level logging |
+
+## Credits
+
+- [habibrehmansg](https://github.com/habibrehmansg): creator of the
+  original InfoPanel for Windows.
+- [emaspa](https://github.com/emaspa): Linux port and Thermalright panel
+  support.
+- [F3NN3X](https://github.com/F3NN3X): for the countless support and
+  awesome plugins.
+- [mrZoSo](https://github.com/mrZoSo): for the beta testing.
+- [CyberFreek](https://github.com/CyberFreek): Lian Li panel support and
+  weather units.
+- [yattuLizard](https://github.com/yattuLizard): VMAX / AuyiHomu panel
+  support.
+- [fweepa](https://github.com/fweepa): stopwatch plugin and hotkeys.
+- [Orkunowski](https://github.com/Orkunowski): designer UX improvements.
+- Everyone else: for those that messaged or posted questions, feedback and
+  panel designs on Reddit, HWiNFO forums and Discord.
 
 ## License
 
