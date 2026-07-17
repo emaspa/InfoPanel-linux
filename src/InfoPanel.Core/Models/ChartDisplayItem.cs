@@ -28,6 +28,16 @@ namespace InfoPanel.Models
             }
         }
 
+        private int _hwInfoRemoteIndex = -1;
+        public int HwInfoRemoteIndex
+        {
+            get { return _hwInfoRemoteIndex; }
+            set
+            {
+                SetProperty(ref _hwInfoRemoteIndex, value);
+            }
+        }
+
         private UInt32 _id;
         public UInt32 Id
         {
@@ -498,23 +508,10 @@ namespace InfoPanel.Models
             }
         }
 
-        private int _rotation = 90;
-        public new int Rotation
-        {
-            get { return _rotation; }
-            set
-            {
-                if (value < 0 || value > 360)
-                {
-                    return;
-                }
-                SetProperty(ref _rotation, value);
-            }
-        }
-
         public DonutDisplayItem()
         {
             Name = "Donut";
+            Rotation = 90;
         }
 
         public DonutDisplayItem(string name, Profile profile) : base(name, profile)
@@ -522,6 +519,7 @@ namespace InfoPanel.Models
             Frame = false;
             BackgroundColor = "#FFDCDCDC";
             Width = 100; Height = 100;
+            Rotation = 90;
         }
 
         public override object Clone()

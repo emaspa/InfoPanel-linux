@@ -252,6 +252,7 @@ namespace InfoPanel.Designer
             var showRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 12 };
             showRow.Children.Add(Check("Show name", sensor.ShowName, v => Commit(session, sensor, nameof(sensor.ShowName), x => sensor.ShowName = x, sensor.ShowName, v)));
             showRow.Children.Add(Check("Show unit", sensor.ShowUnit, v => Commit(session, sensor, nameof(sensor.ShowUnit), x => sensor.ShowUnit = x, sensor.ShowUnit, v)));
+            showRow.Children.Add(Check("1,000s separator", sensor.ShowThousandsSeparator, v => Commit(session, sensor, nameof(sensor.ShowThousandsSeparator), x => sensor.ShowThousandsSeparator = x, sensor.ShowThousandsSeparator, v)));
             _root.Children.Add(showRow);
 
             var multiplyRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
@@ -339,6 +340,32 @@ namespace InfoPanel.Designer
                 AddCell(marqueeGrid, 0, 0, Field("Speed", IntEditor(text.MarqueeSpeed, v => Commit(session, text, nameof(text.MarqueeSpeed), x => text.MarqueeSpeed = x, text.MarqueeSpeed, v), 1, 200)));
                 AddCell(marqueeGrid, 0, 1, Field("Spacing", IntEditor(text.MarqueeSpacing, v => Commit(session, text, nameof(text.MarqueeSpacing), x => text.MarqueeSpacing = x, text.MarqueeSpacing, v), 0, 500)));
                 _root.Children.Add(marqueeGrid);
+            }
+
+            var glowRow = new WrapPanel();
+            glowRow.Children.Add(Check("Glow", text.GlowEnabled, v =>
+            {
+                Commit(session, text, nameof(text.GlowEnabled), x => text.GlowEnabled = x, text.GlowEnabled, v);
+                Rebuild();
+            }));
+            _root.Children.Add(glowRow);
+
+            if (text.GlowEnabled)
+            {
+                var glowDetail = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+                glowDetail.Children.Add(IntEditor(text.GlowRadius, v => Commit(session, text, nameof(text.GlowRadius), x => text.GlowRadius = x, text.GlowRadius, v), 2, 20));
+                glowDetail.Children.Add(ColorEditor(session, text, nameof(text.GlowColor), text.GlowColor, v => text.GlowColor = v));
+                var blendModes = new[] { "SrcOver", "Screen", "Plus", "Lighten", "Multiply" };
+                var blendPicker = new ComboBox { ItemsSource = blendModes, SelectedItem = blendModes.Contains(text.GlowBlendMode) ? text.GlowBlendMode : "SrcOver" };
+                blendPicker.SelectionChanged += (_, _) =>
+                {
+                    if (!_rebuilding && blendPicker.SelectedItem is string mode && mode != text.GlowBlendMode)
+                    {
+                        Commit(session, text, nameof(text.GlowBlendMode), v => text.GlowBlendMode = v, text.GlowBlendMode, mode);
+                    }
+                };
+                glowDetail.Children.Add(blendPicker);
+                _root.Children.Add(Field("Radius / color / blend", glowDetail));
             }
         }
 
@@ -515,6 +542,8 @@ namespace InfoPanel.Designer
             _root.Children.Add(grid);
 
             _root.Children.Add(Field("Scale %", SliderEditor(1, 500, gauge.Scale, v => Commit(session, gauge, nameof(gauge.Scale), x => gauge.Scale = x, gauge.Scale, v))));
+
+            _root.Children.Add(Check("Mirror (flip horizontally)", gauge.FlipX, v => Commit(session, gauge, nameof(gauge.FlipX), x => gauge.FlipX = x, gauge.FlipX, v)));
 
             _root.Children.Add(Header("Image steps"));
             _root.Children.Add(Label("Frames from min to max; the shown frame follows the sensor value."));

@@ -26,6 +26,16 @@ namespace InfoPanel.Models
             }
         }
 
+        private int _hwInfoRemoteIndex = -1;
+        public int HwInfoRemoteIndex
+        {
+            get { return _hwInfoRemoteIndex; }
+            set
+            {
+                SetProperty(ref _hwInfoRemoteIndex, value);
+            }
+        }
+
         private UInt32 _id;
         public UInt32 Id
         {
@@ -203,6 +213,16 @@ namespace InfoPanel.Models
             set
             {
                 SetProperty(ref _precision, value);
+            }
+        }
+
+        private bool _showThousandsSeparator = false;
+        public bool ShowThousandsSeparator
+        {
+            get { return _showThousandsSeparator; }
+            set
+            {
+                SetProperty(ref _showThousandsSeparator, value);
             }
         }
 
@@ -440,6 +460,15 @@ namespace InfoPanel.Models
                 }
             }
 
+            if (ShowThousandsSeparator && double.TryParse(value,
+                System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out double parsedValue))
+            {
+                int decimalIndex = value.IndexOf('.');
+                int decimalPlaces = decimalIndex >= 0 ? value.Length - decimalIndex - 1 : 0;
+                value = parsedValue.ToString("N" + decimalPlaces, System.Globalization.CultureInfo.InvariantCulture);
+            }
 
             if (ShowUnit)
             {

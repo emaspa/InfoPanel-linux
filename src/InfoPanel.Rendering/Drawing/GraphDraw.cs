@@ -16,9 +16,62 @@ namespace InfoPanel.Drawing
         {
             ExpirationScanFrequency = TimeSpan.FromSeconds(5)
         });
+        private static readonly IMemoryCache AutoRangeCache = new MemoryCache(new MemoryCacheOptions()
+        {
+            ExpirationScanFrequency = TimeSpan.FromSeconds(5)
+        });
         private static readonly ConcurrentDictionary<string, Queue<double>> GraphDataCache2 = [];
         private static readonly ConcurrentDictionary<string, Queue<double>> GraphDataCache3 = [];
         private static readonly Stopwatch Stopwatch = new();
+
+        // Expand the auto-scale range immediately on new extremes; contract it gradually so
+        // the scale doesn't yo-yo when a transient spike falls out of the sample window.
+        // 0.05 per frame ≈ 14 frames to halfway convergence at 40fps — responsive but stable.
+        private const double AutoRangeContract = 0.05;
+        private const double AutoRangeMinSpan = 1e-6;
+        private static readonly TimeSpan AutoRangeTtl = TimeSpan.FromSeconds(30);
+
+        private static (double min, double max) ResolveAutoRange(
+            Guid id, double[] samples, double userMin, double userMax, bool autoValue)
+        {
+            if (!autoValue || samples.Length == 0)
+                return (userMin, userMax);
+
+            var sMin = samples[0];
+            var sMax = samples[0];
+            for (int i = 1; i < samples.Length; i++)
+            {
+                var v = samples[i];
+                if (v < sMin) sMin = v;
+                if (v > sMax) sMax = v;
+            }
+
+            if (AutoRangeCache.TryGetValue(id, out (double min, double max) prev))
+            {
+                var newMin = sMin < prev.min ? sMin : prev.min + (sMin - prev.min) * AutoRangeContract;
+                var newMax = sMax > prev.max ? sMax : prev.max + (sMax - prev.max) * AutoRangeContract;
+
+                if (newMax - newMin < AutoRangeMinSpan)
+                {
+                    var mid = 0.5 * (newMin + newMax);
+                    newMin = mid - 0.5;
+                    newMax = mid + 0.5;
+                }
+
+                AutoRangeCache.Set(id, (newMin, newMax), AutoRangeTtl);
+                return (newMin, newMax);
+            }
+
+            // First frame: seed from samples, or fall back to user range if the window is flat.
+            if (sMax - sMin < AutoRangeMinSpan)
+            {
+                AutoRangeCache.Set(id, (userMin, userMax), AutoRangeTtl);
+                return (userMin, userMax);
+            }
+
+            AutoRangeCache.Set(id, (sMin, sMax), AutoRangeTtl);
+            return (sMin, sMax);
+        }
 
         static GraphDraw()
         {
@@ -121,7 +174,7 @@ namespace InfoPanel.Drawing
                     queue = GetGraphDataQueue(chartDisplayItem.LibreSensorId);
                 }
 
-                if (queue.Count == 0)
+                if (queue.Count == 0 && chartDisplayItem is not BarDisplayItem)
                 {
                     return;
                 }
@@ -169,14 +222,8 @@ namespace InfoPanel.Drawing
 
                                         var values = tempValues[(tempValues.Length - size)..];
 
-                                        if (chartDisplayItem.AutoValue)
-                                        {
-                                            if (values.Length > 1 && values.Min() != values.Max())
-                                            {
-                                                minValue = values.Min();
-                                                maxValue = values.Max();
-                                            }
-                                        }
+                                        (minValue, maxValue) = ResolveAutoRange(
+                                            chartDisplayItem.Guid, values, chartDisplayItem.MinValue, chartDisplayItem.MaxValue, chartDisplayItem.AutoValue);
 
                                         using var path = new SKPath();
 
@@ -241,14 +288,8 @@ namespace InfoPanel.Drawing
 
                                         var values = tempValues[(tempValues.Length - size)..];
 
-                                        if (chartDisplayItem.AutoValue)
-                                        {
-                                            if (values.Length > 1 && values.Min() != values.Max())
-                                            {
-                                                minValue = values.Min();
-                                                maxValue = values.Max();
-                                            }
-                                        }
+                                        (minValue, maxValue) = ResolveAutoRange(
+                                            chartDisplayItem.Guid, values, chartDisplayItem.MinValue, chartDisplayItem.MaxValue, chartDisplayItem.AutoValue);
 
                                         // Initialize refRect to start at the right edge of frameRect
                                         var refRect = new SKRect(
@@ -300,14 +341,8 @@ namespace InfoPanel.Drawing
                         }
                     case BarDisplayItem barDisplayItem:
                         {
-                            if (chartDisplayItem.AutoValue)
-                            {
-                                if (tempValues.Length > 1 && tempValues.Min() != tempValues.Max())
-                                {
-                                    minValue = tempValues.Min();
-                                    maxValue = tempValues.Max();
-                                }
-                            }
+                            (minValue, maxValue) = ResolveAutoRange(
+                                chartDisplayItem.Guid, tempValues, chartDisplayItem.MinValue, chartDisplayItem.MaxValue, chartDisplayItem.AutoValue);
 
                             var value = 0.0;
                             var sensorReading = barDisplayItem.GetValue();
@@ -327,34 +362,54 @@ namespace InfoPanel.Drawing
                             value = preview ? value : InterpolateWithCycles(lastValue, value, RenderContext.TargetFrameRate * 3);
                             GraphDataSmoothCache.Set(chartDisplayItem.Guid, value, TimeSpan.FromSeconds(5));
 
+                            // Inset fill/background when the frame is drawn so the 1px AA stroke
+                            // doesn't blend with the fill underneath (issue #81).
+                            var innerLeft = frameRect.Left;
+                            var innerTop = frameRect.Top;
+                            var innerRight = frameRect.Left + frameRect.Width;
+                            var innerBottom = frameRect.Top + frameRect.Height;
+                            var innerRadius = (float)barDisplayItem.CornerRadius;
+                            if (barDisplayItem.Frame)
+                            {
+                                innerLeft = Math.Min(innerLeft + 1, innerRight);
+                                innerTop = Math.Min(innerTop + 1, innerBottom);
+                                innerRight = Math.Max(innerRight - 1, innerLeft);
+                                innerBottom = Math.Max(innerBottom - 1, innerTop);
+                                innerRadius = Math.Max(0, innerRadius - 1);
+                            }
+                            var innerWidth = innerRight - innerLeft;
+                            var innerHeight = innerBottom - innerTop;
+
                             // Create SKPath for usage rectangle
                             using SKPath usagePath = new();
                             if (frameRect.Height > frameRect.Width)
                             {
                                 // Vertical bar - bottom draw
+                                var fillHeight = Math.Min((float)value, innerHeight);
                                 usagePath.AddRoundRect(new SKRoundRect(new SKRect(
-                                    frameRect.Left,
-                                    frameRect.Top + frameRect.Height - (float)value,
-                                    frameRect.Left + frameRect.Width,
-                                    frameRect.Top + frameRect.Height
-                                ), barDisplayItem.CornerRadius));
+                                    innerLeft,
+                                    innerBottom - fillHeight,
+                                    innerRight,
+                                    innerBottom
+                                ), innerRadius));
                             }
                             else
                             {
                                 // Horizontal bar
+                                var fillWidth = Math.Min((float)value, innerWidth);
                                 usagePath.AddRoundRect(new SKRoundRect(new SKRect(
-                                    frameRect.Left,
-                                    frameRect.Top,
-                                    frameRect.Left + (float)value,
-                                    frameRect.Top + frameRect.Height
-                                ), barDisplayItem.CornerRadius));
+                                    innerLeft,
+                                    innerTop,
+                                    innerLeft + fillWidth,
+                                    innerBottom
+                                ), innerRadius));
                             }
 
-                            // Clip the fill to the container's round rect: at low values the
-                            // fill is narrower than the corner radius, and unclipped it pokes
+                            // Clip the fill to the container's (inset) round rect: at low values
+                            // the fill is narrower than the corner radius, and unclipped it pokes
                             // square corners outside the rounded background.
                             using var containerPath = new SKPath();
-                            containerPath.AddRoundRect(new SKRoundRect(new SKRect(frameRect.Left, frameRect.Top, frameRect.Left + frameRect.Width, frameRect.Top + frameRect.Height), barDisplayItem.CornerRadius));
+                            containerPath.AddRoundRect(new SKRoundRect(new SKRect(innerLeft, innerTop, innerRight, innerBottom), innerRadius));
                             using var clippedUsagePath = usagePath.Op(containerPath, SKPathOp.Intersect) ?? new SKPath(usagePath);
 
                             // Draw background if enabled
@@ -378,8 +433,15 @@ namespace InfoPanel.Drawing
 
                             if (barDisplayItem.Frame && SKColor.TryParse(barDisplayItem.FrameColor, out var color))
                             {
+                                // Offset by 0.5px so the 1px stroke lands on whole pixels instead of
+                                // splitting across two columns at 50% opacity each.
                                 using var framePath = new SKPath();
-                                framePath.AddRoundRect(new SKRoundRect(new SKRect(frameRect.Left, frameRect.Top, frameRect.Left + frameRect.Width, frameRect.Top + frameRect.Height), barDisplayItem.CornerRadius));
+                                framePath.AddRoundRect(new SKRoundRect(new SKRect(
+                                    frameRect.Left + 0.5f,
+                                    frameRect.Top + 0.5f,
+                                    frameRect.Left + frameRect.Width - 0.5f,
+                                    frameRect.Top + frameRect.Height - 0.5f
+                                ), Math.Max(0, barDisplayItem.CornerRadius - 0.5f)));
 
                                 g.DrawPath(framePath, color, 1);
                             }
@@ -388,14 +450,8 @@ namespace InfoPanel.Drawing
                         }
                     case DonutDisplayItem donutDisplayItem:
                         {
-                            if (donutDisplayItem.AutoValue)
-                            {
-                                if (tempValues.Length > 1 && tempValues.Min() != tempValues.Max())
-                                {
-                                    minValue = tempValues.Min();
-                                    maxValue = tempValues.Max();
-                                }
-                            }
+                            (minValue, maxValue) = ResolveAutoRange(
+                                chartDisplayItem.Guid, tempValues, chartDisplayItem.MinValue, chartDisplayItem.MaxValue, chartDisplayItem.AutoValue);
 
                             var value = tempValues.LastOrDefault(0.0);
                             var scale = maxValue - minValue;
@@ -409,7 +465,7 @@ namespace InfoPanel.Drawing
 
                             var offset = 1;
                             g.FillDonut((int)frameRect.Left + offset, (int)frameRect.Top + offset, ((int)frameRect.Width / 2) - offset, donutDisplayItem.Thickness,
-                                 donutDisplayItem.Rotation, (int)value, donutDisplayItem.Span, donutDisplayItem.Color,
+                                 0, (int)value, donutDisplayItem.Span, donutDisplayItem.Color,
                                 donutDisplayItem.Background ? donutDisplayItem.BackgroundColor : "#00000000",
                                 donutDisplayItem.Frame ? 1 : 0, donutDisplayItem.FrameColor);
 
@@ -419,7 +475,11 @@ namespace InfoPanel.Drawing
 
                 if (chartDisplayItem is not DonutDisplayItem && chartDisplayItem is not BarDisplayItem && chartDisplayItem.Frame && SKColor.TryParse(chartDisplayItem.FrameColor, out var frameColor))
                 {
-                    g.DrawRectangle(frameColor, 1, 0, 0, chartDisplayItem.Width, chartDisplayItem.Height);
+                    // Offset by 0.5px so the 1px stroke lands on whole pixels instead of
+                    // splitting across two columns at 50% opacity each.
+                    using var framePath = new SKPath();
+                    framePath.AddRect(new SKRect(0.5f, 0.5f, chartDisplayItem.Width - 0.5f, chartDisplayItem.Height - 0.5f));
+                    g.DrawPath(framePath, frameColor, 1);
                 }
             }
         }

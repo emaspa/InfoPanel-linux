@@ -1,4 +1,4 @@
-﻿using InfoPanel.Extensions;
+using InfoPanel.Extensions;
 using InfoPanel.Models;
 using Serilog;
 using SkiaSharp;
@@ -41,23 +41,26 @@ namespace InfoPanel.Drawing
             this.Canvas.Dispose();
         }
 
-        public void DrawBitmap(SKBitmap bitmap, int x, int y, int width, int height, int rotation = 0, int rotationCenterX = 0, int rotationCenterY = 0, bool flipX = false, bool flipY = false)
+        public void DrawBitmap(SKBitmap bitmap, int x, int y, int width, int height, int rotation = 0, int rotationCenterX = 0, int rotationCenterY = 0, bool flipX = false, bool flipY = false, float opacity = 1f)
         {
             using var image = SKImage.FromBitmap(bitmap);
-            DrawImage(image, x, y, width, height, rotation, rotationCenterX, rotationCenterY, flipX, flipY);
+            DrawImage(image, x, y, width, height, rotation, rotationCenterX, rotationCenterY, flipX, flipY, opacity);
         }
 
-        public void DrawImage(SKImage image, int x, int y, int width, int height, int rotation = 0, int rotationCenterX = 0, int rotationCenterY = 0, bool flipX = false, bool flipY = false)
+        public void DrawImage(SKImage image, int x, int y, int width, int height, int rotation = 0, int rotationCenterX = 0, int rotationCenterY = 0, bool flipX = false, bool flipY = false, float opacity = 1f)
         {
-            using var paint = new SKPaint
-            {
-                IsAntialias = true
-            };
+            using var paint = new SKPaint { IsAntialias = true };
 
             var destRect = new SKRect(x, y, x + width, y + height);
             var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Nearest);
 
             Canvas.Save();
+
+            if (opacity < 1f)
+            {
+                using var layerPaint = new SKPaint { Color = new SKColor(255, 255, 255, (byte)(255 * opacity)) };
+                Canvas.SaveLayer(layerPaint);
+            }
 
             if (flipX || flipY)
             {
@@ -78,24 +81,38 @@ namespace InfoPanel.Drawing
             }
             Canvas.DrawImage(image, destRect, sampling, paint);
 
+            if (opacity < 1f)
+                Canvas.Restore();
+
             Canvas.Restore();
         }
 
-        public void DrawImage(LockedImage lockedImage, int x, int y, int width, int height, int rotation = 0, int rotationCenterX = 0, int rotationCenterY = 0, bool cache = true, string cacheHint = "default")
+        public void DrawImage(LockedImage lockedImage, int x, int y, int width, int height, int rotation = 0, int rotationCenterX = 0, int rotationCenterY = 0, bool cache = true, string cacheHint = "default", bool flipX = false, float opacity = 1f)
         {
             if (lockedImage.Type == LockedImage.ImageType.SVG)
             {
                 lockedImage.AccessSVG(picture =>
                 {
-                    Canvas.DrawPicture(picture, x, y, width, height, rotation);
+                    if (flipX)
+                    {
+                        Canvas.Save();
+                        Canvas.Scale(-1, 1, x + width / 2f, y + height / 2f);
+                        Canvas.DrawPicture(picture, x, y, width, height, rotation);
+                        Canvas.Restore();
+                    }
+                    else
+                    {
+                        Canvas.DrawPicture(picture, x, y, width, height, rotation);
+                    }
                 });
             }
             else
             {
-                lockedImage.AccessSK(width, height, bitmap =>
+                lockedImage.AccessSK(width, height, image =>
                 {
-                    if (bitmap != null) { 
-                        DrawImage(bitmap, x, y, width, height, rotation, rotationCenterX, rotationCenterY);
+                    if (image != null)
+                    {
+                        DrawImage(image, x, y, width, height, rotation, rotationCenterX, rotationCenterY, flipX: flipX, opacity: opacity);
                     }
                 }, cache, cacheHint, GRContext);
             }
@@ -161,26 +178,96 @@ namespace InfoPanel.Drawing
             Canvas.Restore();
         }
 
-        public void DrawString(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign = false, bool centerAlign = false, bool bold = false, bool italic = false, bool underline = false, bool strikeout = false, bool wrap = false, bool ellipsis = true, int width = 0, int height = 0)
+        public void DrawString(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign = false, bool centerAlign = false, bool bold = false, bool italic = false, bool underline = false, bool strikeout = false, bool wrap = false, bool ellipsis = true, int width = 0, int height = 0, int glowRadius = 0, string? glowColor = null, string? glowBlendMode = null, int rotation = 0)
         {
             if (string.IsNullOrEmpty(text))
                 return;
 
+            Canvas.Save();
+
+            if (rotation != 0)
+            {
+                int centerX;
+                int centerY;
+                if (width > 0 && height > 0)
+                {
+                    centerX = x + width / 2;
+                    centerY = y + height / 2;
+                }
+                else
+                {
+                    var (measuredWidth, measuredHeight) = MeasureString(text, fontName, fontStyle, fontSize, bold, italic, underline, strikeout, wrap, ellipsis, width, height);
+                    centerX = x + (width > 0 ? width / 2 : (int)(measuredWidth / 2));
+                    centerY = y + (height > 0 ? height / 2 : (int)(measuredHeight / 2));
+                }
+                Canvas.RotateDegrees(rotation, centerX, centerY);
+            }
+
+            if (glowRadius > 0)
+            {
+                string effectiveGlowColor = !string.IsNullOrEmpty(glowColor) ? glowColor! : WithAlpha(color, 0.6f);
+                TryParseBlendMode(glowBlendMode, out var blendMode);
+
+                // Outer layer: composites the combined glow+text against the background using the chosen blend mode
+                using var outerPaint = new SKPaint { BlendMode = blendMode };
+                Canvas.SaveLayer(outerPaint);
+
+                // Inner layer: draw blurred glow with normal compositing
+                using var blurFilter = SKImageFilter.CreateBlur(glowRadius, glowRadius);
+                using var glowPaint = new SKPaint { ImageFilter = blurFilter };
+                Canvas.SaveLayer(glowPaint);
+                DrawStringCore(text, fontName, fontStyle, fontSize, effectiveGlowColor, x, y, rightAlign, centerAlign, bold, italic, underline, strikeout, wrap, ellipsis, width);
+                Canvas.Restore();
+
+                // Sharp text on top within the same blend group
+                DrawStringCore(text, fontName, fontStyle, fontSize, color, x, y, rightAlign, centerAlign, bold, italic, underline, strikeout, wrap, ellipsis, width);
+
+                Canvas.Restore();
+                Canvas.Restore();
+                return;
+            }
+
+            DrawStringCore(text, fontName, fontStyle, fontSize, color, x, y, rightAlign, centerAlign, bold, italic, underline, strikeout, wrap, ellipsis, width);
+
+            Canvas.Restore();
+        }
+
+        private static bool TryParseBlendMode(string? value, out SKBlendMode mode)
+        {
+            if (string.IsNullOrEmpty(value))
+            {
+                mode = SKBlendMode.SrcOver;
+                return true;
+            }
+            return Enum.TryParse(value, ignoreCase: true, out mode);
+        }
+
+        private static string WithAlpha(string hexColor, float alpha)
+        {
+            if (string.IsNullOrEmpty(hexColor)) return "#000000";
+            if (!hexColor.StartsWith("#")) hexColor = "#" + hexColor;
+            var skColor = SKColor.Parse(hexColor);
+            var withAlpha = new SKColor(skColor.Red, skColor.Green, skColor.Blue, (byte)(255 * alpha));
+            return $"#{withAlpha.Alpha:X2}{withAlpha.Red:X2}{withAlpha.Green:X2}{withAlpha.Blue:X2}";
+        }
+
+        private void DrawStringCore(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign, bool centerAlign, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width)
+        {
             var tb = new TextBlock
             {
                 EllipsisEnabled = ellipsis,
                 MaxLines = wrap ? 1 : null,
                 MaxWidth = width > 0 ? width : null
             };
-            
+
             if (rightAlign)
                 tb.Alignment = TextAlignment.Right;
-            
-            if (centerAlign && width > 0) 
+
+            if (centerAlign && width > 0)
                 tb.Alignment = TextAlignment.Center;
-            
+
             SKTypeface typeface = CreateTypeface(fontName, fontStyle, bold, italic);
-           
+
             var style = new Style
             {
                 FontFamily = typeface.FamilyName,
@@ -195,7 +282,6 @@ namespace InfoPanel.Drawing
 
             tb.AddText(text, style);
 
-            // Adjust X position based on alignment and width
             float adjustedX = x;
             if (width == 0 && rightAlign)
                 adjustedX = x - tb.MeasuredWidth;
@@ -404,21 +490,30 @@ namespace InfoPanel.Drawing
                 }
             }
 
-            // --- Draw outline (stroke) ---
+            // --- Draw outline ---
             if (strokeWidth > 0)
             {
-                using var strokePaint = new SKPaint
-                {
-                    Style = SKPaintStyle.Stroke,
-                    Color = SKColor.Parse(strokeColor),
-                    StrokeWidth = strokeWidth,
-                    IsAntialias = true
-                };
-
                 if (span == 360)
                 {
-                    Canvas.DrawCircle(centerX, centerY, radius - strokeWidth / 2f, strokePaint);
-                    Canvas.DrawCircle(centerX, centerY, innerRadius + strokeWidth / 2f, strokePaint);
+                    // Draw each border as a filled annulus rather than a stroked circle.
+                    // Fills compute AA from pixel-area coverage of the ring, which looks
+                    // markedly smoother on curves than a thin centerline stroke.
+                    using var fillPaint = new SKPaint
+                    {
+                        Style = SKPaintStyle.Fill,
+                        Color = SKColor.Parse(strokeColor),
+                        IsAntialias = true
+                    };
+
+                    using var outerRing = new SKPath();
+                    outerRing.AddCircle(centerX, centerY, radius, SKPathDirection.Clockwise);
+                    outerRing.AddCircle(centerX, centerY, Math.Max(0, radius - strokeWidth), SKPathDirection.CounterClockwise);
+                    Canvas.DrawPath(outerRing, fillPaint);
+
+                    using var innerRing = new SKPath();
+                    innerRing.AddCircle(centerX, centerY, innerRadius + strokeWidth, SKPathDirection.Clockwise);
+                    innerRing.AddCircle(centerX, centerY, Math.Max(0, innerRadius), SKPathDirection.CounterClockwise);
+                    Canvas.DrawPath(innerRing, fillPaint);
                 }
                 else
                 {

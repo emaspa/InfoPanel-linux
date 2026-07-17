@@ -56,14 +56,16 @@ namespace InfoPanel.Drawing
                     for (int i = 1; i < verticalLines; i++)
                     {
                         //draw vertical lines
-                        g.DrawLine(i * gridSpace, 0, i * gridSpace, profile.Height, gridColor, 1);
+                        var x = i * gridSpace + 0.5f;
+                        g.DrawLine(x, 0, x, profile.Height, gridColor, 1);
                     }
 
                     var horizontalLines = profile.Height / gridSpace;
                     for (int j = 1; j < horizontalLines; j++)
                     {
                         //draw horizontal lines
-                        g.DrawLine(0, j * gridSpace, profile.Width, j * gridSpace, gridColor, 1);
+                        var y = j * gridSpace + 0.5f;
+                        g.DrawLine(0, y, profile.Width, y, gridColor, 1);
                     }
                 }
 
@@ -338,31 +340,32 @@ namespace InfoPanel.Drawing
                     }
                 case GaugeDisplayItem gaugeDisplayItem:
                     {
-                        var imageDisplayItem = gaugeDisplayItem.EvaluateImage();
+                        gaugeDisplayItem.EvaluateImageFrame(out var imageA, out var imageB, out var blend);
 
-                        if (imageDisplayItem != null)
+                        if (imageA != null)
                         {
-                            var cachedImage = Cache.GetLocalImage(imageDisplayItem);
-
-                            if (cachedImage != null)
+                            var cachedA = Cache.GetLocalImage(imageA);
+                            if (cachedA != null)
                             {
                                 var scaledWidth = gaugeDisplayItem.Width;
                                 var scaledHeight = gaugeDisplayItem.Height;
 
-                                if (scaledWidth == 0)
-                                {
-                                    scaledWidth = cachedImage.Width;
-                                }
-
-                                if (scaledHeight == 0)
-                                {
-                                    scaledHeight = cachedImage.Height;
-                                }
+                                if (scaledWidth == 0) scaledWidth = cachedA.Width;
+                                if (scaledHeight == 0) scaledHeight = cachedA.Height;
 
                                 scaledWidth = (int)Math.Floor(scaledWidth * gaugeDisplayItem.Scale / 100.0f * scale);
                                 scaledHeight = (int)Math.Floor(scaledHeight * gaugeDisplayItem.Scale / 100.0f * scale);
 
-                                g.DrawImage(cachedImage, x, y, scaledWidth, scaledHeight, 0, 0, 0, cache, cacheHint);
+                                g.DrawImage(cachedA, x, y, scaledWidth, scaledHeight, gaugeDisplayItem.Rotation, 0, 0, cache, cacheHint, flipX: gaugeDisplayItem.FlipX);
+
+                                if (imageB != null && imageB != imageA && blend > 0f)
+                                {
+                                    var cachedB = Cache.GetLocalImage(imageB);
+                                    if (cachedB != null)
+                                    {
+                                        g.DrawImage(cachedB, x, y, scaledWidth, scaledHeight, gaugeDisplayItem.Rotation, 0, 0, cache, cacheHint, flipX: gaugeDisplayItem.FlipX, opacity: blend);
+                                    }
+                                }
                             }
                         }
                         break;
@@ -380,11 +383,11 @@ namespace InfoPanel.Drawing
 
                         if (chartDisplayItem.FlipX)
                         {
-                            g.DrawBitmap(graphBitmap, x, y, width, height, flipX: true);
+                            g.DrawBitmap(graphBitmap, x, y, width, height, rotation: chartDisplayItem.Rotation, flipX: true);
                         }
                         else
                         {
-                            g.DrawBitmap(graphBitmap, x, y, width, height);
+                            g.DrawBitmap(graphBitmap, x, y, width, height, rotation: chartDisplayItem.Rotation);
                         }
 
                         break;
@@ -801,6 +804,9 @@ namespace InfoPanel.Drawing
             var format = tableSensorDisplayItem.TableFormat;
             var maxRows = tableSensorDisplayItem.MaxRows;
             var formatParts = format.Split('|');
+            var glowRadius = tableSensorDisplayItem.GlowEnabled ? tableSensorDisplayItem.GlowRadius : 0;
+            var glowColor = tableSensorDisplayItem.GlowEnabled && !string.IsNullOrEmpty(tableSensorDisplayItem.GlowColor) ? tableSensorDisplayItem.GlowColor : null;
+            var glowBlendMode = tableSensorDisplayItem.GlowEnabled ? tableSensorDisplayItem.GlowBlendMode : null;
 
             if (formatParts.Length == 0) return;
 
@@ -826,7 +832,7 @@ namespace InfoPanel.Drawing
                             i != 0 && tableSensorDisplayItem.RightAlign, tableSensorDisplayItem.CenterAlign, 
                             tableSensorDisplayItem.Bold, tableSensorDisplayItem.Italic, 
                             tableSensorDisplayItem.Underline, tableSensorDisplayItem.Strikeout, 
-                            tableSensorDisplayItem.Wrap, tableSensorDisplayItem.Ellipsis, length, 0);
+                            tableSensorDisplayItem.Wrap, tableSensorDisplayItem.Ellipsis, length, 0, glowRadius, glowColor, glowBlendMode);
                     }
 
                     // Draw rows
@@ -841,7 +847,7 @@ namespace InfoPanel.Drawing
                                 i != 0 && tableSensorDisplayItem.RightAlign, tableSensorDisplayItem.CenterAlign, 
                                 tableSensorDisplayItem.Bold, tableSensorDisplayItem.Italic, 
                                 tableSensorDisplayItem.Underline, tableSensorDisplayItem.Strikeout, 
-                                tableSensorDisplayItem.Wrap, tableSensorDisplayItem.Ellipsis, length, 0);
+                                tableSensorDisplayItem.Wrap, tableSensorDisplayItem.Ellipsis, length, 0, glowRadius, glowColor, glowBlendMode);
                         }
                     }
 
@@ -890,15 +896,19 @@ namespace InfoPanel.Drawing
 
             // Draw text twice for infinite scroll
             // Note: Disable alignment for marquee as position is controlled by offset
+            var glowRadius = textDisplayItem.GlowEnabled ? textDisplayItem.GlowRadius : 0;
+            var glowColor = textDisplayItem.GlowEnabled && !string.IsNullOrEmpty(textDisplayItem.GlowColor) ? textDisplayItem.GlowColor : null;
+            var glowBlendMode = textDisplayItem.GlowEnabled ? textDisplayItem.GlowBlendMode : null;
+
             g.DrawString(text, textDisplayItem.Font, textDisplayItem.FontStyle, fontSize, color, 
                 x - offset, y, false, false, // Disable alignment for marquee
                 textDisplayItem.Bold, textDisplayItem.Italic, textDisplayItem.Underline, 
-                textDisplayItem.Strikeout, false, false, 0);
+                textDisplayItem.Strikeout, false, false, 0, 0, glowRadius, glowColor, glowBlendMode);
 
             g.DrawString(text, textDisplayItem.Font, textDisplayItem.FontStyle, fontSize, color, 
                 x - offset + (int)textWidth + padding, y, false, false, // Disable alignment for marquee
                 textDisplayItem.Bold, textDisplayItem.Italic, textDisplayItem.Underline, 
-                textDisplayItem.Strikeout, false, false, 0);
+                textDisplayItem.Strikeout, false, false, 0, 0, glowRadius, glowColor, glowBlendMode);
 
             g.Canvas.Restore();
         }
@@ -908,11 +918,16 @@ namespace InfoPanel.Drawing
         {
             var fontSize = (int)Math.Floor(textDisplayItem.FontSize * scale);
             var drawWidth = (int)(textDisplayItem.Width * scale);
-            
-            g.DrawString(text, textDisplayItem.Font, textDisplayItem.FontStyle, fontSize, color, 
+            var glowRadius = textDisplayItem.GlowEnabled ? textDisplayItem.GlowRadius : 0;
+            var glowColor = textDisplayItem.GlowEnabled && !string.IsNullOrEmpty(textDisplayItem.GlowColor) ? textDisplayItem.GlowColor : null;
+            var glowBlendMode = textDisplayItem.GlowEnabled ? textDisplayItem.GlowBlendMode : null;
+
+            var drawHeight = (int)(textDisplayItem.Height * scale);
+
+            g.DrawString(text, textDisplayItem.Font, textDisplayItem.FontStyle, fontSize, color,
                 x, y, textDisplayItem.RightAlign, textDisplayItem.CenterAlign,
-                textDisplayItem.Bold, textDisplayItem.Italic, textDisplayItem.Underline, 
-                textDisplayItem.Strikeout, textDisplayItem.Wrap, textDisplayItem.Ellipsis, drawWidth);
+                textDisplayItem.Bold, textDisplayItem.Italic, textDisplayItem.Underline,
+                textDisplayItem.Strikeout, textDisplayItem.Wrap, textDisplayItem.Ellipsis, drawWidth, drawHeight, glowRadius, glowColor, glowBlendMode, textDisplayItem.Rotation);
         }
 
     }
