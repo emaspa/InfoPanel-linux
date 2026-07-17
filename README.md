@@ -1,49 +1,158 @@
 # InfoPanel for Linux
 
-Hardware monitoring dashboards for desktop overlays and USB LCD panels, rebuilt
-natively for Linux on .NET 10 and Avalonia 12. Based on
+Hardware monitoring dashboards for desktop overlays, USB LCD panels and web
+browsers, rebuilt natively for Linux on .NET 10 and Avalonia 12. Based on
 [InfoPanel](https://github.com/habibrehmansg/infopanel) and its
-[Thermalright-enabled fork](https://github.com/emaspa/infopanel-1).
+[Thermalright-enabled fork](https://github.com/emaspa/infopanel-1), with full
+two-way compatibility for profiles, settings and plugins.
 
 New here? Start with the [User Guide](docs/USER-GUIDE.md).
 
+## Contents
+
+- [Features](#features)
+- [Architecture](#architecture)
+- [Supported USB panels](#supported-usb-panels)
+- [Windows interoperability](#windows-interoperability)
+- [Building](#building)
+- [Installing](#installing)
+- [Data and paths](#data-and-paths)
+- [Command line](#command-line)
+- [License](#license)
+
 ## Features
 
-- **Designer**: direct-manipulation editor - zoom/pan canvas, drag with grid
-  snapping, resize handles, marquee selection, layers panel, live sensor tree
-  (double-click to add), contextual inspector, full undo/redo, autosave with
-  per-profile session backups (Restore swaps back to the pre-session layout).
-- **USB panels**: Thermalright/TRCC family (HID, TrofeoBulk, ChiZhu, ALi, SCSI -
-  incl. Trofeo Vision 9.16" with flicker fix and display masks), Turing Smart
-  Screen (USB + serial, CT13/CT21INCH companion detection), BeadaPanel.
-  Devices self-heal their USB binding after replug. Full model list under
-  [Supported USB panels](#supported-usb-panels).
-- **Sensors**: Linux hwmon, Intel iGPU (sysfs + PMU), AMD (ROCm SMI),
-  NVIDIA (NVML), plus the .NET plugin system - existing InfoPanel plugin
-  binaries load unchanged.
-- **Plugins**: dedicated management page with the 1.4.x configuration
-  framework - `IPluginConfigurable` plugins get an auto-generated settings UI
-  with host-managed persistence (`plugins/<id>.config.json`), and the
-  `InfoPanel.Plugins.Graphics` image-provider contract lets plugins render
-  their own visuals: each image appears in the sensor tree as a
-  `plugin-image://` entry that can be placed on any profile as a live image
-  item. Bundled: the Extras superpack
-  (system/network/drives/weather + MangoHud FPS + SMART drive health) and
-  Audio Spectrum (real-time system-audio visualizer via PulseAudio/PipeWire).
-- **Outputs**: transparent desktop overlays (X11/XWayland), USB panels, and a
-  built-in web server serving live profile images.
-- **Profile hotkeys**: system-wide shortcuts (X11 `XGrabKey`) that switch a
-  panel to a profile, configured on the Devices page. On Wayland sessions the
-  grab goes through XWayland, so hotkeys only fire while an X11 window has
-  focus; on X11 sessions they are fully global.
-- **Program-specific profiles**: overlays that appear automatically while a
-  chosen application is in the foreground (X11 `_NET_ACTIVE_WINDOW` with an
-  XRes fallback; Proton/Wine games report their Windows executable names).
-  Set trigger programs per profile in the Designer and enable the feature in
-  Settings.
-- **Headless mode**: `infopanel --headless` runs sensors + panels without a UI;
-  `--render-once <dir>` renders profiles to PNG; `--dump-sensors` lists all
-  live sensor readings.
+### Designer
+
+A direct-manipulation profile editor: zoom/pan canvas with vector-crisp
+scaling, drag with grid snapping, resize handles, marquee multi-select,
+layers panel with z-order control, and a contextual inspector for every
+property of the selected item. A live sensor tree adds any reading as a
+value, graph, bar, gauge, table or image with a double click.
+
+Fifteen display item types are supported: text, sensor value, clock,
+calendar, image (file, URL or RTSP/video stream), sensor-driven image,
+URL image, bar, graph, donut, gauge, sensor table, shape, group and guide
+line. Gauges support custom image frames with smooth crossfade, mirroring
+and live preview; charts support auto-ranging, corner radius and glow
+effects; sensor values support thousands separators, unit overrides and
+current/min/max/average reading modes.
+
+Editing is protected end to end: full undo/redo, autosave about 2 seconds
+after the last change, and a per-profile session backup taken before the
+first change of each app run. The Restore button swaps the current layout
+with that backup, and restoring twice toggles between the two states, so a
+bad editing session is never fatal.
+
+### Outputs
+
+- **Desktop overlays**: transparent, repositionable windows rendered
+  through X11/XWayland, one per active profile.
+- **USB LCD panels**: six device families with per-device profile
+  assignment, rotation, brightness, and live frame rate and latency
+  readouts. Devices are supervised: they self-heal their USB binding after
+  a replug and back off cleanly when unplugged.
+- **Web server**: a built-in ASP.NET Core server lists profiles at `/`,
+  serves a live viewer page per profile and streams the rendered image at
+  `/{profile-id}/image` for browsers, wall tablets or OBS overlays.
+
+### Sensors
+
+Native Linux providers, no kernel modules or vendor daemons required:
+
+- **hwmon/sysfs**: CPU temperatures, voltages, fans, power, NVMe and SATA
+  drive temperatures, and everything else the kernel exposes.
+- **Intel GPU**: frequency via sysfs plus engine utilization via PMU perf
+  events.
+- **AMD GPU**: ROCm SMI (usage, clocks, VRAM, power, temperature).
+- **NVIDIA GPU**: NVML (usage, clocks, VRAM, power, temperature).
+- **Drive health**: SMART data (health, wear, spare, power-on hours, data
+  written) collected by a root systemd timer into `/run/infopanel/smart.json`
+  and read by the bundled plugin without elevating the app.
+
+### Plugins
+
+The .NET plugin system is binary-compatible with InfoPanel for Windows:
+existing plugin assemblies load unchanged. The Plugins page manages each
+module individually with enable/disable toggles and per-plugin reload.
+
+- **Configuration framework**: `IPluginConfigurable` plugins get an
+  auto-generated settings UI (text, numeric, toggle and choice editors)
+  with host-managed persistence in `plugins/<id>.config.json`. Changes
+  apply live.
+- **Plugin-rendered images**: the `InfoPanel.Plugins.Graphics` contract
+  lets plugins draw into shared image buffers. Each image appears in the
+  sensor tree as a `plugin-image://` entry and can be placed on any
+  profile as a live image item.
+- **Bundled**: the Extras superpack (system info, clock, network, drives,
+  volume, weather via OpenWeatherMap, MangoHud FPS, SMART drive health),
+  Audio Spectrum (real-time system-audio visualizer via
+  PulseAudio/PipeWire) and a stopwatch with global hotkeys.
+
+### Automation
+
+- **Profile hotkeys**: system-wide shortcuts (X11 `XGrabKey`) switch any
+  panel to any profile, plus stopwatch start/stop/reset bindings,
+  configured on the Devices page.
+- **Program-specific profiles**: overlays that appear automatically while
+  a chosen application is in the foreground, with an optional rule to hide
+  all other overlays meanwhile. Detection reads `_NET_ACTIVE_WINDOW` with
+  an XRes client-pid fallback; Proton and Wine games report their Windows
+  executable names (e.g. `Cyberpunk2077.exe`), so trigger lists carry over
+  from Windows setups unchanged.
+- **Refreshing URL images**: image items pointing at a URL can re-download
+  on a per-item interval (webcams, rendered dashboards, weather radar),
+  swapping frames in the background without blocking rendering.
+
+Wayland note: hotkey grabs and foreground detection go through XWayland,
+so they act on X11 windows (games and most apps). On plain X11 sessions
+both are fully global.
+
+### Headless mode
+
+`infopanel --headless` runs sensors, panels and the web server with no UI,
+for kiosk or server use. `--render-once <dir>` renders every profile to
+PNG and exits; `--dump-sensors` prints all live sensor readings.
+
+## Architecture
+
+Single process, layered so that nothing below the UI references Avalonia:
+
+```
+InfoPanel.App (Avalonia 12 UI, tray, headless CLI)
+   ├─ InfoPanel.Web             ASP.NET Core preview server
+   ├─ InfoPanel.Devices.*       one project per USB panel family
+   │    └─ InfoPanel.Devices    supervisor/worker framework, frame mailbox
+   ├─ InfoPanel.Sensors(.Linux) hwmon/GPU monitors, plugin monitor
+   ├─ InfoPanel.Rendering       SkiaSharp pipeline: PanelDraw, graphs,
+   │                            image cache, font cache
+   ├─ InfoPanel.Platform(.Linux) OS seams: SG_IO SCSI, autostart, X11
+   │                            hotkeys, foreground app detection
+   └─ InfoPanel.Core            models, XML persistence, stores (UI-free)
+
+InfoPanel.Plugins (net8.0 SDK) + Plugins.Loader + Plugins.Graphics
+```
+
+Key design points:
+
+- **Render pipeline**: profiles render once per tick with SkiaSharp; each
+  output (overlay, panel, web, thumbnails) consumes the same draw path
+  with its own cache hints. Font lookups are memoized per family/weight,
+  which is what sustains full frame rate on 1920-wide panels.
+- **Device supervision**: each panel runs a supervised worker with its own
+  lifecycle (present, starting, streaming, faulted, cooldown), exponential
+  backoff and a bounded frame mailbox, so one wedged device never stalls
+  the others.
+- **Platform seams**: OS specifics sit behind interfaces in
+  `InfoPanel.Platform` (`IScsiTransport`, `IGlobalHotkeyService`,
+  `IForegroundAppService`, `IAutostartService`), with Linux
+  implementations in `InfoPanel.Platform.Linux`. Windows backends can slot
+  in later without touching the app.
+- **Plugin isolation**: plugins load in collectible
+  `AssemblyLoadContext`s; the SDK stays net8.0 so assemblies built against
+  the Windows app load on the net10 host unchanged. Shared contracts
+  (`InfoPanel.Plugins.Graphics`, SkiaSharp) resolve to the host copies for
+  type identity.
 
 ## Supported USB panels
 
@@ -178,10 +287,44 @@ descriptor at connect time.
 | 9 / Z | 462×1920 | 9.2" |
 | 11 / X | 440×1920 | 11.3" |
 
+## Windows interoperability
+
+This build is designed to coexist with InfoPanel for Windows, in both
+directions:
+
+- **Configuration format**: `settings.xml`, `profiles.xml` and the
+  per-profile `profiles/{guid}.xml` files use the exact same XML
+  serialization (class names, property names and CLR namespace preserved).
+  A data folder written by one app loads in the other. Unknown elements
+  are ignored on both sides, so Linux-only additions (like URL image
+  refresh) simply have no effect on Windows rather than breaking files.
+- **Profile archives**: `.infopanel` exports (profile + display items +
+  assets) import on either platform with a fresh guid.
+- **Sensor bindings**: the `SensorType` enum is the union of both apps'
+  values (`HwInfo`, `Libre`, `Plugin`, `Hwmon`). Plugin sensor ids are
+  identical across platforms, so plugin-bound items (including
+  `plugin-image://` entries) work unchanged. Hardware sensors use
+  different backends (HWiNFO/LibreHardwareMonitor on Windows, hwmon here),
+  so hardware-bound items keep their layout but need re-binding to the
+  equivalent Linux sensor with the designer's Replace Sensor action.
+- **Plugins**: third-party plugin binaries built for the Windows app load
+  unchanged (the SDK targets net8.0 and keeps its public surface). The
+  configuration framework and image-provider contract match the 1.4.x
+  behavior, including config sidecar naming.
+- **Hotkeys**: bindings are stored using the WPF key vocabulary
+  ("Control, Alt" + "F5"), so hotkey settings survive a round trip
+  through the Windows app.
+- **Trigger programs**: program-specific profile rules use process names
+  with the `.exe` suffix ignored; because Proton/Wine expose Windows
+  executable names, the same trigger lists work for the same games on
+  both platforms.
+
 ## Building
 
+Requires the .NET 10 SDK.
+
 ```bash
-dotnet build InfoPanel.slnx -c Release      # requires .NET 10 SDK
+dotnet build InfoPanel.slnx -c Release
 dotnet run --project src/InfoPanel.App
 ```
 
@@ -193,29 +336,45 @@ packaging/publish.sh 2.0.0     # builds artifacts/infopanel-2.0.0-linux-x64.tar.
 tar xf infopanel-2.0.0-linux-x64.tar.gz && cd infopanel-2.0.0-linux-x64 && ./install.sh
 ```
 
-USB panel access requires the bundled udev rules (installed by `install.sh`)
-and membership in the `plugdev` group. Intel GPU engine-utilization sensors
-need `sysctl kernel.perf_event_paranoid=-1` (see comments in
-`packaging/infopanel-udev.rules`).
+The tarball is self-contained (no .NET runtime needed). `install.sh`
+installs to `~/.local/opt/infopanel` with a launcher in `~/.local/bin`, a
+desktop entry, the udev rules (sudo) and, when `smartmontools` is present,
+a root systemd timer that feeds the SMART drive health sensors.
 
-## Data
+Requirements and optional dependencies:
 
-Configuration lives in `~/.local/share/InfoPanel/` (XML, format-compatible
-with InfoPanel for Windows - profiles can be shared across platforms).
-Override with `INFOPANEL_DATA_DIR` for portable/test setups.
+- **USB panels**: the bundled udev rules plus membership in the `plugdev`
+  group.
+- **Intel GPU engine utilization**: `sysctl kernel.perf_event_paranoid=-1`
+  (see comments in `packaging/infopanel-udev.rules`).
+- **Video/RTSP display items**: a system `ffmpeg` binary.
+- **Audio Spectrum**: PulseAudio or PipeWire (uses `parec`/`pactl`).
+- **SMART sensors**: `smartmontools`.
 
-## Project layout
+## Data and paths
 
-| Project | Purpose |
+Configuration lives in `~/.local/share/InfoPanel/`:
+
+| Path | Contents |
 |---|---|
-| `InfoPanel.Core` | Models, XML persistence, stores - UI-free |
-| `InfoPanel.Rendering` | SkiaSharp render pipeline (PanelDraw, graphs, image cache) |
-| `InfoPanel.Platform(.Linux)` | OS abstractions: SCSI transport, autostart |
-| `InfoPanel.Sensors(.Linux)` | hwmon/GPU monitors, plugin monitor |
-| `InfoPanel.Devices.*` | USB panel families over LibUsbDotNet/HidSharp |
-| `InfoPanel.Web` | ASP.NET Core preview server |
-| `InfoPanel.App` | Avalonia 12 UI + headless CLI |
-| `InfoPanel.Plugins(.Loader)` | Plugin SDK (net8.0, binary-compatible) |
+| `settings.xml`, `profiles.xml` | app settings and profile list |
+| `profiles/{guid}.xml` | display items per profile |
+| `assets/{guid}/` | per-profile images and media |
+| `autosave/profiles/{guid}.xml` | session-start layout backups |
+| `plugins/{id}.config.json` | plugin configuration sidecars |
+| `logs/` | rolling Serilog output |
+
+Set `INFOPANEL_DATA_DIR` to relocate everything (portable or test setups).
+A single instance is enforced via a lock file in the data directory.
+
+## Command line
+
+| Flag | Effect |
+|---|---|
+| `--headless` | run sensors, panels and web server without a UI |
+| `--render-once <dir>` | render every profile to PNG in `<dir>` and exit |
+| `--dump-sensors` | print all live sensor readings and exit |
+| `--verbose` | debug-level logging |
 
 ## License
 
