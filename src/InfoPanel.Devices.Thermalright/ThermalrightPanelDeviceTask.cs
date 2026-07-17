@@ -585,6 +585,23 @@ namespace InfoPanel.Services
                     }
                 }
 
+                // Linux DeviceIds are libusb paths (usbdevB.D) with no VID/PID to parse, so
+                // map runtime variants back to their base model's USB identity.
+                if (vendorId == 0 || productId == 0)
+                {
+                    var baseModel = _device.Model switch
+                    {
+                        ThermalrightPanelModel.TrofeoVision916V2 or ThermalrightPanelModel.TrofeoVision113 => ThermalrightPanelModel.TrofeoVision916,
+                        _ => (ThermalrightPanelModel?)null,
+                    };
+
+                    if (baseModel.HasValue && ThermalrightPanelModelDatabase.Models.TryGetValue(baseModel.Value, out var baseInfo))
+                    {
+                        vendorId = baseInfo.VendorId;
+                        productId = baseInfo.ProductId;
+                    }
+                }
+
                 Logger.Information("ThermalrightPanelDevice {Device}: Opening device via LibUsbDotNet (VID={Vid:X4} PID={Pid:X4})...",
                     _device, vendorId, productId);
 

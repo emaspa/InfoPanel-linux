@@ -255,6 +255,7 @@ namespace InfoPanel.Drawing
         {
             var tb = new TextBlock
             {
+                FontMapper = _fontMapper,
                 EllipsisEnabled = ellipsis,
                 MaxLines = wrap ? 1 : null,
                 MaxWidth = width > 0 ? width : null
@@ -290,6 +291,36 @@ namespace InfoPanel.Drawing
 
             tb.Paint(Canvas, new SKPoint(adjustedX, y));
         }
+
+        /// <summary>
+        /// RichTextKit's default FontMapper resolves FontFamily strings through the OS
+        /// font stack (fontconfig on Linux) on every shaping pass, which costs multiple
+        /// milliseconds per text draw. This mapper memoizes the resolved SKTypeface per
+        /// (family, weight, italic) so repeated draws are dictionary hits, and consults
+        /// our own typeface cache first so profile-embedded fonts resolve correctly.
+        /// </summary>
+        private sealed class CachedFontMapper : Topten.RichTextKit.FontMapper
+        {
+            private readonly ConcurrentDictionary<string, SKTypeface> _cache = new();
+
+            public override SKTypeface TypefaceFromStyle(Topten.RichTextKit.IStyle style, bool ignoreFontVariants)
+            {
+                var key = $"{style.FontFamily}|{style.FontWeight}|{style.FontItalic}|{ignoreFontVariants}";
+                return _cache.GetOrAdd(key, _ =>
+                {
+                    // Embedded/custom fonts (e.g. profile fonts) live in our cache under
+                    // the family name; fall back to RichTextKit's default resolution.
+                    if (_typefaceCache.TryGetValue($"{style.FontFamily}--{style.FontWeight >= 700}-{style.FontItalic}", out var cached))
+                    {
+                        return cached;
+                    }
+
+                    return base.TypefaceFromStyle(style, ignoreFontVariants);
+                });
+            }
+        }
+
+        private static readonly CachedFontMapper _fontMapper = new();
 
         private static readonly ConcurrentDictionary<string, SKTypeface> _typefaceCache = [];
 
@@ -851,6 +882,7 @@ namespace InfoPanel.Drawing
 
             var tb = new TextBlock
             {
+                FontMapper = _fontMapper,
                 EllipsisEnabled = ellipsis,
                 MaxLines = wrap ? 1 : null,
                 MaxWidth = width > 0 ? width : null
