@@ -1199,18 +1199,12 @@ namespace InfoPanel.Services
                         jpegOffset += dataSize;
                     }
 
-                    // Write frame in 4096-byte USB transfers
-                    int writeOffset = 0;
-                    int bytesRemaining = totalUsbBytes;
-                    while (bytesRemaining > 0)
-                    {
-                        int writeSize = (bytesRemaining >= USB_TRANSFER_SIZE) ? USB_TRANSFER_SIZE : bytesRemaining;
-                        var writeEc = writer.Write(buffer, writeOffset, writeSize, 1000, out int written);
-                        if (writeEc != ErrorCode.None)
-                            throw new Exception($"USB write failed: {writeEc}");
-                        writeOffset += USB_TRANSFER_SIZE;
-                        bytesRemaining -= USB_TRANSFER_SIZE;
-                    }
+                    // Single bulk write (TRCC uses 4096-byte transfers, but the byte
+                    // stream is identical and one large URB avoids ~50 sequential
+                    // submit/reap round trips per frame on Linux)
+                    var writeEc = writer.Write(buffer, 0, totalUsbBytes, 2000, out int written);
+                    if (writeEc != ErrorCode.None)
+                        throw new Exception($"USB write failed: {writeEc}");
                 }
                 finally
                 {
@@ -1261,30 +1255,31 @@ namespace InfoPanel.Services
                 int firstChunkSize = Math.Min(frameData.Length, TROFEO_PACKET_SIZE - TROFEO_HEADER_JPEG_OFFSET);
                 Array.Copy(frameData, 0, header, TROFEO_HEADER_JPEG_OFFSET, firstChunkSize);
 
-                var writeEc = writer.Write(header, 0, TROFEO_PACKET_SIZE, 500, out _);
-                if (writeEc != ErrorCode.None)
-                    throw new Exception($"USB bulk write failed: {writeEc}");
+                // Single bulk write: originally this streamed one 512-byte transfer per
+                // chunk, which costs a full URB round trip each on Linux (hundreds per
+                // frame). The concatenated buffer produces the identical byte stream
+                // (every chunk was a full 512-byte packet, zero-padded at the end).
+                int remaining = frameData.Length - firstChunkSize;
+                int payloadChunks = (remaining + TROFEO_PACKET_SIZE - 1) / TROFEO_PACKET_SIZE;
+                int totalBytes = TROFEO_PACKET_SIZE + payloadChunks * TROFEO_PACKET_SIZE;
 
-                int offset = firstChunkSize;
-                while (offset < frameData.Length)
+                var sendBuffer = ArrayPool<byte>.Shared.Rent(totalBytes);
+                try
                 {
-                    var chunk = ArrayPool<byte>.Shared.Rent(TROFEO_PACKET_SIZE);
-                    try
+                    Array.Clear(sendBuffer, 0, totalBytes);
+                    Array.Copy(header, 0, sendBuffer, 0, TROFEO_PACKET_SIZE);
+                    if (remaining > 0)
                     {
-                        Array.Clear(chunk, 0, TROFEO_PACKET_SIZE);
-                        int chunkSize = Math.Min(frameData.Length - offset, TROFEO_PACKET_SIZE);
-                        Array.Copy(frameData, offset, chunk, 0, chunkSize);
-
-                        writeEc = writer.Write(chunk, 0, TROFEO_PACKET_SIZE, 500, out _);
-                        if (writeEc != ErrorCode.None)
-                            throw new Exception($"USB bulk write failed: {writeEc}");
-
-                        offset += chunkSize;
+                        Array.Copy(frameData, firstChunkSize, sendBuffer, TROFEO_PACKET_SIZE, remaining);
                     }
-                    finally
-                    {
-                        ArrayPool<byte>.Shared.Return(chunk);
-                    }
+
+                    var writeEc = writer.Write(sendBuffer, 0, totalBytes, 2000, out _);
+                    if (writeEc != ErrorCode.None)
+                        throw new Exception($"USB bulk write failed: {writeEc}");
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(sendBuffer);
                 }
             }
             finally
