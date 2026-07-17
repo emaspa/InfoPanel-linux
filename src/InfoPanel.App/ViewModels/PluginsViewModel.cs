@@ -347,6 +347,12 @@ namespace InfoPanel.ViewModels
 
         public ObservableCollection<PluginModuleViewModel> Plugins { get; set; } = [];
 
+        /// <summary>Modules without a config panel — listed inside the package card.</summary>
+        public ObservableCollection<PluginModuleViewModel> SimpleModules { get; } = [];
+
+        /// <summary>Modules with a config panel — each rendered as its own tile.</summary>
+        public ObservableCollection<PluginModuleViewModel> ConfigurableModules { get; } = [];
+
         [ObservableProperty]
         private bool _controlEnabled = true;
 
@@ -380,8 +386,14 @@ namespace InfoPanel.ViewModels
 
             foreach (var wrapper in pluginDescriptor.PluginWrappers.Values)
             {
-                Plugins.Add(new PluginModuleViewModel(wrapper));
+                AddModule(new PluginModuleViewModel(wrapper));
             }
+        }
+
+        private void AddModule(PluginModuleViewModel module)
+        {
+            Plugins.Add(module);
+            (module.IsConfigurable ? ConfigurableModules : SimpleModules).Add(module);
         }
 
         public void Refresh()
@@ -400,7 +412,7 @@ namespace InfoPanel.ViewModels
                 }
                 else
                 {
-                    Plugins.Add(new PluginModuleViewModel(wrapper));
+                    AddModule(new PluginModuleViewModel(wrapper));
                 }
             }
         }

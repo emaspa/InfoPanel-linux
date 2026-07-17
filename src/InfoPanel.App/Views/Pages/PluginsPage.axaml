@@ -28,60 +28,86 @@
             </DockPanel>
         </DataTemplate>
 
-        <DataTemplate x:Key="PluginCardTemplate" x:DataType="vm:PluginViewModel">
+        <DataTemplate x:Key="ModuleRowTemplate" x:DataType="vm:PluginModuleViewModel">
+            <DockPanel Margin="0,2,0,0">
+                <Button DockPanel.Dock="Right" Content="Reload" FontSize="10" Padding="6,2"
+                        Command="{Binding ReloadCommand}" />
+                <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Actions}" Margin="0,0,6,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="4" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PluginActionCommand">
+                            <Button Content="{Binding DisplayName}" FontSize="10" Padding="6,2"
+                                    Command="{Binding Command}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding Name}" FontSize="11" Opacity="0.75" VerticalAlignment="Center" />
+            </DockPanel>
+        </DataTemplate>
+
+        <!-- Modules with a config panel get their own tile with the editors inline -->
+        <DataTemplate x:Key="ConfigurableModuleTileTemplate" x:DataType="vm:PluginModuleViewModel">
             <Border CornerRadius="8" Padding="12,8" Margin="0,0,0,8"
                     Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1">
                 <StackPanel Spacing="4">
                     <DockPanel>
-                        <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Activated, Mode=TwoWay}"
-                                      IsEnabled="{Binding ControlEnabled}" OnContent="" OffContent="" MinWidth="0" />
-                        <StackPanel Spacing="2">
-                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                            <TextBlock FontSize="11" Opacity="0.6">
-                                <Run Text="{Binding Version}" /> · <Run Text="{Binding Author}" />
-                            </TextBlock>
-                        </StackPanel>
+                        <Button DockPanel.Dock="Right" Content="Reload" FontSize="10" Padding="6,2"
+                                Command="{Binding ReloadCommand}" />
+                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Actions}" Margin="0,0,6,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="4" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:PluginActionCommand">
+                                    <Button Content="{Binding DisplayName}" FontSize="10" Padding="6,2"
+                                            Command="{Binding Command}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" VerticalAlignment="Center" />
                     </DockPanel>
                     <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
-                    <ItemsControl ItemsSource="{Binding Plugins}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:PluginModuleViewModel">
-                                <StackPanel Margin="0,2,0,0">
-                                    <DockPanel>
-                                        <Button DockPanel.Dock="Right" Content="Reload" FontSize="10" Padding="6,2"
-                                                Command="{Binding ReloadCommand}" />
-                                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding Actions}" Margin="0,0,6,0">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <StackPanel Orientation="Horizontal" Spacing="4" />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="vm:PluginActionCommand">
-                                                    <Button Content="{Binding DisplayName}" FontSize="10" Padding="6,2"
-                                                            Command="{Binding Command}" />
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                        <TextBlock Text="{Binding Name}" FontSize="11" Opacity="0.75" VerticalAlignment="Center" />
-                                    </DockPanel>
-                                    <Expander Header="Configuration" FontSize="11" Margin="0,4,0,0"
-                                              HorizontalAlignment="Stretch"
-                                              IsVisible="{Binding IsConfigurable}">
-                                        <StackPanel Margin="0,4,0,4">
-                                            <TextBlock Text="Changes apply and save automatically." FontSize="10" Opacity="0.5" />
-                                            <ItemsControl ItemsSource="{Binding ConfigEntries}"
-                                                          ItemTemplate="{StaticResource ConfigEntryTemplate}" />
-                                        </StackPanel>
-                                    </Expander>
-                                </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                    <Separator Margin="0,2" Opacity="0.3" />
+                    <ItemsControl ItemsSource="{Binding ConfigEntries}"
+                                  ItemTemplate="{StaticResource ConfigEntryTemplate}" />
+                    <TextBlock Text="Changes apply and save automatically." FontSize="10" Opacity="0.5" Margin="0,2,0,0" />
                 </StackPanel>
             </Border>
+        </DataTemplate>
+
+        <DataTemplate x:Key="PluginCardTemplate" x:DataType="vm:PluginViewModel">
+            <StackPanel>
+                <Border CornerRadius="8" Padding="12,8" Margin="0,0,0,8"
+                        Background="{DynamicResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1">
+                    <StackPanel Spacing="4">
+                        <DockPanel>
+                            <ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding Activated, Mode=TwoWay}"
+                                          IsEnabled="{Binding ControlEnabled}" OnContent="" OffContent="" MinWidth="0" />
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                                <TextBlock FontSize="11" Opacity="0.6">
+                                    <Run Text="{Binding Version}" /> · <Run Text="{Binding Author}" />
+                                </TextBlock>
+                            </StackPanel>
+                        </DockPanel>
+                        <TextBlock Text="{Binding Description}" FontSize="11" Opacity="0.7" TextWrapping="Wrap" />
+                        <ItemsControl ItemsSource="{Binding SimpleModules}"
+                                      ItemTemplate="{StaticResource ModuleRowTemplate}" />
+                    </StackPanel>
+                </Border>
+                <ItemsControl ItemsSource="{Binding ConfigurableModules}"
+                              ItemTemplate="{StaticResource ConfigurableModuleTileTemplate}" />
+            </StackPanel>
         </DataTemplate>
     </UserControl.Resources>
 
