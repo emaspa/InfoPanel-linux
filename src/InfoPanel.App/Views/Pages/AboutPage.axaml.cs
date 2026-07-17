@@ -24,8 +24,7 @@ namespace InfoPanel.Views.Pages
                     ("habibrehmansg", "Creator of the original InfoPanel for Windows."),
                     ("emaspa", "Linux port and Thermalright panel support."),
                     ("F3NN3X", "For the countless support and awesome plugins."),
-                    ("/u/ME5ER", "Special thanks for patiently troubleshooting the early and buggy software iterations over extended periods."),
-                    ("/u/DRA6N", "Better known as RobOnTwoWheels our CM on Discord, without whom it would not have existed."),
+                    ("mrZoSo", "For the beta testing."),
                     ("Everyone else", "For those that messaged or posted questions, feedback and panel designs on Reddit, HWiNFO forums and Discord."),
                 })
                 {
