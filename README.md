@@ -198,4 +198,4 @@ Override with `INFOPANEL_DATA_DIR` for portable/test setups.
 
 ## License
 
-GPL-3.0, same as upstream InfoPanel.
+GPL-3.0.
