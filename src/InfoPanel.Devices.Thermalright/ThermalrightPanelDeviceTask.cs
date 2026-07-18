@@ -397,6 +397,34 @@ namespace InfoPanel.Services
         /// When matchDeviceId is false, returns the first device with matching VID/PID
         /// (used for bulk interface discovery on composite devices).
         /// </summary>
+        // Physical device paths currently bound by a running Thermalright task.
+        // Multiple identical panels (e.g. two 0416:5408 Trofeos) renumber on every
+        // replug; each task claims one unclaimed match instead of both fighting
+        // over the first, and the runtime byte[20] identification then corrects
+        // the model if the panels swapped paths.
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ThermalrightPanelDevice> BoundPaths = new();
+        private string? _boundPath;
+
+        private bool TryClaimPath(string path)
+        {
+            if (BoundPaths.TryAdd(path, _device))
+            {
+                _boundPath = path;
+                return true;
+            }
+
+            return BoundPaths.TryGetValue(path, out var owner) && ReferenceEquals(owner, _device);
+        }
+
+        private void ReleaseClaimedPath()
+        {
+            if (_boundPath != null)
+            {
+                BoundPaths.TryRemove(new KeyValuePair<string, ThermalrightPanelDevice>(_boundPath, _device));
+                _boundPath = null;
+            }
+        }
+
         private UsbRegistry? FindUsbRegistry(int vendorId, int productId, bool matchDeviceId = true)
         {
             var vidPidMatches = new List<(UsbRegistry Registry, string? DeviceId)>();
@@ -415,7 +443,14 @@ namespace InfoPanel.Services
                     if (string.IsNullOrEmpty(_device.DeviceId) ||
                         (deviceId != null && deviceId.Equals(_device.DeviceId, StringComparison.OrdinalIgnoreCase)))
                     {
-                        return deviceReg;
+                        if (deviceId == null || TryClaimPath(deviceId))
+                        {
+                            return deviceReg;
+                        }
+
+                        // Our saved id points at a device another task holds; treat
+                        // it as a candidate and fall through to the rebind logic.
+                        continue;
                     }
 
                     vidPidMatches.Add((deviceReg, deviceId));
@@ -423,34 +458,28 @@ namespace InfoPanel.Services
             }
 
             // Self-heal: on Linux the libusb device id (usbdevBUS.DEV) changes on every
-            // replug, so a saved id never matches again. When exactly one device with
-            // this VID/PID is present, rebind to it and update the stored id.
-            if (vidPidMatches.Count == 1)
+            // replug, so a saved id never matches again. Rebind to the first present
+            // device with this VID/PID that no other task has claimed.
+            foreach (var (registry, currentId) in vidPidMatches)
             {
-                var (registry, currentId) = vidPidMatches[0];
-                Logger.Information(
-                    "ThermalrightPanelDevice {Device}: saved id {Saved} not present; rebinding to sole VID/PID match {Current}",
-                    _device, _device.DeviceId, currentId);
-
-                if (!string.IsNullOrEmpty(currentId))
+                if (string.IsNullOrEmpty(currentId) || !TryClaimPath(currentId))
                 {
-                    if (_device.DeviceLocation == _device.DeviceId)
-                    {
-                        _device.DeviceLocation = currentId;
-                    }
-
-                    _device.DeviceId = currentId;
-                    DeviceRuntime.RequestSettingsSave();
+                    continue;
                 }
 
-                return registry;
-            }
+                Logger.Information(
+                    "ThermalrightPanelDevice {Device}: saved id {Saved} not present; rebinding to unclaimed VID/PID match {Current}",
+                    _device, _device.DeviceId, currentId);
 
-            if (vidPidMatches.Count > 1)
-            {
-                Logger.Warning(
-                    "ThermalrightPanelDevice {Device}: saved id {Saved} not present and {Count} devices share VID/PID - not rebinding (ambiguous). Rescan devices to update.",
-                    _device, _device.DeviceId, vidPidMatches.Count);
+                if (_device.DeviceLocation == _device.DeviceId)
+                {
+                    _device.DeviceLocation = currentId;
+                }
+
+                _device.DeviceId = currentId;
+                DeviceRuntime.RequestSettingsSave();
+
+                return registry;
             }
 
             return null;
@@ -562,6 +591,7 @@ namespace InfoPanel.Services
             }
             finally
             {
+                ReleaseClaimedPath();
                 _device.UpdateRuntimeProperties(isRunning: false);
             }
         }
@@ -717,6 +747,7 @@ namespace InfoPanel.Services
             }
             finally
             {
+                ReleaseClaimedPath();
                 _device.UpdateRuntimeProperties(isRunning: false);
             }
         }
@@ -1894,6 +1925,7 @@ namespace InfoPanel.Services
             }
             finally
             {
+                ReleaseClaimedPath();
                 _device.UpdateRuntimeProperties(isRunning: false);
             }
         }
