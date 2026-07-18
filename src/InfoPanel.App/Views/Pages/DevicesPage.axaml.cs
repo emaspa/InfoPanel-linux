@@ -598,7 +598,17 @@ namespace InfoPanel.Views.Pages
                 BorderThickness = new Thickness(1),
             };
 
-            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*,Auto,Auto,Auto,Auto") };
+            // Sequential column assignment: optional controls used to shift already
+            // placed children while later ones kept hardcoded indexes, stacking the
+            // rotation picker on top of the profile picker on brightness rows.
+            var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("*") };
+            var nextColumn = 0;
+            void AddCell(Control control)
+            {
+                grid.ColumnDefinitions.Add(new ColumnDefinition(GridLength.Auto));
+                Grid.SetColumn(control, ++nextColumn);
+                grid.Children.Add(control);
+            }
 
             var info = new StackPanel { Spacing = 2, VerticalAlignment = VerticalAlignment.Center };
             info.Children.Add(new TextBlock { Text = title, FontWeight = Avalonia.Media.FontWeight.SemiBold });
@@ -607,22 +617,6 @@ namespace InfoPanel.Views.Pages
             info.Children.Add(statusText);
             _statusBindings.Add((statusText, status));
             grid.Children.Add(info);
-
-            var profilePicker = new ComboBox
-            {
-                MinWidth = 150,
-                Margin = new Thickness(12, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-                ItemsSource = _app!.Host.Profiles,
-                SelectedItem = _app.Host.Profiles.FirstOrDefault(p => p.Guid == profileGuid),
-                DisplayMemberBinding = new Avalonia.Data.Binding(nameof(Profile.Name)),
-            };
-            profilePicker.SelectionChanged += (_, _) =>
-            {
-                if (profilePicker.SelectedItem is Profile p) setProfile(p.Guid);
-            };
-            Grid.SetColumn(profilePicker, 1);
-            grid.Children.Add(profilePicker);
 
             if (setBrightness != null)
             {
@@ -637,17 +631,24 @@ namespace InfoPanel.Views.Pages
                 };
                 ToolTip.SetTip(brightnessSlider, "Brightness");
                 brightnessSlider.ValueChanged += (_, _) => setBrightness((int)brightnessSlider.Value);
-                Grid.SetColumn(brightnessSlider, 1);
-                // shares the cell with the profile picker column shift below
-                grid.ColumnDefinitions.Insert(1, new ColumnDefinition(GridLength.Auto));
-                foreach (var child in grid.Children)
-                {
-                    var col = Grid.GetColumn((Control)child);
-                    if (col >= 1) Grid.SetColumn((Control)child, col + 1);
-                }
-                Grid.SetColumn(brightnessSlider, 1);
-                grid.Children.Add(brightnessSlider);
+                AddCell(brightnessSlider);
             }
+
+            var profilePicker = new ComboBox
+            {
+                MinWidth = 150,
+                Margin = new Thickness(12, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                ItemsSource = _app!.Host.Profiles,
+                SelectedItem = _app.Host.Profiles.FirstOrDefault(p => p.Guid == profileGuid),
+                DisplayMemberBinding = new Avalonia.Data.Binding(nameof(Profile.Name)),
+                PlaceholderText = "Assign profile…",
+            };
+            profilePicker.SelectionChanged += (_, _) =>
+            {
+                if (profilePicker.SelectedItem is Profile p) setProfile(p.Guid);
+            };
+            AddCell(profilePicker);
 
             if (setRotation != null)
             {
@@ -666,8 +667,7 @@ namespace InfoPanel.Views.Pages
                         setRotation((LCD_ROTATION)rotationPicker.SelectedIndex);
                     }
                 };
-                Grid.SetColumn(rotationPicker, 2);
-                grid.Children.Add(rotationPicker);
+                AddCell(rotationPicker);
             }
 
             var enabled = new ToggleSwitch
@@ -679,13 +679,11 @@ namespace InfoPanel.Views.Pages
                 VerticalAlignment = VerticalAlignment.Center,
             };
             enabled.IsCheckedChanged += (_, _) => setEnabled(enabled.IsChecked == true);
-            Grid.SetColumn(enabled, 3);
-            grid.Children.Add(enabled);
+            AddCell(enabled);
 
             var removeButton = new Button { Content = "Remove", VerticalAlignment = VerticalAlignment.Center };
             removeButton.Click += (_, _) => remove();
-            Grid.SetColumn(removeButton, 4);
-            grid.Children.Add(removeButton);
+            AddCell(removeButton);
 
             border.Child = grid;
             DeviceRows.Children.Add(border);
