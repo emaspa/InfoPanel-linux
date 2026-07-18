@@ -30,18 +30,32 @@ namespace InfoPanel
             {
                 if (!AcquireSingleInstanceLock())
                 {
-                    Logger.Error("Another InfoPanel instance is already running");
-                    Environment.Exit(1);
+                    // Launching again (desktop icon, terminal) surfaces the running
+                    // instance instead of dying silently: touch a request file the
+                    // first instance watches, then exit.
+                    Logger.Information("Another InfoPanel instance is already running; asking it to show its window");
+                    try
+                    {
+                        File.WriteAllText(ShowRequestPath, "");
+                    }
+                    catch
+                    {
+                    }
+                    Environment.Exit(0);
                     return;
                 }
+
+                StartShowRequestWatcher();
 
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 desktop.ShutdownRequested += OnShutdownRequested;
 
-                // Session managers end the session with SIGTERM/SIGHUP; run the
-                // normal fast shutdown so logout and restart never wait on us
-                // (issue #2). A backstop hard-exits if that path ever stalls.
-                foreach (var signal in new[] { System.Runtime.InteropServices.PosixSignal.SIGTERM, System.Runtime.InteropServices.PosixSignal.SIGHUP })
+                // Session managers end the session with SIGTERM; run the normal
+                // fast shutdown so logout and restart never wait on us (issue #2).
+                // A backstop hard-exits if that path ever stalls. SIGHUP is left
+                // alone: registering a handler would override nohup's ignore and
+                // kill the app when a launching terminal closes.
+                foreach (var signal in new[] { System.Runtime.InteropServices.PosixSignal.SIGTERM })
                 {
                     _signalRegistrations.Add(System.Runtime.InteropServices.PosixSignalRegistration.Create(signal, context =>
                     {
@@ -107,6 +121,50 @@ namespace InfoPanel
             }
 
             base.OnFrameworkInitializationCompleted();
+        }
+
+        private static string ShowRequestPath =>
+            Path.Combine(Persistence.ConfigPersistence.BaseFolder, ".show-request");
+
+        private FileSystemWatcher? _showRequestWatcher;
+
+        private void StartShowRequestWatcher()
+        {
+            try
+            {
+                File.Delete(ShowRequestPath);
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                _showRequestWatcher = new FileSystemWatcher(Persistence.ConfigPersistence.BaseFolder, ".show-request")
+                {
+                    EnableRaisingEvents = true,
+                };
+
+                void OnRequest(object? _, FileSystemEventArgs __)
+                {
+                    try
+                    {
+                        File.Delete(ShowRequestPath);
+                    }
+                    catch
+                    {
+                    }
+
+                    Avalonia.Threading.Dispatcher.UIThread.Post(ShowMainWindow);
+                }
+
+                _showRequestWatcher.Created += OnRequest;
+                _showRequestWatcher.Changed += OnRequest;
+            }
+            catch (Exception ex)
+            {
+                Logger.Warning(ex, "Could not watch for show requests from other instances");
+            }
         }
 
         private bool AcquireSingleInstanceLock()
