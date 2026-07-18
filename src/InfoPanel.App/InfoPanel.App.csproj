@@ -5,7 +5,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>InfoPanel</RootNamespace>
     <AssemblyName>infopanel</AssemblyName>
-    <Version>0.0.6</Version>
+    <Version>0.0.7</Version>
   </PropertyGroup>
 
   <PropertyGroup>
