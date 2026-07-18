@@ -136,6 +136,11 @@ namespace InfoPanel
 
         private void TrayMenu_Open(object? sender, EventArgs e) => ShowMainWindow();
 
+        // Fires on tray activation: single or double click depending on what the
+        // desktop's tray host sends (KDE/XFCE activate on left click; some hosts
+        // only on double click; GNOME's AppIndicator extension is menu-only).
+        private void TrayIcon_Clicked(object? sender, EventArgs e) => ShowMainWindow();
+
         private void OpenAt(string tag)
         {
             ShowMainWindow();
