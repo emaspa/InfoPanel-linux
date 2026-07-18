@@ -136,7 +136,18 @@ namespace InfoPanel.Views.Pages
                     remove: () => { settings.TuringPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
                     setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
-                AddTuringAdvanced(device);
+                // Serial models stream raw pixels, so quality only applies to USB models
+                if (device.ModelInfo?.IsUsbDevice == true)
+                {
+                    AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
+                        device.TargetFrameRate, f => { device.TargetFrameRate = f; _app.Host.SaveSettings(); },
+                        device.JpegQuality, q => { device.JpegQuality = q; _app.Host.SaveSettings(); });
+                }
+                else
+                {
+                    AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
+                        device.TargetFrameRate, f => { device.TargetFrameRate = f; _app.Host.SaveSettings(); });
+                }
             }
 
             AddFamilyHeader("BeadaPanel", settings.BeadaPanelMultiDeviceMode,
@@ -178,9 +189,10 @@ namespace InfoPanel.Views.Pages
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.ThermaltakePanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
-                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
-                    brightness: device.Brightness,
-                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
+                    device.TargetFrameRate, f => { device.TargetFrameRate = f; _app.Host.SaveSettings(); },
+                    device.JpegQuality, q => { device.JpegQuality = q; _app.Host.SaveSettings(); });
             }
 
             AddFamilyHeader("Jungle Leopard / Hongtai", settings.JlPanelMultiDeviceMode,
@@ -489,7 +501,10 @@ namespace InfoPanel.Views.Pages
             DeviceRows.Children.Add(border);
         }
 
-        private void AddTuringAdvanced(TuringPanelDevice device)
+        /// <summary>Collapsible "Panel options" section: brightness, per-device target FPS, and JPEG quality when applicable.</summary>
+        private void AddPanelOptions(int brightness, Action<int> setBrightness,
+            int targetFps, Action<int> setTargetFps,
+            int? jpegQuality = null, Action<int>? setJpegQuality = null)
         {
             var expander = new Expander
             {
@@ -502,25 +517,24 @@ namespace InfoPanel.Views.Pages
 
             var brightnessRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
             brightnessRow.Children.Add(new TextBlock { Text = "Brightness", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
-            var brightness = new Slider { Minimum = 5, Maximum = 100, Value = device.Brightness, Width = 200 };
-            brightness.ValueChanged += (_, _) => { device.Brightness = (int)brightness.Value; _app?.Host.SaveSettings(); };
-            brightnessRow.Children.Add(brightness);
+            var brightnessSlider = new Slider { Minimum = 5, Maximum = 100, Value = brightness, Width = 200 };
+            brightnessSlider.ValueChanged += (_, _) => setBrightness((int)brightnessSlider.Value);
+            brightnessRow.Children.Add(brightnessSlider);
             panel.Children.Add(brightnessRow);
 
             var fpsRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
             fpsRow.Children.Add(new TextBlock { Text = "Target FPS", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
-            var fps = new NumericUpDown { Minimum = 1, Maximum = 60, Value = device.TargetFrameRate, Increment = 1, FormatString = "0" };
-            fps.ValueChanged += (_, _) => { device.TargetFrameRate = (int)(fps.Value ?? 15); _app?.Host.SaveSettings(); };
+            var fps = new NumericUpDown { Minimum = 1, Maximum = 60, Value = targetFps, Increment = 1, FormatString = "0" };
+            fps.ValueChanged += (_, _) => setTargetFps((int)(fps.Value ?? 15));
             fpsRow.Children.Add(fps);
             panel.Children.Add(fpsRow);
 
-            // Serial models stream raw pixels, so quality only applies to USB models
-            if (device.ModelInfo?.IsUsbDevice == true)
+            if (jpegQuality != null && setJpegQuality != null)
             {
                 var qualityRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
                 qualityRow.Children.Add(new TextBlock { Text = "JPEG quality", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
-                var quality = new NumericUpDown { Minimum = 50, Maximum = 100, Value = device.JpegQuality, Increment = 5, FormatString = "0" };
-                quality.ValueChanged += (_, _) => { device.JpegQuality = (int)(quality.Value ?? 90); _app?.Host.SaveSettings(); };
+                var quality = new NumericUpDown { Minimum = 50, Maximum = 100, Value = jpegQuality, Increment = 5, FormatString = "0" };
+                quality.ValueChanged += (_, _) => setJpegQuality((int)(quality.Value ?? 90));
                 qualityRow.Children.Add(quality);
                 panel.Children.Add(qualityRow);
             }
