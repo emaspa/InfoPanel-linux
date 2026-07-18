@@ -184,11 +184,12 @@ namespace InfoPanel
 
         public void ShowMainWindow()
         {
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow != null)
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow is { } main)
             {
-                desktop.MainWindow.Show();
-                desktop.MainWindow.WindowState = WindowState.Normal;
-                desktop.MainWindow.Activate();
+                Logger.Debug("ShowMainWindow: IsVisible={IsVisible} State={State}", main.IsVisible, main.WindowState);
+                main.WindowState = WindowState.Normal;
+                main.Show();
+                main.Activate();
             }
         }
 

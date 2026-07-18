@@ -10,6 +10,7 @@ namespace InfoPanel.Views
     {
         private readonly Dictionary<string, Control> _pages = [];
         private DispatcherTimer? _statusTimer;
+        private bool _minimizingToTray;
 
         public MainWindow()
         {
@@ -36,10 +37,25 @@ namespace InfoPanel.Views
                 else if (args.Property == WindowStateProperty
                     && WindowState == WindowState.Minimized
                     && Avalonia.Application.Current is App trayApp
-                    && trayApp.Host.Settings.MinimizeToTray)
+                    && trayApp.Host.Settings.MinimizeToTray
+                    && !_minimizingToTray)
                 {
-                    WindowState = WindowState.Normal;
-                    Hide();
+                    // Deferred, guarded, and hide-before-restore: setting WindowState
+                    // inside its own change notification recursed with the WM
+                    // re-reporting Minimized until the stack overflowed.
+                    _minimizingToTray = true;
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        try
+                        {
+                            Hide();
+                            WindowState = WindowState.Normal;
+                        }
+                        finally
+                        {
+                            _minimizingToTray = false;
+                        }
+                    });
                 }
             };
 
