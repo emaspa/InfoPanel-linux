@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.0.3 alpha: shutdown and serial panel fixes" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.0.4 alpha: serial panel detection" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Serial Turing/Turzx and JL panels are now detected: sysfs symlink resolution in the port scan was broken, so no serial panel was ever found. Scanning no longer resets an identified ChiZhu panel (like the Phantom Spirit 120 Vision EVO) to Unknown. Launching InfoPanel while it is already running brings the window to the front, and minimizing with close-to-tray enabled no longer crashes." />
+                        <TextBlock Text="v0.0.3 alpha: shutdown and serial panel fixes" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Logout and restart no longer stall while InfoPanel is running: the app exits cleanly when the session ends and close-to-tray no longer intercepts OS shutdown. udev rules now cover the serial tty nodes of Turing/Turzx panels, so they work without dialout group membership. Fixed the tray Exit occasionally leaving the process behind." />
                         <TextBlock Text="v0.0.2 alpha: first published build" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
