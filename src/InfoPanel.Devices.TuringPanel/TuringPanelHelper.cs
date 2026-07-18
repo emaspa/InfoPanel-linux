@@ -190,7 +190,7 @@ namespace InfoPanel.TuringPanel
                         Logger.Information("Detected CT13INCH identifier port");
                     }
 
-                    // Check for CT21INCH identifier port (VID_1A86&PID_CA21) - companion of Truz 5"
+                    // Check for CT21INCH identifier port (VID_1A86&PID_CA21) - companion of Turzx 5"
                     // panels (from emaspa/infopanel-1@2ce848f; the RevisionE model override was
                     // reverted in 636525e, so today it is detection + skip only)
                     bool hasCt21Inch = serialPorts.Any(p => p.vid == 0x1a86 && p.pid == 0xca21);
