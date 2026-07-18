@@ -1111,6 +1111,8 @@ namespace InfoPanel.Services
                 _panelHeight = v113Model.RenderHeight;
                 Logger.Information("ThermalrightPanelDevice {Device}: byte[20]=0x05 detected as Trofeo Vision 11.3\" ({Width}x{Height})",
                     _device, _panelWidth, _panelHeight);
+                // Persist the identification (the scan can only see the shared VID/PID)
+                DeviceRuntime.RequestSettingsSave();
             }
             // On restart, model is already 11.3" but device still reports 480. Override to model's render size.
             else if (_device.Model == ThermalrightPanelModel.TrofeoVision113 && _device.ModelInfo != null)
@@ -1130,6 +1132,8 @@ namespace InfoPanel.Services
                 _device.Model = v2Model.Model;
                 _panelWidth = v2Model.RenderWidth;
                 _panelHeight = v2Model.RenderHeight;
+                // Persist the identification (the scan can only see the shared VID/PID)
+                DeviceRuntime.RequestSettingsSave();
             }
             // On restart, model is already v2 but device still reports 599. Override to model's render size.
             else if (_device.Model == ThermalrightPanelModel.TrofeoVision916V2 && _device.ModelInfo != null)

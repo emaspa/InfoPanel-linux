@@ -62,10 +62,32 @@ namespace InfoPanel.Views.Pages
             }
         }
 
+        // Runtime variant detection can rename a device after the rows were built
+        // (e.g. Trofeo 9.16" re-identified as 11.3"); rebuild when Model changes.
+        private readonly List<Action> _modelSubscriptionCleanups = [];
+
+        private void WatchModelChanges(System.ComponentModel.INotifyPropertyChanged device)
+        {
+            System.ComponentModel.PropertyChangedEventHandler handler = (_, e) =>
+            {
+                if (e.PropertyName == "Model")
+                {
+                    Dispatcher.UIThread.Post(RebuildRows);
+                }
+            };
+            device.PropertyChanged += handler;
+            _modelSubscriptionCleanups.Add(() => device.PropertyChanged -= handler);
+        }
+
         private void RebuildRows()
         {
             DeviceRows.Children.Clear();
             _statusBindings.Clear();
+            foreach (var cleanup in _modelSubscriptionCleanups)
+            {
+                cleanup();
+            }
+            _modelSubscriptionCleanups.Clear();
             if (_app == null) return;
 
             var settings = _app.Host.Settings;
@@ -90,6 +112,7 @@ namespace InfoPanel.Views.Pages
                 AddThermalrightAdvanced(device);
                 AddMatchingProfileButton(device.ModelInfo?.Name ?? device.Model.ToString(),
                     device.DisplayWidth, device.DisplayHeight, g => { device.ProfileGuid = g; _app.Host.SaveSettings(); });
+                WatchModelChanges(device);
             }
 
             AddFamilyHeader("Turing Smart Screen", settings.TuringPanelMultiDeviceMode,
