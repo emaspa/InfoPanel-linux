@@ -13,6 +13,7 @@ namespace InfoPanel
         private static readonly ILogger Logger = Log.ForContext<App>();
 
         private FileStream? _instanceLock;
+        private MainWindow? _mainWindow;
         private AppHost? _host;
         private CancellationTokenSource? _cts;
         private readonly List<System.Runtime.InteropServices.PosixSignalRegistration> _signalRegistrations = [];
@@ -107,10 +108,14 @@ namespace InfoPanel
                     _ = Task.Run(Services.UpdateChecker.RunStartupCheckAsync);
                 }
 
-                desktop.MainWindow = new MainWindow();
+                // The classic desktop lifetime auto-shows MainWindow after init,
+                // so for Start minimized the window must not be assigned yet
+                // (issue #3); ShowMainWindow assigns it on first show.
+                _mainWindow = new MainWindow();
                 if (!_host.Settings.StartMinimized)
                 {
-                    desktop.MainWindow.Show();
+                    desktop.MainWindow = _mainWindow;
+                    _mainWindow.Show();
                 }
 
                 // Show overlay windows for active profiles
@@ -184,9 +189,10 @@ namespace InfoPanel
 
         public void ShowMainWindow()
         {
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && desktop.MainWindow is { } main)
+            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop && _mainWindow is { } main)
             {
                 Logger.Debug("ShowMainWindow: IsVisible={IsVisible} State={State}", main.IsVisible, main.WindowState);
+                desktop.MainWindow ??= main;
                 main.WindowState = WindowState.Normal;
                 main.Show();
                 main.Activate();
@@ -203,11 +209,7 @@ namespace InfoPanel
         private void OpenAt(string tag)
         {
             ShowMainWindow();
-            if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop
-                && desktop.MainWindow is MainWindow main)
-            {
-                main.NavigateTo(tag);
-            }
+            _mainWindow?.NavigateTo(tag);
         }
 
         private void TrayMenu_Dashboard(object? sender, EventArgs e) => OpenAt("dashboard");
