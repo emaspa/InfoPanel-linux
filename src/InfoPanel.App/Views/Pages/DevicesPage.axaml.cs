@@ -98,10 +98,8 @@ namespace InfoPanel.Views.Pages
             {
                 AddRow(
                     title: device.ModelInfo?.Name ?? device.Model ?? "Turing panel",
-                    // Portrait-native strips are mounted and rendered landscape by
-                    // default, so present the resolution that way (1920×480, not 480×1920)
                     subtitle: device.ModelInfo is { } mi
-                        ? $"{device.DeviceId} · {device.DeviceLocation} · renders at {Math.Max(mi.Width, mi.Height)}×{Math.Min(mi.Width, mi.Height)}"
+                        ? $"{device.DeviceId} · {device.DeviceLocation} · renders at {mi.Width}×{mi.Height}"
                         : $"{device.DeviceId} · {device.DeviceLocation}",
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
