@@ -105,6 +105,7 @@ namespace InfoPanel.Views.Pages
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
                         ? RunningStatus(device.ProfileGuid, device.RuntimeProperties.FrameRate, device.RuntimeProperties.FrameTime)
+                        : !device.Enabled ? "disabled"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.ThermalrightPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -130,6 +131,7 @@ namespace InfoPanel.Views.Pages
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
                         ? RunningStatus(device.ProfileGuid, device.RuntimeProperties.FrameRate, device.RuntimeProperties.FrameTime)
+                        : !device.Enabled ? "disabled"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.TuringPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -150,6 +152,7 @@ namespace InfoPanel.Views.Pages
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
                         ? RunningStatus(device.ProfileGuid, device.RuntimeProperties.FrameRate, device.RuntimeProperties.FrameTime)
+                        : !device.Enabled ? "disabled"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.BeadaPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -171,6 +174,7 @@ namespace InfoPanel.Views.Pages
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
                         ? RunningStatus(device.ProfileGuid, device.RuntimeProperties.FrameRate, device.RuntimeProperties.FrameTime)
+                        : !device.Enabled ? "disabled"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.ThermaltakePanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -192,6 +196,7 @@ namespace InfoPanel.Views.Pages
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
                         ? RunningStatus(device.ProfileGuid, device.RuntimeProperties.FrameRate, device.RuntimeProperties.FrameTime)
+                        : !device.Enabled ? "disabled"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.JlPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
@@ -213,6 +218,7 @@ namespace InfoPanel.Views.Pages
                     setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
                     status: () => device.RuntimeProperties.IsRunning
                         ? RunningStatus(device.ProfileGuid, device.RuntimeProperties.FrameRate, device.RuntimeProperties.FrameTime)
+                        : !device.Enabled ? "disabled"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.VmaxPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
