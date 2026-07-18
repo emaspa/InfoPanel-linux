@@ -1816,7 +1816,13 @@ namespace InfoPanel.Services
 
                 try
                 {
-                    var bulkRegistry = FindUsbRegistry(
+                    // On Linux the "bulk" frame endpoint (EP 0x02 OUT) is an interrupt
+                    // endpoint on the HID interface itself, which the kernel usbhid
+                    // driver owns - libusb writes fail (MonoApiError) without detaching
+                    // it, and detaching would kill the hidraw handle used for commands.
+                    // Writing frames through hidraw reaches the same wire endpoint, so
+                    // use the HID frame path instead of the WinUSB-style upgrade.
+                    var bulkRegistry = OperatingSystem.IsLinux() ? null : FindUsbRegistry(
                         ThermalrightPanelModelDatabase.TROFEO_VENDOR_ID,
                         ThermalrightPanelModelDatabase.TROFEO_PRODUCT_ID_686,
                         matchDeviceId: false);
@@ -1826,13 +1832,11 @@ namespace InfoPanel.Services
                         bulkDevice = bulkRegistry.Device;
                         if (bulkDevice != null)
                         {
-                            if (bulkDevice is IUsbDevice wholeBulkDevice)
-                            {
-                                wholeBulkDevice.SetConfiguration(1);
-                                wholeBulkDevice.ClaimInterface(0);
-                            }
-
-                            // Find write endpoint (prefer EP2 OUT as TRCC uses it)
+                            // Find the interface that actually carries a bulk OUT
+                            // endpoint (the composite device's interface 0 is the HID
+                            // interface owned by the kernel driver; claiming it fails
+                            // and frame writes error out with MonoApiError).
+                            int bulkInterface = -1;
                             WriteEndpointID bulkWriteEp = WriteEndpointID.Ep02;
                             foreach (var config in bulkDevice.Configs)
                             {
@@ -1841,12 +1845,35 @@ namespace InfoPanel.Services
                                     foreach (var ep in iface.EndpointInfoList)
                                     {
                                         var addr = (byte)ep.Descriptor.EndpointID;
-                                        if ((addr & 0x80) == 0) // OUT endpoint
+                                        var isBulkOut = (addr & 0x80) == 0
+                                            && (ep.Descriptor.Attributes & 0x03) == 0x02;
+                                        if (!isBulkOut)
                                         {
+                                            continue;
+                                        }
+
+                                        var isHidInterface = iface.Descriptor.Class == LibUsbDotNet.Descriptors.ClassCodeType.Hid;
+                                        if (bulkInterface < 0 || !isHidInterface)
+                                        {
+                                            bulkInterface = iface.Descriptor.InterfaceID;
                                             bulkWriteEp = (WriteEndpointID)addr;
-                                            break;
                                         }
                                     }
+                                }
+                            }
+
+                            if (bulkInterface >= 0 && bulkDevice is IUsbDevice wholeBulkDevice)
+                            {
+                                if (OperatingSystem.IsLinux())
+                                {
+                                    try { wholeBulkDevice.SetAutoDetachKernelDriver(true); }
+                                    catch (Exception ex) { Logger.Warning(ex, "SetAutoDetachKernelDriver failed, continuing"); }
+                                }
+
+                                wholeBulkDevice.SetConfiguration(1);
+                                if (!wholeBulkDevice.ClaimInterface(bulkInterface))
+                                {
+                                    throw new Exception($"Failed to claim bulk interface {bulkInterface}");
                                 }
                             }
 
@@ -1854,8 +1881,8 @@ namespace InfoPanel.Services
                             useBulk = true;
 
                             Logger.Information(
-                                "ThermalrightPanelDevice {Device}: Bulk upgrade successful! Using EP 0x{Ep:X2} for frame data",
-                                _device, (byte)bulkWriteEp);
+                                "ThermalrightPanelDevice {Device}: Bulk upgrade successful! Using interface {Iface}, EP 0x{Ep:X2} for frame data",
+                                _device, bulkInterface, (byte)bulkWriteEp);
                         }
                     }
                 }
