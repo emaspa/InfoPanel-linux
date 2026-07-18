@@ -193,7 +193,7 @@ Windows build and are expected to work - reports welcome.
 | Model | Resolution |
 |---|---|
 | Trofeo Vision 9.16" (v1 and v2 firmware) ✓ | 1920×480 |
-| Trofeo Vision 11.3" | 1920×400 |
+| Trofeo Vision 11.3" ✓ | 1920×400 |
 
 **ALi bulk protocol** - USB `0416:5406`:
 
@@ -211,7 +211,7 @@ Windows build and are expected to work - reports welcome.
 | Levita Vision 360 6.67" | 2400×1080 (renders 1600×720) |
 | TL-M10 Vision | 1920×462 |
 | Elite Vision 360 ARGB Black (SPISCRM-V2) | 320×320 |
-| Core Vision, Hyper Vision, RP130 Vision, LM16 SE, LF10V, LM19 SE, Grand Vision, Phantom Spirit 120 Vision EVO, Frozen Warframe Ultra, Frozen Vision V2 | 480×480 |
+| Core Vision, Hyper Vision, RP130 Vision, LM16 SE, LF10V, LM19 SE, Grand Vision, Phantom Spirit 120 Vision EVO ✓, Frozen Warframe Ultra, Frozen Vision V2 | 480×480 |
 | Mjolnir Vision | 320×240 |
 | Mjolnir Vision Pro, Stream Vision | 640×480 |
 | LC2JD, LF19, LD8 | 854×480 |
@@ -263,11 +263,11 @@ CDC serial JPEG protocol at 2 Mbaud (VID `33C3`):
 |---|---|---|
 | Turing Smart Screen 3.5" / XuanFang 3.5" | 320×480 | Serial `1a86:5722` |
 | Turing Smart Screen 2.1" | 480×480 | Serial `1d6b:0121` or USB `1cbe:0021` |
-| Turing Smart Screen 5" | 800×480 | Serial `1d6b:0106` |
+| Turing Smart Screen 5" (incl. Turzx with CT21INCH companion) ✓ | 800×480 | Serial `1d6b:0106` |
 | Turing Smart Screen 5" | 720×1280 | USB `1cbe:0050` |
 | Turing Smart Screen 8" | 800×1280 | USB `1cbe:0080` |
 | Turing Smart Screen 8.8" Rev 1.0 | 480×1920 | Serial `0525:a4a7` |
-| Turing Smart Screen 8.8" Rev 1.1 | 480×1920 | USB `1cbe:0088` |
+| Turing Smart Screen 8.8" Rev 1.1 (TURZX) ✓ | 480×1920 | USB `1cbe:0088` |
 | Turing Smart Screen 9.2" | 464×1920 | USB `1cbe:0092` |
 | Turing Smart Screen 1.6" | 400×400 | USB `1cbe:0016` |
 | Turing Smart Screen 4.6" | 320×960 | USB `1cbe:0046` |

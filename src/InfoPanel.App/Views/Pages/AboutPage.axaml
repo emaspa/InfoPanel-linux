@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.0.5 alpha: Turing USB panels" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.0.6 alpha: serial panel speed, 11.3 inch identification" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Serial Turing panels (Turzx 5 inch and friends) batch their protocol writes, lifting frame rates toward Windows levels. Trofeo 11.3 inch and 9.16 inch v2 keep their runtime identification: the device card updates live and the model persists across restarts. Disabled devices say disabled instead of idle." />
+                        <TextBlock Text="v0.0.5 alpha: Turing USB panels" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="USB Turing/TURZX panels stream reliably: the protocol now consumes the device response after every command (frames stalled at zero bytes before), and frames are sent as JPEG like the Windows build, roughly tripling the frame rate. Turing devices get a Panel options section with brightness, per-device target FPS and JPEG quality, portrait strips default to 90 degrees at scan, and cards show the native resolution. Shipped stack traces no longer contain build machine paths." />
                         <TextBlock Text="v0.0.4 alpha: serial panel detection" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
