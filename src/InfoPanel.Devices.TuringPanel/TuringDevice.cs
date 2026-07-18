@@ -386,6 +386,10 @@ namespace InfoPanel.TuringPanel
 
             try
             {
+                // Vendor driver flushes stale responses before each request; without
+                // it a restarted session can desync request/response pairing
+                _reader.ReadFlush();
+
                 ErrorCode ec = _writer.Write(encryptedCommand, timeout, out int transferLength);
                 if (ec != ErrorCode.None || transferLength != encryptedCommand.Length)
                 {
@@ -431,6 +435,9 @@ namespace InfoPanel.TuringPanel
 
             try
             {
+                // Vendor driver flushes stale responses before each request
+                _reader.ReadFlush();
+
                 // Write the data
                 int transferLength = 0;
                 ErrorCode ec = _writer.Write(data, timeout, out transferLength);
@@ -1289,6 +1296,16 @@ namespace InfoPanel.TuringPanel
                 Logger.Error(ex, "Error deleting file");
                 throw new TuringDeviceException("Error deleting file", ex);
             }
+        }
+
+        /// <summary>
+        /// Stops on-device media playback (command 111). Without this the panel
+        /// keeps playing its stored media and ignores streamed frames.
+        /// </summary>
+        public bool SendStopMediaCommand()
+        {
+            byte[] cmdPacket = BuildCommandPacketHeader(111);
+            return WriteToDevice(EncryptCommandPacket(cmdPacket));
         }
 
         public bool SendJpegBytes(byte[] jpegData)

@@ -35,7 +35,11 @@ namespace InfoPanel.Services
                 return true;
             }
 
-            public bool StopMedia() => true; // fork driver has no stop-media command
+            public bool StopMedia()
+            {
+                inner.SendStopMediaCommand();
+                return true;
+            }
 
             public bool SetBrightness(byte value)
             {
@@ -277,12 +281,15 @@ namespace InfoPanel.Services
                     }
                     Thread.Sleep(200);
 
-                    // Stop any media playback and clear the Lian Li image layers
-                    // (vendor ApplyTemplate prep sequence), then set the frame rate.
+                    // Stop any on-device media playback: a panel playing its stored
+                    // media ignores streamed frames (frozen on an old image).
+                    device.StopMedia();
+                    Thread.Sleep(200);
+
+                    // Clear the Lian Li image layers (vendor ApplyTemplate prep
+                    // sequence), then set the frame rate.
                     if (device is LianLiUsbScreenDevice lianLi)
                     {
-                        lianLi.StopMedia();
-                        Thread.Sleep(200);
                         PrepareLianLiImageLayers(lianLi);
                         Thread.Sleep(200);
                     }
