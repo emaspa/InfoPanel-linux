@@ -75,15 +75,6 @@ namespace InfoPanel.Services
             {
                 var rotation = _device.Rotation;
 
-                // Portrait-native framebuffer showing a landscape profile: rotate
-                // into the frame by default (these panels are usually mounted
-                // horizontally); an explicit rotation choice still wins.
-                if (rotation == LCD_ROTATION.RotateNone
-                    && _panelHeight > _panelWidth && profile.Width > profile.Height)
-                {
-                    rotation = LCD_ROTATION.Rotate90FlipNone;
-                }
-
                 // The Lian Li 8.8" sends frames as JPEG like the vendor app.
                 if (IsLianLi)
                 {

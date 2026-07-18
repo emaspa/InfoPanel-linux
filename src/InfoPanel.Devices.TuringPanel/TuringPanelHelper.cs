@@ -53,7 +53,11 @@ namespace InfoPanel.TuringPanel
                             {
                                 DeviceId = deviceId,
                                 DeviceLocation = deviceLocation,
-                                Model = modelInfo.Model.ToString()
+                                Model = modelInfo.Model.ToString(),
+                                // Portrait-native strips are usually mounted landscape
+                                Rotation = modelInfo.Height > modelInfo.Width
+                                    ? LCD_ROTATION.Rotate90FlipNone
+                                    : LCD_ROTATION.RotateNone,
                             };
 
                             devices.Add(device);
@@ -221,7 +225,11 @@ namespace InfoPanel.TuringPanel
                                 {
                                     DeviceId = $"USB\\VID_{vid:X4}&PID_{pid:X4}",
                                     DeviceLocation = portPath,
-                                    Model = model.ToString()
+                                    Model = model.ToString(),
+                                    // Portrait-native strips are usually mounted landscape
+                                    Rotation = modelInfo.Height > modelInfo.Width
+                                        ? LCD_ROTATION.Rotate90FlipNone
+                                        : LCD_ROTATION.RotateNone,
                                 };
 
                                 devices.Add(device);
