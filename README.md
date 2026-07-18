@@ -239,7 +239,7 @@ BY-OEM HID protocol (JPEG over 1024-byte reports):
 
 | Model | Resolution | USB ID |
 |---|---|---|
-| Thermaltake 6" LCD (ToughLiquid Ultra) | 1480×720 | `264A:2347` |
+| Thermaltake 6" LCD (ToughLiquid Ultra) ✓ | 1480×720 | `264A:2347` |
 | ASRock Phantom Gaming 360 LCD | 480×480 | `26CE:0A10` |
 
 ### Jungle Leopard / Hongtai
@@ -370,7 +370,7 @@ dotnet run --project src/InfoPanel.App
 To produce the same self-contained tarball as the published releases:
 
 ```bash
-packaging/publish.sh 0.0.8     # builds artifacts/infopanel-0.0.8-linux-x64.tar.gz
+packaging/publish.sh 0.0.9     # builds artifacts/infopanel-0.0.9-linux-x64.tar.gz
 ```
 
 ## Data and paths

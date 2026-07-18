@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.0.8 alpha: Trofeo HID panel family" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.0.9 alpha: panel options everywhere" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Every panel family gets the collapsible Panel options section with brightness, per-device target FPS, and JPEG quality where the protocol uses JPEG. Device cards show the native resolution for all models, BeadaPanel cards show friendly model names, and the Thermaltake 6 inch is verified on real hardware (24 fps at 17 ms)." />
+                        <TextBlock Text="v0.0.8 alpha: Trofeo HID panel family" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="The Trofeo HID protocol family (6.86 inch and about 15 sibling models) now works: udev rules cover their hidraw nodes, frames stream through the HID interface (the libusb style upgrade cannot work on Linux where the kernel driver owns it), and the device scan no longer aborts when an unreadable HID device is present. Verified on a Trofeo Vision 6.86 inch at 24 fps." />
                         <TextBlock Text="v0.0.7 alpha: stability with multiple panels" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
