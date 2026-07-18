@@ -119,17 +119,11 @@ namespace InfoPanel.Views
             }
         }
 
-        private void LogsToggle_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
-        {
-            SetLogsDrawerVisible(LogsToggle.IsChecked == true);
-        }
-
         private void NavView_ItemInvoked(object? sender, FANavigationViewItemInvokedEventArgs e)
         {
             if ((e.InvokedItemContainer as FANavigationViewItem)?.Tag as string == "logs")
             {
-                LogsToggle.IsChecked = LogsToggle.IsChecked != true;
-                SetLogsDrawerVisible(LogsToggle.IsChecked == true);
+                SetLogsDrawerVisible(!LogsDrawer.IsVisible);
             }
         }
 

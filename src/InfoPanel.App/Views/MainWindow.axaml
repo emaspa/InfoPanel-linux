@@ -16,8 +16,6 @@
                 BorderThickness="0,1,0,0"
                 Padding="12,4">
             <DockPanel>
-                <ToggleButton DockPanel.Dock="Right" x:Name="LogsToggle" Content="Logs" FontSize="12"
-                              Padding="8,2" Click="LogsToggle_Click" />
                 <TextBlock x:Name="StatusText"
                            VerticalAlignment="Center"
                            FontSize="12"
