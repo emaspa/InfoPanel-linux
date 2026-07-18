@@ -1034,6 +1034,10 @@ namespace InfoPanel.Services
             {
                 Logger.Error("ThermalrightPanelDevice {Device}: TrofeoBulk init write failed", _device);
                 _device.UpdateRuntimeProperties(errorMessage: "TrofeoBulk init failed");
+                // The read task is still blocked inside libusb on this handle;
+                // returning now lets the caller free the device under it, which
+                // segfaults the process (libusb use-after-free). Wait it out.
+                await readTask;
                 return;
             }
             Logger.Information("ThermalrightPanelDevice {Device}: TrofeoBulk init sent ({Bytes} bytes)", _device, initWritten);
@@ -1343,6 +1347,8 @@ namespace InfoPanel.Services
             {
                 Logger.Error("ThermalrightPanelDevice {Device}: TrofeoBulk LY1 init write failed", _device);
                 _device.UpdateRuntimeProperties(errorMessage: "TrofeoBulk LY1 init failed");
+                // See TrofeoBulk: the pending read must finish before the handle is freed
+                await readTask;
                 return;
             }
             Logger.Information("ThermalrightPanelDevice {Device}: TrofeoBulk LY1 init sent ({Bytes} bytes)", _device, initWritten);
@@ -1527,6 +1533,8 @@ namespace InfoPanel.Services
             {
                 Logger.Error("ThermalrightPanelDevice {Device}: ALi init write failed: {Error}", _device, ec);
                 _device.UpdateRuntimeProperties(errorMessage: $"ALi init failed: {ec}");
+                // See TrofeoBulk: the pending read must finish before the handle is freed
+                await readTask;
                 return;
             }
             Logger.Information("ThermalrightPanelDevice {Device}: ALi init sent ({Bytes} bytes)", _device, initWritten);
