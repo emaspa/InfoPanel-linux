@@ -54,6 +54,9 @@ namespace InfoPanel.Views.Pages
                 ? "running · assign a profile to start streaming"
                 : $"running · {frameRate} fps · {frameTime} ms";
 
+        private static string Subtitle(params string?[] parts) =>
+            string.Join(" · ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+
         private void RebuildStatusOnly()
         {
             foreach (var (status, get) in _statusBindings)
@@ -154,9 +157,12 @@ namespace InfoPanel.Views.Pages
                 v => { settings.BeadaPanelMultiDeviceMode = v; _app.Host.SaveSettings(); });
             foreach (var device in settings.BeadaPanelDevices.ToList())
             {
+                var beadaInfo = Enum.TryParse<BeadaPanelModel>(device.Model, out var beadaModel)
+                    && BeadaPanelModelDatabase.Models.TryGetValue(beadaModel, out var bi) ? bi : null;
                 AddRow(
-                    title: device.Model ?? "BeadaPanel",
-                    subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
+                    title: beadaInfo?.Name ?? device.Model ?? "BeadaPanel",
+                    subtitle: Subtitle(device.DeviceId, device.DeviceLocation,
+                        beadaInfo != null ? $"renders at {beadaInfo.Width}×{beadaInfo.Height}" : null),
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
                     profileGuid: device.ProfileGuid,
@@ -167,9 +173,10 @@ namespace InfoPanel.Views.Pages
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.BeadaPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
-                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
-                    brightness: device.Brightness,
-                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                // BeadaPanel streams raw RGB565, so there is no JPEG quality
+                AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
+                    device.TargetFrameRate, f => { device.TargetFrameRate = f; _app.Host.SaveSettings(); });
             }
 
             AddFamilyHeader("Thermaltake / ASRock LCD", settings.ThermaltakePanelMultiDeviceMode,
@@ -178,9 +185,8 @@ namespace InfoPanel.Views.Pages
             {
                 AddRow(
                     title: device.ModelInfo?.Name ?? device.Model.ToString(),
-                    subtitle: device.DisplayWidth > 0
-                        ? $"{device.DeviceId} · {device.DeviceLocation} · renders at {device.DisplayWidth}×{device.DisplayHeight}"
-                        : $"{device.DeviceId} · {device.DeviceLocation}",
+                    subtitle: Subtitle(device.DeviceId, device.DeviceLocation,
+                        device.DisplayWidth > 0 ? $"renders at {device.DisplayWidth}×{device.DisplayHeight}" : null),
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
                     profileGuid: device.ProfileGuid,
@@ -203,9 +209,8 @@ namespace InfoPanel.Views.Pages
             {
                 AddRow(
                     title: device.ModelInfo?.Name ?? device.Model.ToString(),
-                    subtitle: device.DisplayWidth > 0
-                        ? $"{device.DeviceId} · {device.DeviceLocation} · renders at {device.DisplayWidth}×{device.DisplayHeight}"
-                        : $"{device.DeviceId} · {device.DeviceLocation}",
+                    subtitle: Subtitle(device.DeviceId, device.DeviceLocation,
+                        device.DisplayWidth > 0 ? $"renders at {device.DisplayWidth}×{device.DisplayHeight}" : null),
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
                     profileGuid: device.ProfileGuid,
@@ -216,9 +221,10 @@ namespace InfoPanel.Views.Pages
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.JlPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
-                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
-                    brightness: device.Brightness,
-                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
+                    device.TargetFrameRate, f => { device.TargetFrameRate = f; _app.Host.SaveSettings(); },
+                    device.JpegQuality, q => { device.JpegQuality = q; _app.Host.SaveSettings(); });
             }
 
             AddFamilyHeader("VMAX / AuyiHomu", settings.VmaxPanelMultiDeviceMode,
@@ -227,9 +233,8 @@ namespace InfoPanel.Views.Pages
             {
                 AddRow(
                     title: device.ModelInfo?.Name ?? device.Model.ToString(),
-                    subtitle: device.DisplayWidth > 0
-                        ? $"{device.DeviceId} · {device.DeviceLocation} · renders at {device.DisplayWidth}×{device.DisplayHeight}"
-                        : $"{device.DeviceId} · {device.DeviceLocation}",
+                    subtitle: Subtitle(device.DeviceId, device.DeviceLocation,
+                        device.DisplayWidth > 0 ? $"renders at {device.DisplayWidth}×{device.DisplayHeight}" : null),
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
                     profileGuid: device.ProfileGuid,
@@ -240,9 +245,10 @@ namespace InfoPanel.Views.Pages
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.VmaxPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
-                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
-                    brightness: device.Brightness,
-                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
+                    device.TargetFrameRate, f => { device.TargetFrameRate = f; _app.Host.SaveSettings(); },
+                    device.JpegQuality, q => { device.JpegQuality = q; _app.Host.SaveSettings(); });
             }
 
             AddHotkeysSection(settings);
@@ -676,8 +682,7 @@ namespace InfoPanel.Views.Pages
 
         private void AddRow(string title, string subtitle, bool isEnabled, Action<bool> setEnabled,
             Guid profileGuid, Action<Guid> setProfile, Func<string> status, Action remove,
-            LCD_ROTATION rotation = LCD_ROTATION.RotateNone, Action<LCD_ROTATION>? setRotation = null,
-            int brightness = 100, Action<int>? setBrightness = null)
+            LCD_ROTATION rotation = LCD_ROTATION.RotateNone, Action<LCD_ROTATION>? setRotation = null)
         {
             var border = new Border
             {
@@ -707,22 +712,6 @@ namespace InfoPanel.Views.Pages
             info.Children.Add(statusText);
             _statusBindings.Add((statusText, status));
             grid.Children.Add(info);
-
-            if (setBrightness != null)
-            {
-                var brightnessSlider = new Slider
-                {
-                    Minimum = 0,
-                    Maximum = 100,
-                    Value = brightness,
-                    Width = 110,
-                    Margin = new Thickness(0, 0, 12, 0),
-                    VerticalAlignment = VerticalAlignment.Center,
-                };
-                ToolTip.SetTip(brightnessSlider, "Brightness");
-                brightnessSlider.ValueChanged += (_, _) => setBrightness((int)brightnessSlider.Value);
-                AddCell(brightnessSlider);
-            }
 
             var profilePicker = new ComboBox
             {

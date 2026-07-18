@@ -217,7 +217,7 @@ namespace InfoPanel.Services
                                 _frameAvailable.Set();
                             }
 
-                            var targetFrameTime = 1000 / DeviceRuntime.Settings.TargetFrameRate;
+                            var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
                             var desiredFrameTime = Math.Max((int)(fpsCounter.FrameTime * 0.9), targetFrameTime);
                             var adaptiveFrameTime = 0;
 
