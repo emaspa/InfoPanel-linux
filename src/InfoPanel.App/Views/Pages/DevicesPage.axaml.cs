@@ -178,7 +178,9 @@ namespace InfoPanel.Views.Pages
             {
                 AddRow(
                     title: device.ModelInfo?.Name ?? device.Model.ToString(),
-                    subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
+                    subtitle: device.DisplayWidth > 0
+                        ? $"{device.DeviceId} · {device.DeviceLocation} · renders at {device.DisplayWidth}×{device.DisplayHeight}"
+                        : $"{device.DeviceId} · {device.DeviceLocation}",
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
                     profileGuid: device.ProfileGuid,
@@ -201,7 +203,9 @@ namespace InfoPanel.Views.Pages
             {
                 AddRow(
                     title: device.ModelInfo?.Name ?? device.Model.ToString(),
-                    subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
+                    subtitle: device.DisplayWidth > 0
+                        ? $"{device.DeviceId} · {device.DeviceLocation} · renders at {device.DisplayWidth}×{device.DisplayHeight}"
+                        : $"{device.DeviceId} · {device.DeviceLocation}",
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
                     profileGuid: device.ProfileGuid,
@@ -223,7 +227,9 @@ namespace InfoPanel.Views.Pages
             {
                 AddRow(
                     title: device.ModelInfo?.Name ?? device.Model.ToString(),
-                    subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
+                    subtitle: device.DisplayWidth > 0
+                        ? $"{device.DeviceId} · {device.DeviceLocation} · renders at {device.DisplayWidth}×{device.DisplayHeight}"
+                        : $"{device.DeviceId} · {device.DeviceLocation}",
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
                     profileGuid: device.ProfileGuid,
