@@ -110,9 +110,8 @@ namespace InfoPanel.Views.Pages
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.TuringPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
-                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); },
-                    brightness: device.Brightness,
-                    setBrightness: b => { device.Brightness = b; _app.Host.SaveSettings(); });
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                AddTuringAdvanced(device);
             }
 
             AddFamilyHeader("BeadaPanel", settings.BeadaPanelMultiDeviceMode,
@@ -459,6 +458,46 @@ namespace InfoPanel.Views.Pages
 
             border.Child = grid;
             DeviceRows.Children.Add(border);
+        }
+
+        private void AddTuringAdvanced(TuringPanelDevice device)
+        {
+            var expander = new Expander
+            {
+                Header = "Panel options",
+                Margin = new Thickness(24, -8, 0, 0),
+                FontSize = 12,
+            };
+
+            var panel = new StackPanel { Spacing = 8, Margin = new Thickness(0, 8, 0, 0) };
+
+            var brightnessRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
+            brightnessRow.Children.Add(new TextBlock { Text = "Brightness", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
+            var brightness = new Slider { Minimum = 5, Maximum = 100, Value = device.Brightness, Width = 200 };
+            brightness.ValueChanged += (_, _) => { device.Brightness = (int)brightness.Value; _app?.Host.SaveSettings(); };
+            brightnessRow.Children.Add(brightness);
+            panel.Children.Add(brightnessRow);
+
+            var fpsRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
+            fpsRow.Children.Add(new TextBlock { Text = "Target FPS", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
+            var fps = new NumericUpDown { Minimum = 1, Maximum = 60, Value = device.TargetFrameRate, Increment = 1, FormatString = "0" };
+            fps.ValueChanged += (_, _) => { device.TargetFrameRate = (int)(fps.Value ?? 15); _app?.Host.SaveSettings(); };
+            fpsRow.Children.Add(fps);
+            panel.Children.Add(fpsRow);
+
+            // Serial models stream raw pixels, so quality only applies to USB models
+            if (device.ModelInfo?.IsUsbDevice == true)
+            {
+                var qualityRow = new DockPanel { MaxWidth = 380, HorizontalAlignment = HorizontalAlignment.Left };
+                qualityRow.Children.Add(new TextBlock { Text = "JPEG quality", VerticalAlignment = VerticalAlignment.Center, Width = 110 });
+                var quality = new NumericUpDown { Minimum = 50, Maximum = 100, Value = device.JpegQuality, Increment = 5, FormatString = "0" };
+                quality.ValueChanged += (_, _) => { device.JpegQuality = (int)(quality.Value ?? 90); _app?.Host.SaveSettings(); };
+                qualityRow.Children.Add(quality);
+                panel.Children.Add(qualityRow);
+            }
+
+            expander.Content = panel;
+            DeviceRows.Children.Add(expander);
         }
 
         private void AddThermalrightAdvanced(ThermalrightPanelDevice device)
