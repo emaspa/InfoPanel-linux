@@ -84,51 +84,44 @@ namespace InfoPanel.TuringPanel
         {
             var results = new List<(string portPath, int vid, int pid)>();
 
-            // ttyUSB devices (e.g. CH340-based Turing panels)
-            string usbSerialPath = "/sys/bus/usb-serial/devices";
-            if (Directory.Exists(usbSerialPath))
+            // ttyUSB devices (e.g. CH340-based Turing panels) and ttyACM devices
+            // (CDC ACM class). Each class/bus entry is a symlink into the sysfs
+            // device tree; resolve it (its parent directory is real, so the
+            // relative link target resolves correctly) and walk up to the USB
+            // device that carries idVendor/idProduct. Resolving deeper links like
+            // entry/device instead fails: their relative targets would resolve
+            // against a path that is itself a symlink (issue #1, "Found 0 devices").
+            foreach (var (root, pattern) in new[] { ("/sys/bus/usb-serial/devices", "*"), ("/sys/class/tty", "ttyACM*") })
             {
-                foreach (var entry in Directory.GetDirectories(usbSerialPath))
+                if (!Directory.Exists(root))
                 {
-                    var name = Path.GetFileName(entry);
-                    var portPath = $"/dev/{name}";
-                    var vidPath = Path.Combine(entry, "..", "..", "idVendor");
-                    var pidPath = Path.Combine(entry, "..", "..", "idProduct");
-
-                    if (TryReadSysfsHex(vidPath, out var vid) && TryReadSysfsHex(pidPath, out var pid))
-                    {
-                        results.Add((portPath, vid, pid));
-                    }
+                    continue;
                 }
-            }
 
-            // ttyACM devices (CDC ACM class)
-            string ttyClassPath = "/sys/class/tty";
-            if (Directory.Exists(ttyClassPath))
-            {
-                foreach (var entry in Directory.GetDirectories(ttyClassPath, "ttyACM*"))
+                foreach (var entry in Directory.GetDirectories(root, pattern))
                 {
                     var name = Path.GetFileName(entry);
                     var portPath = $"/dev/{name}";
 
-                    // Walk up from /sys/class/tty/ttyACMN/device to find the USB device with idVendor/idProduct
-                    var deviceLink = Path.Combine(entry, "device");
-                    if (!Directory.Exists(deviceLink))
-                        continue;
-
-                    var resolved = Path.GetFullPath(deviceLink);
-                    // Walk up until we find idVendor
-                    var current = resolved;
-                    while (current != null && current != "/")
+                    string? current;
+                    try
                     {
-                        var vidPath = Path.Combine(current, "idVendor");
-                        var pidPath = Path.Combine(current, "idProduct");
-                        if (File.Exists(vidPath) && File.Exists(pidPath)
-                            && TryReadSysfsHex(vidPath, out var vid) && TryReadSysfsHex(pidPath, out var pid))
+                        current = Directory.ResolveLinkTarget(entry, returnFinalTarget: true)?.FullName ?? entry;
+                    }
+                    catch
+                    {
+                        current = entry;
+                    }
+
+                    while (!string.IsNullOrEmpty(current) && current != "/")
+                    {
+                        if (TryReadSysfsHex(Path.Combine(current, "idVendor"), out var vid)
+                            && TryReadSysfsHex(Path.Combine(current, "idProduct"), out var pid))
                         {
                             results.Add((portPath, vid, pid));
                             break;
                         }
+
                         current = Path.GetDirectoryName(current);
                     }
                 }
@@ -142,10 +135,12 @@ namespace InfoPanel.TuringPanel
             value = 0;
             try
             {
-                var fullPath = Path.GetFullPath(path);
-                if (!File.Exists(fullPath))
+                // No GetFullPath: it strips ".." segments lexically, but sysfs
+                // paths only resolve correctly when the kernel walks them through
+                // the symlinks (".." applies to the link target, not the link).
+                if (!File.Exists(path))
                     return false;
-                var text = File.ReadAllText(fullPath).Trim();
+                var text = File.ReadAllText(path).Trim();
                 value = Convert.ToInt32(text, 16);
                 return true;
             }

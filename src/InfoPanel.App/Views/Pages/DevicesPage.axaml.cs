@@ -713,7 +713,10 @@ namespace InfoPanel.Views.Pages
                     else
                     {
                         existing.DeviceLocation = found.DeviceLocation;
-                        if (existing.Model != found.Model)
+                        // ChiZhu models are only identifiable through the init exchange,
+                        // which the scan does not perform; never downgrade a known model
+                        // to Unknown (issue #1, Phantom Spirit showing "Unknown · 0×0").
+                        if (existing.Model != found.Model && found.Model != ThermalrightPanel.ThermalrightPanelModel.Unknown)
                         {
                             Logger.Information("Device {Id} model updated from {Old} to {New}", found.DeviceId, existing.Model, found.Model);
                             existing.Model = found.Model;

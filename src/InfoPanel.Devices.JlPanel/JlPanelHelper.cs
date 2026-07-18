@@ -73,12 +73,20 @@ namespace InfoPanel.JlPanel
                 var name = Path.GetFileName(entry);
                 var portPath = $"/dev/{name}";
 
-                var deviceLink = Path.Combine(entry, "device");
-                if (!Directory.Exists(deviceLink))
-                    continue;
-
-                // Walk up from the tty's device node to the USB device that has idVendor/idProduct
-                var current = Path.GetFullPath(deviceLink);
+                // Resolve the class symlink itself (its parent /sys/class/tty is a
+                // real directory, so the relative target resolves correctly), then
+                // walk up the real device tree to the USB device with idVendor.
+                // Resolving entry/device instead fails: its relative target would
+                // resolve against a path that is itself a symlink.
+                string? current;
+                try
+                {
+                    current = Directory.ResolveLinkTarget(entry, returnFinalTarget: true)?.FullName ?? entry;
+                }
+                catch
+                {
+                    current = entry;
+                }
                 while (!string.IsNullOrEmpty(current) && current != "/")
                 {
                     var vidPath = Path.Combine(current, "idVendor");
