@@ -97,7 +97,7 @@ namespace InfoPanel.Views.Pages
             foreach (var device in settings.TuringPanelDevices.ToList())
             {
                 AddRow(
-                    title: device.Model ?? "Turing panel",
+                    title: device.ModelInfo?.Name ?? device.Model ?? "Turing panel",
                     subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
