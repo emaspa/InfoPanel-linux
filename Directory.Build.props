@@ -5,6 +5,14 @@
     <Nullable>enable</Nullable>
     <WarningLevel>6</WarningLevel>
     <AnalysisLevel>latest</AnalysisLevel>
+    <!-- Strip the build machine's absolute source paths from PDBs so shipped
+         stack traces show /InfoPanel/... instead of /home/<user>/... -->
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildThisFileDirectory)=/InfoPanel/</PathMap>
+    <!-- SourceLink would re-embed the local checkout path (and points at the
+         wrong remote); stack traces only need the mapped paths above -->
+    <EnableSourceLink>false</EnableSourceLink>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
   </PropertyGroup>
 
 </Project>

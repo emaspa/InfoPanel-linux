@@ -130,6 +130,10 @@ namespace InfoPanel.Services
                     Logger.Debug("TuringPanel: Multi-device mode is disabled. No devices will be started.");
                 }
             }
+            catch (OperationCanceledException)
+            {
+                // normal shutdown
+            }
             catch (Exception e)
             {
                 Logger.Error(e, "TuringPanel: Error in DoWorkAsync");
@@ -177,10 +181,21 @@ namespace InfoPanel.Services
 
                     await Task.Delay(1000, token);
                 }
+                catch (OperationCanceledException)
+                {
+                    break; // normal shutdown
+                }
                 catch (Exception ex)
                 {
                     Logger.Error(ex, "TuringPanel: Error in RunMultiDeviceMode");
-                    await Task.Delay(1000, token); // Wait longer on error
+                    try
+                    {
+                        await Task.Delay(1000, token); // Wait longer on error
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        break;
+                    }
                 }
             }
         }
