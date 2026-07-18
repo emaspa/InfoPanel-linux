@@ -98,7 +98,9 @@ namespace InfoPanel.Views.Pages
             {
                 AddRow(
                     title: device.ModelInfo?.Name ?? device.Model ?? "Turing panel",
-                    subtitle: $"{device.DeviceId} · {device.DeviceLocation}",
+                    subtitle: device.ModelInfo is { } mi
+                        ? $"{device.DeviceId} · {device.DeviceLocation} · renders at {mi.Width}×{mi.Height}"
+                        : $"{device.DeviceId} · {device.DeviceLocation}",
                     isEnabled: device.Enabled,
                     setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
                     profileGuid: device.ProfileGuid,

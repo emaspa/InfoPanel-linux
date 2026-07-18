@@ -365,48 +365,61 @@ namespace InfoPanel.TuringPanel
             // Use the SendPngBytes method to send the clear image
             SendPngBytes(imgData);
         }
+        // Strict write-then-read protocol (TURZX vendor app): the device answers
+        // every command with a 512-byte response that MUST be consumed before it
+        // accepts the next transfer. Fire-and-forget writes back up its queue and
+        // the bulk OUT endpoint stops accepting data entirely.
         public bool WriteToDevice(byte[] data, int timeout = 2000)
         {
-            if (_writer == null)
-                return false;
+            return WriteToDevice(data, timeout, out _);
+        }
 
-            // Scale timeout for large transfers (PNG data can be hundreds of KB)
-            int adjustedTimeout = data.Length > 1024 ? Math.Max(timeout, 5000) : timeout;
+        /// <summary>
+        /// Writes an encrypted command packet followed by its data payload as two
+        /// transfers, then consumes the device's response (write, write, read,
+        /// flush), matching the vendor app's frame path.
+        /// </summary>
+        private bool WriteCommandAndData(byte[] encryptedCommand, byte[] data, int timeout = 2000)
+        {
+            if (_writer == null || _reader == null)
+                return false;
 
             try
             {
-                ErrorCode ec = _writer.Write(data, adjustedTimeout, out int transferLength);
-
-                if (ec != ErrorCode.None)
+                ErrorCode ec = _writer.Write(encryptedCommand, timeout, out int transferLength);
+                if (ec != ErrorCode.None || transferLength != encryptedCommand.Length)
                 {
-                    Logger.Warning("Write Error: {ErrorCode} (sent {Sent}/{Total} bytes)", ec, transferLength, data.Length);
-
-                    // Reset endpoint on error to prevent stale state
-                    try { _writer.Reset(); } catch { /* ignore */ }
-
+                    Logger.Warning("Command write failed: {ErrorCode}, transferred {Length}/{Expected}", ec, transferLength, encryptedCommand.Length);
                     return false;
                 }
 
-                // For large payloads (image data), read the device response as flow
-                // control - the device ACKs each frame before accepting the next.
-                // Without this, frames queue up faster than the device can process
-                // them, eventually overflowing its USB receive buffer.
-                // For small command packets, skip the read (fire-and-forget).
-                if (_reader != null && data.Length > FULL_PACKET_SIZE)
+                ec = _writer.Write(data, timeout, out transferLength);
+                if (ec != ErrorCode.None || transferLength != data.Length)
                 {
-                    byte[] readBuffer = new byte[512];
-                    ec = _reader.Read(readBuffer, adjustedTimeout, out _);
-                    if (ec != ErrorCode.None && ec != ErrorCode.IoTimedOut)
-                    {
-                        Logger.Debug("Flow-control read returned {ErrorCode}", ec);
-                    }
+                    Logger.Warning("Data write failed: {ErrorCode}, transferred {Length}/{Expected}", ec, transferLength, data.Length);
+                    return false;
                 }
 
+                byte[] readBuffer = new byte[FULL_PACKET_SIZE];
+                ec = _reader.Read(readBuffer, timeout, out transferLength);
+
+                if (ec == ErrorCode.IoTimedOut)
+                {
+                    Logger.Warning("USB read operation timed out after command+data write");
+                    return false;
+                }
+                else if (ec != ErrorCode.None)
+                {
+                    Logger.Warning("Read Error after command+data write: {ErrorCode}", ec);
+                    return false;
+                }
+
+                _reader.ReadFlush();
                 return true;
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, "Error writing to device");
+                Logger.Error(ex, "Error in WriteCommandAndData");
                 return false;
             }
         }
@@ -969,16 +982,10 @@ namespace InfoPanel.TuringPanel
                         byte[] buffer = new byte[TOTAL_BUFFER_SIZE];
                         Array.Copy(dataBuffer, 0, buffer, 0, bytesRead);
 
-                        // Encrypt the command packet
+                        // Encrypt the command packet, then command + chunk + response read
                         byte[] encryptedPacket = EncryptCommandPacket(cmdPacket);
 
-                        // Combine encrypted packet with buffer data
-                        byte[] fullPayload = new byte[encryptedPacket.Length + buffer.Length];
-                        Buffer.BlockCopy(encryptedPacket, 0, fullPayload, 0, encryptedPacket.Length);
-                        Buffer.BlockCopy(buffer, 0, fullPayload, encryptedPacket.Length, buffer.Length);
-
-                        // Send the chunk
-                        if (!WriteToDevice(fullPayload))
+                        if (!WriteCommandAndData(encryptedPacket, buffer))
                         {
                             Logger.Error("Failed to write chunk to device.");
                             return false;
@@ -1295,15 +1302,9 @@ namespace InfoPanel.TuringPanel
             cmdPacket[10] = (byte)((imgSize >> 8) & 0xFF);
             cmdPacket[11] = (byte)(imgSize & 0xFF);
 
-            // Encrypt the command packet
+            // Encrypt the command packet, then command + payload + response read
             byte[] encryptedPacket = EncryptCommandPacket(cmdPacket);
-
-            // Combine the encrypted packet with the image data
-            byte[] fullPayload = new byte[encryptedPacket.Length + pngData.Length];
-            Buffer.BlockCopy(encryptedPacket, 0, fullPayload, 0, encryptedPacket.Length);
-            Buffer.BlockCopy(pngData, 0, fullPayload, encryptedPacket.Length, pngData.Length);
-            // Write the payload to the device
-            return WriteToDevice(fullPayload);
+            return WriteCommandAndData(encryptedPacket, pngData);
         }
 
         public bool SendImage(string imagePath)
@@ -1391,11 +1392,7 @@ namespace InfoPanel.TuringPanel
             cmdPacket[11] = (byte)(imgSize & 0xFF);
 
             byte[] encryptedPacket = EncryptCommandPacket(cmdPacket);
-            byte[] fullPayload = new byte[encryptedPacket.Length + fullImgData.Length];
-            Buffer.BlockCopy(encryptedPacket, 0, fullPayload, 0, encryptedPacket.Length);
-            Buffer.BlockCopy(fullImgData, 0, fullPayload, encryptedPacket.Length, fullImgData.Length);
-
-            bool success = WriteToDevice(fullPayload);
+            bool success = WriteCommandAndData(encryptedPacket, fullImgData);
             if (!success)
                 throw new TuringDeviceException("Failed to send clear image command to device");
 

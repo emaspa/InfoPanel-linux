@@ -98,6 +98,15 @@ namespace InfoPanel
             if (DeviceRuntime.GetProfile(_device.ProfileGuid) is Profile profile)
             {
                 var rotation = _device.Rotation;
+
+                // Portrait-native panel showing a landscape profile: rotate into
+                // the frame by default; an explicit rotation choice still wins.
+                if (rotation == LCD_ROTATION.RotateNone
+                    && _panelHeight > _panelWidth && profile.Width > profile.Height)
+                {
+                    rotation = LCD_ROTATION.Rotate90FlipNone;
+                }
+
                 var bitmap = PanelRenderer.RenderSK(profile, false);
 
                 var ensuredBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);

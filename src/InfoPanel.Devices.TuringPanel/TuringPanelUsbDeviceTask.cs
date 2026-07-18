@@ -75,16 +75,18 @@ namespace InfoPanel.Services
             {
                 var rotation = _device.Rotation;
 
-                // The Lian Li 8.8" framebuffer is natively portrait (480x1920);
-                // landscape profiles rotate 90 degrees into the portrait frame,
-                // and frames are sent as JPEG like the vendor app.
+                // Portrait-native framebuffer showing a landscape profile: rotate
+                // into the frame by default (these panels are usually mounted
+                // horizontally); an explicit rotation choice still wins.
+                if (rotation == LCD_ROTATION.RotateNone
+                    && _panelHeight > _panelWidth && profile.Width > profile.Height)
+                {
+                    rotation = LCD_ROTATION.Rotate90FlipNone;
+                }
+
+                // The Lian Li 8.8" sends frames as JPEG like the vendor app.
                 if (IsLianLi)
                 {
-                    if (rotation == LCD_ROTATION.RotateNone)
-                    {
-                        rotation = LCD_ROTATION.Rotate90FlipNone;
-                    }
-
                     using var lianLiBitmap = PanelRenderer.RenderSK(profile, false);
                     using var lianLiResized = SKBitmapExtensions.EnsureBitmapSize(lianLiBitmap, _panelWidth, _panelHeight, rotation);
                     using var lianLiPixmap = lianLiResized.PeekPixels();
