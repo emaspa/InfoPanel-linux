@@ -75,7 +75,14 @@ namespace InfoPanel.Views
 
             Closing += (_, e) =>
             {
-                // Close-to-tray: hide instead of exiting; Exit lives in the tray menu
+                // Close-to-tray: hide instead of exiting; Exit lives in the tray menu.
+                // Never intercept OS/session or application shutdown, or logout and
+                // restart stall waiting for us (issue #2).
+                if (e.CloseReason is WindowCloseReason.OSShutdown or WindowCloseReason.ApplicationShutdown)
+                {
+                    return;
+                }
+
                 if (Avalonia.Application.Current is App app && app.Host.Settings.MinimizeToTray)
                 {
                     e.Cancel = true;

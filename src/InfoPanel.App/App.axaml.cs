@@ -15,6 +15,7 @@ namespace InfoPanel
         private FileStream? _instanceLock;
         private AppHost? _host;
         private CancellationTokenSource? _cts;
+        private readonly List<System.Runtime.InteropServices.PosixSignalRegistration> _signalRegistrations = [];
 
         public AppHost Host => _host ?? throw new InvalidOperationException("AppHost not initialized");
 
@@ -36,6 +37,42 @@ namespace InfoPanel
 
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 desktop.ShutdownRequested += OnShutdownRequested;
+
+                // Session managers end the session with SIGTERM/SIGHUP; run the
+                // normal fast shutdown so logout and restart never wait on us
+                // (issue #2). A backstop hard-exits if that path ever stalls.
+                foreach (var signal in new[] { System.Runtime.InteropServices.PosixSignal.SIGTERM, System.Runtime.InteropServices.PosixSignal.SIGHUP })
+                {
+                    _signalRegistrations.Add(System.Runtime.InteropServices.PosixSignalRegistration.Create(signal, context =>
+                    {
+                        context.Cancel = true;
+                        Logger.Information("Received {Signal}, shutting down", context.Signal);
+
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(TimeSpan.FromSeconds(12));
+                            Environment.Exit(1);
+                        });
+
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            try
+                            {
+                                Logger.Information("Invoking application shutdown");
+                                // TryShutdown, not Shutdown: the force path skips the
+                                // ShutdownRequested event that runs our cleanup and
+                                // the hard exit, leaving LibUsb threads holding the
+                                // process open.
+                                desktop.TryShutdown();
+                            }
+                            catch (Exception ex)
+                            {
+                                Logger.Error(ex, "Shutdown failed, exiting hard");
+                                Environment.Exit(1);
+                            }
+                        });
+                    }));
+                }
 
                 // Marshal Core model notifications through the Avalonia dispatcher
                 UiThread.Configure(action => Avalonia.Threading.Dispatcher.UIThread.Post(action));
@@ -121,7 +158,8 @@ namespace InfoPanel
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                desktop.Shutdown();
+                // TryShutdown so ShutdownRequested fires (see signal handler note)
+                desktop.TryShutdown();
             }
         }
 
