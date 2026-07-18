@@ -128,8 +128,22 @@ namespace InfoPanel.ThermalrightPanel
             foreach (var (vendorId, productId) in hidDevices)
             {
                 var allHidDevices = DeviceList.Local.GetHidDevices(vendorId, productId).ToList();
-                // Filter to data interface only (512-byte packets + report ID)
-                var hidDeviceList = allHidDevices.Where(d => d.GetMaxOutputReportLength() >= 513).ToList();
+                // Filter to data interface only (512-byte packets + report ID).
+                // Reading the report length opens the hidraw node on Linux, which can
+                // throw for devices we lack permissions on; skip those instead of
+                // aborting the whole scan.
+                var hidDeviceList = allHidDevices.Where(d =>
+                {
+                    try
+                    {
+                        return d.GetMaxOutputReportLength() >= 513;
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.Debug(ex, "ThermalrightPanelHelper: skipping unreadable HID device {Path}", d.DevicePath);
+                        return false;
+                    }
+                }).ToList();
                 Logger.Information("ThermalrightPanelHelper: Scanning for HID devices VID={VendorId:X4} PID={ProductId:X4}: {Total} found, {DataOnly} data interfaces",
                     vendorId, productId, allHidDevices.Count, hidDeviceList.Count);
 
