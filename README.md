@@ -173,7 +173,7 @@ Windows build and are expected to work - reports welcome.
 
 | Model | Resolution |
 |---|---|
-| Trofeo Vision 6.86" | 1280×480 |
+| Trofeo Vision 6.86" ✓ | 1280×480 |
 | Trofeo Vision 1600×720 | 1600×720 |
 | Trofeo Vision 960×540 | 960×540 |
 | Trofeo Vision 800×480 | 800×480 |
