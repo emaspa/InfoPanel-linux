@@ -23,7 +23,6 @@ namespace InfoPanel
 
         private readonly int _nativeWidth;
         private readonly int _nativeHeight;
-        private readonly ScreenOrientation _screenOrientation;
 
         private readonly int _sectorWidth;
         private readonly int _sectorHeight;
@@ -44,7 +43,6 @@ namespace InfoPanel
                 _panelHeight = modelInfo.Height;
                 _nativeWidth = modelInfo.Width;
                 _nativeHeight = modelInfo.Height;
-                _screenOrientation = ScreenOrientation.Portrait;
 
                 switch (modelInfo.Model)
                 {

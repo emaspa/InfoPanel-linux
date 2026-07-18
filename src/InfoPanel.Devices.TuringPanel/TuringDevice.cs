@@ -1291,6 +1291,21 @@ namespace InfoPanel.TuringPanel
             }
         }
 
+        public bool SendJpegBytes(byte[] jpegData)
+        {
+            int imgSize = jpegData.Length;
+            byte[] cmdPacket = BuildCommandPacketHeader(101);
+
+            // Set image size in the packet (big-endian)
+            cmdPacket[8] = (byte)((imgSize >> 24) & 0xFF);
+            cmdPacket[9] = (byte)((imgSize >> 16) & 0xFF);
+            cmdPacket[10] = (byte)((imgSize >> 8) & 0xFF);
+            cmdPacket[11] = (byte)(imgSize & 0xFF);
+
+            byte[] encryptedPacket = EncryptCommandPacket(cmdPacket);
+            return WriteCommandAndData(encryptedPacket, jpegData);
+        }
+
         public bool SendPngBytes(byte[] pngData)
         {
             int imgSize = pngData.Length;

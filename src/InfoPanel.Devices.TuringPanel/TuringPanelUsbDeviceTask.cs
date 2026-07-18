@@ -21,8 +21,6 @@ namespace InfoPanel.Services
         private readonly TuringPanelDevice _device;
         private readonly int _panelWidth;
         private readonly int _panelHeight;
-        private static readonly int _maxSize = 1024 * 1024; // 1MB
-        private DateTime _downgradeRenderingUntil = DateTime.MinValue;
 
         public TuringPanelDevice Device => _device;
 
@@ -47,7 +45,7 @@ namespace InfoPanel.Services
 
             public bool DrawFrame(byte[] imageBytes)
             {
-                inner.SendPngBytes(imageBytes);
+                inner.SendJpegBytes(imageBytes);
                 return true;
             }
 
@@ -92,69 +90,24 @@ namespace InfoPanel.Services
                     return lianLiData.ToArray();
                 }
 
-                using var bitmap = PanelRenderer.RenderSK(profile, false,
-                    colorType: DateTime.Now > _downgradeRenderingUntil ? SKColorType.Rgba8888 : SKColorType.Argb4444);
-
+                // JPEG like the Windows build (command 101): much cheaper to encode
+                // and for the panel to decode than PNG, which capped frame rate.
+                using var bitmap = PanelRenderer.RenderSK(profile, false);
                 using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
 
-                var options = new SKPngEncoderOptions(
-                        filterFlags: SKPngEncoderFilterFlags.NoFilters,
-                        zLibLevel: 3
-                        );
-
                 using var pixmap = resizedBitmap.PeekPixels();
-                using var data = pixmap.Encode(options);
+                using var data = pixmap.Encode(SKEncodedImageFormat.Jpeg, _device.JpegQuality);
 
                 if (data == null || data.IsEmpty)
                 {
-                    Logger.Error("TuringPanelDevice {Device}: Failed to encode bitmap to PNG", _device);
+                    Logger.Error("TuringPanelDevice {Device}: Failed to encode bitmap to JPEG", _device);
                     return null;
                 }
 
-                var result = data.ToArray();
-
-                if (resizedBitmap.ColorType != SKColorType.Argb4444 && result.Length > _maxSize)
-                {
-                    Logger.Warning("TuringPanelDevice {Device}: Downgrading rendering to ARGB4444 due to size constraints. Size: {Size} bytes, max: {MaxSize} bytes", 
-                        _device, result.Length, _maxSize);
-                    DateTime now = DateTime.Now;
-                    DateTime targetTime = now.AddSeconds(10);
-                    _downgradeRenderingUntil = targetTime;
-                    return null;
-                }
-                else if (result.Length > _maxSize)
-                {
-                    result = DownscaleUpscaleAndEncode(resizedBitmap);
-                }
-
-                return result;
+                return data.ToArray();
             }
 
             return null;
-        }
-
-        private static byte[]? DownscaleUpscaleAndEncode(SKBitmap original, float scale = 0.5f)
-        {
-            int downWidth = (int)(original.Width * scale);
-            int downHeight = (int)(original.Height * scale);
-
-            using var downscaled = original.Resize(new SKImageInfo(downWidth, downHeight), SKSamplingOptions.Default);
-            using var upscaled = downscaled.Resize(new SKImageInfo(original.Width, original.Height), SKSamplingOptions.Default);
-
-            var options = new SKPngEncoderOptions(
-                      filterFlags: SKPngEncoderFilterFlags.NoFilters,
-                      zLibLevel: 3
-                      );
-
-            using var pixmap = upscaled.PeekPixels();
-            using var data = pixmap.Encode(options);
-
-            if (data == null || data.IsEmpty)
-            {
-                Logger.Error("Failed to encode bitmap to PNG");
-                return null;
-            }
-            return data.ToArray();
         }
 
         private static byte[] EncodeSolidFrame(int width, int height, SKColor color, SKEncodedImageFormat format, int quality)
