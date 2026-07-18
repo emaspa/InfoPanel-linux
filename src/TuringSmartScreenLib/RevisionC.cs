@@ -22,13 +22,23 @@ public sealed unsafe class TuringSmartScreenRevisionC : IDisposable
 
     private static readonly byte[] CommandUpdateBitmapTerminate = [0xef, 0x69];
 
+    // Batch outgoing 250-byte protocol blocks into large writes: on Linux each
+    // SerialPort.Write is a syscall plus a USB CDC transfer, and a full frame is
+    // ~6000 blocks, which capped the panel far below its Windows frame rate.
+    // The wire bytes are identical; blocks are only coalesced.
+    private const int BatchSize = 64 * 1024;
+
     private readonly SerialPort port;
 
     private byte[] writeBuffer;
 
+    private byte[] batchBuffer;
+
     private byte[] readBuffer;
 
     private int writeOffset;
+
+    private int batchOffset;
 
     private int renderCount;
 
@@ -51,6 +61,7 @@ public sealed unsafe class TuringSmartScreenRevisionC : IDisposable
             Parity = Parity.None
         };
         writeBuffer = ArrayPool<byte>.Shared.Rent(WriteSize);
+        batchBuffer = ArrayPool<byte>.Shared.Rent(BatchSize);
         readBuffer = ArrayPool<byte>.Shared.Rent(ReadSize);
     }
 
@@ -62,6 +73,11 @@ public sealed unsafe class TuringSmartScreenRevisionC : IDisposable
         {
             ArrayPool<byte>.Shared.Return(writeBuffer);
             writeBuffer = [];
+        }
+        if (batchBuffer.Length > 0)
+        {
+            ArrayPool<byte>.Shared.Return(batchBuffer);
+            batchBuffer = [];
         }
         if (readBuffer.Length > 0)
         {
@@ -107,6 +123,9 @@ public sealed unsafe class TuringSmartScreenRevisionC : IDisposable
 
     private ReadOnlySpan<byte> ReadResponse(int length = ReadSize)
     {
+        // Everything pending must be on the wire before a response can arrive
+        Drain();
+
         var offset = 0;
         try
         {
@@ -175,8 +194,25 @@ public sealed unsafe class TuringSmartScreenRevisionC : IDisposable
     private void FlushInternal(byte pad)
     {
         writeBuffer.AsSpan(writeOffset, WriteSize - writeOffset).Fill(pad);
-        port.Write(writeBuffer, 0, WriteSize);
+
+        if (batchOffset + WriteSize > batchBuffer.Length)
+        {
+            Drain();
+        }
+
+        writeBuffer.AsSpan(0, WriteSize).CopyTo(batchBuffer.AsSpan(batchOffset));
+        batchOffset += WriteSize;
         writeOffset = 0;
+    }
+
+    /// <summary>Writes all batched protocol blocks to the port in one call.</summary>
+    private void Drain()
+    {
+        if (batchOffset > 0)
+        {
+            port.Write(batchBuffer, 0, batchOffset);
+            batchOffset = 0;
+        }
     }
 
     public void SetBrightness(int level)
@@ -184,6 +220,7 @@ public sealed unsafe class TuringSmartScreenRevisionC : IDisposable
         Write(CommandSetBrightness);
         Write((byte)level);
         Flush();
+        Drain(); // no response follows, push it out now
     }
 
     public void Clear() => Clear(0, 0, 0);
