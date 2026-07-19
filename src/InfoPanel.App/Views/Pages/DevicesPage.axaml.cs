@@ -271,7 +271,7 @@ namespace InfoPanel.Views.Pages
                     remove: () => { settings.JonsboPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
                     setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
-                // The DS339 streams raw BGR888, so JPEG quality only applies to the
+                // The DS339 streams raw UYVY, so JPEG quality only applies to the
                 // DS916 serial transport.
                 int? jpegQuality = device.Model == JonsboPanelModel.DS916 ? device.JpegQuality : null;
                 Action<int>? setJpegQuality = device.Model == JonsboPanelModel.DS916

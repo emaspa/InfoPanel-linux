@@ -25,7 +25,7 @@ namespace InfoPanel.JonsboPanel
     ///       A6 05 01                       video on
     ///   * Frames go to bulk OUT EP 0x04 on the vendor "msusb video" interface (3):
     ///       8-byte header: FF 00 | x/16 (u8) | y (be16) | width/16 (u8) | height|0x8000 (be16)
-    ///       + width*height*3 bytes BGR888 + 8-byte trailer FF C0 00 00 00 00 00 00,
+    ///       + width*height*2 bytes UYVY422 + 8-byte trailer FF C0 00 00 00 00 00 00,
     ///     written in 64 KB chunks. Width byte rounds down (376/16 -> 23), as captured.
     /// </summary>
     public sealed class JonsboMs9132Device : IDisposable
@@ -147,7 +147,7 @@ namespace InfoPanel.JonsboPanel
             Thread.Sleep(30);
             WriteControl([0xA6, 0x03, 0x03, 0, 0, 0, 0, 0]);
             Thread.Sleep(30);
-            WriteControl([0xA6, 0x01, wHi, wLo, hHi, hLo, 0x11, 0x00]); // in: RGB888
+            WriteControl([0xA6, 0x01, wHi, wLo, hHi, hLo, 0x22, 0x00]); // in: UYVY422 (0x22, per ms912x PIXFMT_UYVY)
             Thread.Sleep(30);
             WriteControl([0xA6, 0x02, vic, 0x00, wHi, wLo, hHi, hLo]);  // out: VIC
             Thread.Sleep(30);
@@ -166,16 +166,18 @@ namespace InfoPanel.JonsboPanel
         }
 
         /// <summary>
-        /// Sends one full frame. <paramref name="bgrPixels"/> must be width*height*3 bytes,
-        /// B,G,R order, top-down rows at the panel's native (portrait) resolution.
+        /// Sends one full frame. <paramref name="uyvyPixels"/> must be width*height*2 bytes
+        /// of UYVY422 (U Y0 V Y1 per pixel pair), top-down rows at the panel's native
+        /// (portrait) resolution. RGB (0x11) mode-set with 3-byte payloads only produces
+        /// flashing garbage on the real DS339 - the chip consumes UYVY.
         /// </summary>
-        public void SendFrame(byte[] bgrPixels, int width, int height)
+        public void SendFrame(byte[] uyvyPixels, int width, int height)
         {
             if (_writer == null) throw new InvalidOperationException("USB not open");
 
-            int payloadLen = width * height * 3;
-            if (bgrPixels.Length < payloadLen)
-                throw new ArgumentException($"Pixel buffer too small: {bgrPixels.Length} < {payloadLen}");
+            int payloadLen = width * height * 2;
+            if (uyvyPixels.Length < payloadLen)
+                throw new ArgumentException($"Pixel buffer too small: {uyvyPixels.Length} < {payloadLen}");
 
             int total = 8 + payloadLen + 8;
             var buffer = System.Buffers.ArrayPool<byte>.Shared.Rent(total);
@@ -192,7 +194,7 @@ namespace InfoPanel.JonsboPanel
                 buffer[6] = (byte)(flaggedHeight >> 8);
                 buffer[7] = (byte)(flaggedHeight & 0xFF);
 
-                Buffer.BlockCopy(bgrPixels, 0, buffer, 8, payloadLen);
+                Buffer.BlockCopy(uyvyPixels, 0, buffer, 8, payloadLen);
 
                 // Trailer: FF C0 00 00 00 00 00 00
                 int t = 8 + payloadLen;

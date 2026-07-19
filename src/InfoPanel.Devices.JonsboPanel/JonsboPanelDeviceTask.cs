@@ -346,14 +346,14 @@ namespace InfoPanel.Services
         {
             FpsCounter fpsCounter = new(60);
             var stopwatch = new Stopwatch();
-            byte[]? bgrBuffer = null;
+            byte[]? uyvyBuffer = null;
 
             while (!token.IsCancellationRequested)
             {
                 stopwatch.Restart();
 
-                GenerateBgrFrame(ref bgrBuffer);
-                ms.SendFrame(bgrBuffer!, _panelWidth, _panelHeight);
+                GenerateUyvyFrame(ref uyvyBuffer);
+                ms.SendFrame(uyvyBuffer!, _panelWidth, _panelHeight);
 
                 fpsCounter.Update(stopwatch.ElapsedMilliseconds);
                 _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
@@ -365,13 +365,15 @@ namespace InfoPanel.Services
         }
 
         /// <summary>
-        /// Renders the profile and converts to BGR888 at the panel's native portrait
-        /// resolution, reusing <paramref name="bgrBuffer"/> across frames.
+        /// Renders the profile and converts to UYVY422 (2 bytes/pixel, U Y0 V Y1 per
+        /// pixel pair, BT.601 coefficients from the ms912x kernel driver) at the panel's
+        /// native portrait resolution, reusing <paramref name="uyvyBuffer"/> across frames.
+        /// The chip consumes UYVY only - RGB payloads desync into flashing garbage.
         /// </summary>
-        private void GenerateBgrFrame(ref byte[]? bgrBuffer)
+        private void GenerateUyvyFrame(ref byte[]? uyvyBuffer)
         {
             int pixelCount = _panelWidth * _panelHeight;
-            bgrBuffer ??= new byte[pixelCount * 3];
+            uyvyBuffer ??= new byte[pixelCount * 2];
 
             SKBitmap? rendered = null;
             try
@@ -389,34 +391,37 @@ namespace InfoPanel.Services
                     rendered.Erase(SKColors.Black);
                 }
 
-                float scale = Math.Clamp(_device.Brightness, 0, 100) / 100f;
-                bool dim = scale < 1f;
+                int scale256 = Math.Clamp(_device.Brightness, 0, 100) * 256 / 100;
+                bool dim = scale256 < 256;
 
                 unsafe
                 {
                     byte* src = (byte*)rendered.GetPixels().ToPointer();
                     int srcRowBytes = rendered.RowBytes;
-                    fixed (byte* dstBase = bgrBuffer)
+                    fixed (byte* dstBase = uyvyBuffer)
                     {
                         byte* dst = dstBase;
                         for (int y = 0; y < _panelHeight; y++)
                         {
                             byte* row = src + y * srcRowBytes;
-                            for (int x = 0; x < _panelWidth; x++)
+                            for (int x = 0; x < _panelWidth; x += 2)
                             {
-                                byte r = row[x * 4];      // Rgba8888: R,G,B,A
-                                byte g = row[x * 4 + 1];
-                                byte b = row[x * 4 + 2];
+                                int o = x * 4;            // Rgba8888: R,G,B,A
+                                int r1 = row[o], g1 = row[o + 1], b1 = row[o + 2];
+                                int r2 = row[o + 4], g2 = row[o + 5], b2 = row[o + 6];
                                 if (dim)
                                 {
-                                    r = (byte)(r * scale);
-                                    g = (byte)(g * scale);
-                                    b = (byte)(b * scale);
+                                    r1 = r1 * scale256 >> 8; g1 = g1 * scale256 >> 8; b1 = b1 * scale256 >> 8;
+                                    r2 = r2 * scale256 >> 8; g2 = g2 * scale256 >> 8; b2 = b2 * scale256 >> 8;
                                 }
-                                // Wire format is BGR888 (DRM_FORMAT_RGB888 memory order)
-                                *dst++ = b;
-                                *dst++ = g;
-                                *dst++ = r;
+                                int y1 = (16 << 16) + 16763 * r1 + 32904 * g1 + 6391 * b1;
+                                int y2 = (16 << 16) + 16763 * r2 + 32904 * g2 + 6391 * b2;
+                                int u = ((128 << 17) - 9676 * (r1 + r2) - 18996 * (g1 + g2) + 28672 * (b1 + b2)) >> 1;
+                                int v = ((128 << 17) + 28672 * (r1 + r2) - 24009 * (g1 + g2) - 4663 * (b1 + b2)) >> 1;
+                                *dst++ = (byte)(u >> 16);
+                                *dst++ = (byte)(y1 >> 16);
+                                *dst++ = (byte)(v >> 16);
+                                *dst++ = (byte)(y2 >> 16);
                             }
                         }
                     }

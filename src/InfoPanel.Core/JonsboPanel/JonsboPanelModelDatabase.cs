@@ -42,7 +42,7 @@ namespace InfoPanel.JonsboPanel
             },
             // DS339: MS9132 driving a 376x960 portrait panel. Mode-set uses Jonsbo's
             // custom VIC 171 (from the OEM app's EDID timing table), frames are raw
-            // BGR888 (verified against a USB capture of the OEM app).
+            // UYVY422 at 2 bytes/pixel (RGB payloads desync; verified on real hardware).
             [JonsboPanelModel.DS339] = new JonsboPanelModelInfo
             {
                 Model = JonsboPanelModel.DS339,

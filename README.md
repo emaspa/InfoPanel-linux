@@ -265,7 +265,7 @@ the OEM JONSBO-AIO app (see [upstream PR #152](https://github.com/habibrehmansg/
 | Model | Resolution | Connection |
 |---|---|---|
 | Jonsbo DS916 | 462×1920 | Serial `33C3:F101` (HLVMAX, raw JPEG frames) |
-| Jonsbo DS339 | 376×960 | USB `345F:9132` (MacroSilicon MS9132, HID + bulk BGR888) |
+| Jonsbo DS339 | 376×960 | USB `345F:9132` (MacroSilicon MS9132, HID + bulk UYVY422) |
 
 The DS339 shares its USB ID with the VMAX 4.6"; the device scan reads the
 panel EDID to tell them apart.
