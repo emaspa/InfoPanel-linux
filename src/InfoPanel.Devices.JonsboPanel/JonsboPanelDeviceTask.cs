@@ -119,6 +119,7 @@ namespace InfoPanel.Services
             FpsCounter fpsCounter = new(60);
             byte[]? latestFrame = null;
             byte[]? lastSentFrame = null;
+            long lastRenderMs = 0;
             AutoResetEvent frameAvailable = new(false);
 
             var renderCts = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -138,6 +139,7 @@ namespace InfoPanel.Services
                         stopwatch.Restart();
 
                         var frame = GenerateJpegBuffer();
+                        Interlocked.Exchange(ref lastRenderMs, stopwatch.ElapsedMilliseconds);
                         Interlocked.Exchange(ref latestFrame, frame);
                         frameAvailable.Set();
 
@@ -185,7 +187,10 @@ namespace InfoPanel.Services
                             serial.SendJpegFrame(jpegData);
                             lastSentFrame = jpegData;
 
-                            fpsCounter.Update(stopwatch.ElapsedMilliseconds);
+                            // The firmware sends no reply, so the buffered serial write
+                            // returns in ~0 ms; report render+encode+send as the frame
+                            // time instead of a meaningless constant zero.
+                            fpsCounter.Update(Interlocked.Read(ref lastRenderMs) + stopwatch.ElapsedMilliseconds);
                             _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
                         }
                     }
