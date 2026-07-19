@@ -98,7 +98,7 @@ namespace InfoPanel.Services
                 {
                     while (!renderToken.IsCancellationRequested)
                     {
-                        var frame = GenerateBgr888Frame();
+                        var frame = GenerateUyvyFrame();
                         try
                         {
                             await frames.Writer.WriteAsync(frame, renderToken);
@@ -133,7 +133,7 @@ namespace InfoPanel.Services
                     {
                         var stopwatch = Stopwatch.StartNew();
 
-                        vmaxDevice.SendRgb888Frame(frame.Buffer, frame.Length);
+                        vmaxDevice.SendUyvyFrame(frame.Buffer, frame.Length);
 
                         vmaxDevice.SetScreenSwitch(_device.ScreenSwitch);
 
@@ -174,7 +174,7 @@ namespace InfoPanel.Services
                 ArrayPool<byte>.Shared.Return(frame.Buffer);
         }
 
-        private RenderedFrame GenerateBgr888Frame()
+        private RenderedFrame GenerateUyvyFrame()
         {
             if (DeviceRuntime.GetProfile(_device.ProfileGuid) is Profile profile)
             {
@@ -184,21 +184,27 @@ namespace InfoPanel.Services
 
                 using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, _device.Rotation);
 
-                var length = resizedBitmap.Width * resizedBitmap.Height * 3;
+                var length = resizedBitmap.Width * resizedBitmap.Height * 2;
                 var output = ArrayPool<byte>.Shared.Rent(length);
-                ToBgr888(resizedBitmap, output, _device.Brightness);
+                ToUyvy(resizedBitmap, output, _device.Brightness);
                 return new RenderedFrame(output, length);
             }
 
-            var blackFrame = GenerateBlackRgb888();
+            var blackFrame = GenerateBlackUyvy();
             return new RenderedFrame(blackFrame, blackFrame.Length, ReturnToPool: false);
         }
 
-        private static void ToBgr888(SKBitmap bitmap, byte[] output, int brightness)
+        /// <summary>
+        /// Converts Rgba8888 to UYVY422 (U Y0 V Y1 per pixel pair, BT.601 integer
+        /// coefficients from the ms912x kernel driver). The MS9132 consumes UYVY only;
+        /// RGB payloads desync into flashing garbage (verified on the sibling DS339).
+        /// </summary>
+        private static void ToUyvy(SKBitmap bitmap, byte[] output, int brightness)
         {
             var pixels = bitmap.GetPixelSpan();
             var srcStride = bitmap.RowBytes;
-            var scale = Math.Clamp(brightness, 0, 99);
+            int scale256 = Math.Clamp(brightness, 0, 100) * 256 / 100;
+            bool dim = scale256 < 256;
             int offset = 0;
 
             unsafe
@@ -209,24 +215,45 @@ namespace InfoPanel.Services
                     for (int y = 0; y < bitmap.Height; y++)
                     {
                         byte* srcRow = srcBase + y * srcStride;
-                        for (int x = 0; x < bitmap.Width; x++)
+                        for (int x = 0; x < bitmap.Width; x += 2)
                         {
-                            int si = x * 4;
-                            dstBase[offset++] = (byte)(srcRow[si + 2] * scale / 100);
-                            dstBase[offset++] = (byte)(srcRow[si + 1] * scale / 100);
-                            dstBase[offset++] = (byte)(srcRow[si + 0] * scale / 100);
+                            int si = x * 4;              // Rgba8888: R,G,B,A
+                            int r1 = srcRow[si], g1 = srcRow[si + 1], b1 = srcRow[si + 2];
+                            int r2 = srcRow[si + 4], g2 = srcRow[si + 5], b2 = srcRow[si + 6];
+                            if (dim)
+                            {
+                                r1 = r1 * scale256 >> 8; g1 = g1 * scale256 >> 8; b1 = b1 * scale256 >> 8;
+                                r2 = r2 * scale256 >> 8; g2 = g2 * scale256 >> 8; b2 = b2 * scale256 >> 8;
+                            }
+                            int y1 = (16 << 16) + 16763 * r1 + 32904 * g1 + 6391 * b1;
+                            int y2 = (16 << 16) + 16763 * r2 + 32904 * g2 + 6391 * b2;
+                            int u = ((128 << 17) - 9676 * (r1 + r2) - 18996 * (g1 + g2) + 28672 * (b1 + b2)) >> 1;
+                            int v = ((128 << 17) + 28672 * (r1 + r2) - 24009 * (g1 + g2) - 4663 * (b1 + b2)) >> 1;
+                            dstBase[offset++] = (byte)(u >> 16);
+                            dstBase[offset++] = (byte)(y1 >> 16);
+                            dstBase[offset++] = (byte)(v >> 16);
+                            dstBase[offset++] = (byte)(y2 >> 16);
                         }
                     }
                 }
             }
         }
 
-        private byte[]? _cachedBlackRgb888;
+        private byte[]? _cachedBlackUyvy;
 
-        private byte[] GenerateBlackRgb888()
+        private byte[] GenerateBlackUyvy()
         {
-            _cachedBlackRgb888 ??= new byte[_panelWidth * _panelHeight * 3];
-            return _cachedBlackRgb888;
+            if (_cachedBlackUyvy == null)
+            {
+                // Black in UYVY is Y=16, U=V=128 - an all-zero buffer would be green.
+                _cachedBlackUyvy = new byte[_panelWidth * _panelHeight * 2];
+                for (int i = 0; i < _cachedBlackUyvy.Length; i += 2)
+                {
+                    _cachedBlackUyvy[i] = 0x80;
+                    _cachedBlackUyvy[i + 1] = 0x10;
+                }
+            }
+            return _cachedBlackUyvy;
         }
 
         private readonly record struct RenderedFrame(

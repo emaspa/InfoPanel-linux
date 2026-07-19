@@ -61,7 +61,7 @@ namespace InfoPanel.JonsboPanel
                     return null;
                 }
 
-                dev._hidRaw = LinuxHidRawFeature.Open(hidDevice);
+                dev._hidRaw = LinuxHidRawFeature.Open(hidDevice.DevicePath);
                 if (dev._hidRaw == null)
                 {
                     Logger.Warning("JonsboMs9132: Cannot open hidraw node (udev rules installed?)");

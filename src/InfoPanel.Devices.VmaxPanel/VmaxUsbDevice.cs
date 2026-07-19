@@ -79,7 +79,7 @@ namespace InfoPanel.VmaxPanel
             [0xB5, 0xF4, 0x39, 0x00, 0x00, 0x00, 0x00, 0x00],
             [0xA6, 0x03, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00],
             [0xB5, 0xC5, 0x58, 0x00, 0x00, 0x00, 0x00, 0x00],
-            [0xA6, 0x01, 0x01, 0x40, 0x03, 0xC0, 0x11, 0x00],
+            [0xA6, 0x01, 0x01, 0x40, 0x03, 0xC0, 0x22, 0x00], // in: UYVY422 (0x22; RGB 0x11 desyncs on Linux, see DS339)
             [0xB5, 0xC5, 0x56, 0x00, 0x00, 0x00, 0x00, 0x00],
             [0xA6, 0x02, 0xB2, 0x00, 0x01, 0x40, 0x03, 0xC0],
             [0xB5, 0xC5, 0x57, 0x00, 0x00, 0x00, 0x00, 0x00],
@@ -93,7 +93,7 @@ namespace InfoPanel.VmaxPanel
         private UsbDevice? _usbDevice;
         private UsbEndpointWriter? _writer;
         private IUsbDevice? _wholeUsbDevice;
-        private HidStream? _hidStream;
+        private LinuxHidRawFeature? _hidRaw;
         private DateTime _lastStreamingStatusPolled = DateTime.MinValue;
         private byte[]? _frameBuffer;
         private bool _hasSentFrame;
@@ -135,7 +135,7 @@ namespace InfoPanel.VmaxPanel
                         claimed);
                 }
 
-                device._hidStream = InitializeStreamingMode();
+                device._hidRaw = InitializeStreamingMode();
 
                 var writeEndpoint = FindWriteEndpoint(usbDevice);
                 device._writer = usbDevice.OpenEndpointWriter(writeEndpoint);
@@ -191,8 +191,11 @@ namespace InfoPanel.VmaxPanel
             return endpoint;
         }
 
-        private static HidStream InitializeStreamingMode()
+        private static LinuxHidRawFeature InitializeStreamingMode()
         {
+            // Feature reports go through direct hidraw ioctls: HidSharp's Linux
+            // GetFeature issues HIDIOCGFEATURE with length-1, which this chip rejects
+            // with EOVERFLOW (same MS9132 bridge as the Jonsbo DS339).
             var hidDevices = DeviceList.Local
                 .GetHidDevices(VmaxPanelModelDatabase.VMAX_VENDOR_ID, VmaxPanelModelDatabase.VMAX_PRODUCT_ID_46INCH)
                 .ToList();
@@ -201,53 +204,41 @@ namespace InfoPanel.VmaxPanel
 
             foreach (var hidDevice in hidDevices)
             {
+                LinuxHidRawFeature? raw = null;
                 try
                 {
+                    Logger.Information("VmaxUsbDevice: Trying HID init via {Path}", hidDevice.DevicePath);
+
+                    raw = LinuxHidRawFeature.Open(hidDevice.DevicePath);
+                    if (raw == null) continue;
+
+                    byte[] response = [];
+                    foreach (var featureReport in StreamingStartupFeatureReports)
+                    {
+                        response = SendFeatureReport(raw, featureReport);
+                        ApplyStartupDelay(featureReport);
+                    }
+
+                    for (var i = 0; i < 42; i++)
+                    {
+                        response = SendFeatureReport(raw, StreamingPulseFeatureReport);
+                        Thread.Sleep(2);
+                    }
+
+                    response = SendFeatureReport(raw, DisplayEnableFeatureReport);
+                    Thread.Sleep(StreamingInitDelayMs);
+                    response = SendFeatureReport(raw, StreamingStatusFeatureReport);
+
                     Logger.Information(
-                        "VmaxUsbDevice: Trying HID init via {Path}, FeatureLen={FeatureLength}, InputLen={InputLength}, OutputLen={OutputLength}",
-                        hidDevice.DevicePath,
-                        hidDevice.GetMaxFeatureReportLength(),
-                        hidDevice.GetMaxInputReportLength(),
-                        hidDevice.GetMaxOutputReportLength());
-
-                    var stream = hidDevice.Open();
-                    stream.WriteTimeout = UsbWriteTimeoutMs;
-                    stream.ReadTimeout = UsbWriteTimeoutMs;
-
-                    try
-                    {
-                        byte[] response = [];
-                        foreach (var featureReport in StreamingStartupFeatureReports)
-                        {
-                            response = SendFeatureReport(stream, featureReport);
-                            ApplyStartupDelay(featureReport);
-                        }
-
-                        for (var i = 0; i < 42; i++)
-                        {
-                            response = SendFeatureReport(stream, StreamingPulseFeatureReport);
-                            Thread.Sleep(2);
-                        }
-
-                        response = SendFeatureReport(stream, DisplayEnableFeatureReport);
-                        Thread.Sleep(StreamingInitDelayMs);
-                        response = SendFeatureReport(stream, StreamingStatusFeatureReport);
-
-                        Logger.Information(
-                            "VmaxUsbDevice: Streaming startup init completed with {CommandCount} feature reports, last response {Response}",
-                            StreamingStartupFeatureReports.Length + 44,
-                            BitConverter.ToString(response));
-                        Thread.Sleep(StreamingInitDelayMs);
-                        return stream;
-                    }
-                    catch
-                    {
-                        stream.Dispose();
-                        throw;
-                    }
+                        "VmaxUsbDevice: Streaming startup init completed with {CommandCount} feature reports, last response {Response}",
+                        StreamingStartupFeatureReports.Length + 44,
+                        BitConverter.ToString(response));
+                    Thread.Sleep(StreamingInitDelayMs);
+                    return raw;
                 }
                 catch (Exception ex)
                 {
+                    raw?.Dispose();
                     Logger.Warning(ex, "VmaxUsbDevice: HID streaming init failed for {Path}", hidDevice.DevicePath);
                 }
             }
@@ -255,18 +246,22 @@ namespace InfoPanel.VmaxPanel
             throw new InvalidOperationException("VMAX streaming init failed: no HID interface accepted the feature report.");
         }
 
-        private static byte[] SendFeatureReport(HidStream stream, byte[] payload)
+        private static byte[] SendFeatureReport(LinuxHidRawFeature raw, byte[] payload)
         {
-            var report = new byte[payload.Length + 1];
-            report[0] = 0x00;
-            Buffer.BlockCopy(payload, 0, report, 1, payload.Length);
+            raw.SetFeature(payload);
 
-            stream.SetFeature(report);
-
-            var response = new byte[report.Length];
-            response[0] = 0x00;
-            stream.GetFeature(response);
-            return response;
+            // The captured Windows traffic pairs every SET_REPORT with a GET_REPORT;
+            // tolerate a failed read (untested whether the chip answers reads for
+            // A6/C5-class writes) so a reply quirk cannot abort the whole init.
+            try
+            {
+                return raw.GetFeature();
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug(ex, "VmaxUsbDevice: GET_REPORT after {Op:X2} failed, continuing", payload.Length > 0 ? payload[0] : 0);
+                return new byte[9];
+            }
         }
 
         private static void ApplyStartupDelay(byte[] featureReport)
@@ -300,26 +295,22 @@ namespace InfoPanel.VmaxPanel
                 && featureReport[2] == third;
         }
 
-        public void SendRgb888Frame(byte[] rgbData)
-        {
-            SendRgb888Frame(rgbData, rgbData.Length);
-        }
-
-        public void SendRgb888Frame(byte[] rgbData, int rgbDataLength)
+        /// <summary>Sends one frame of UYVY422 pixel data (2 bytes/pixel).</summary>
+        public void SendUyvyFrame(byte[] pixelData, int pixelDataLength)
         {
             if (_writer == null) throw new InvalidOperationException("VMAX USB device is not open.");
-            if (rgbDataLength < 0 || rgbDataLength > rgbData.Length)
-                throw new ArgumentOutOfRangeException(nameof(rgbDataLength));
+            if (pixelDataLength < 0 || pixelDataLength > pixelData.Length)
+                throw new ArgumentOutOfRangeException(nameof(pixelDataLength));
 
-            var frameLength = FramePrefix.Length + rgbDataLength + FrameSuffix.Length;
+            var frameLength = FramePrefix.Length + pixelDataLength + FrameSuffix.Length;
             if (_frameBuffer == null || _frameBuffer.Length != frameLength)
             {
                 _frameBuffer = new byte[frameLength];
                 Buffer.BlockCopy(FramePrefix, 0, _frameBuffer, 0, FramePrefix.Length);
-                Buffer.BlockCopy(FrameSuffix, 0, _frameBuffer, FramePrefix.Length + rgbDataLength, FrameSuffix.Length);
+                Buffer.BlockCopy(FrameSuffix, 0, _frameBuffer, FramePrefix.Length + pixelDataLength, FrameSuffix.Length);
             }
 
-            Buffer.BlockCopy(rgbData, 0, _frameBuffer, FramePrefix.Length, rgbDataLength);
+            Buffer.BlockCopy(pixelData, 0, _frameBuffer, FramePrefix.Length, pixelDataLength);
 
             var offset = 0;
             while (offset < _frameBuffer.Length)
@@ -340,7 +331,7 @@ namespace InfoPanel.VmaxPanel
 
         public void SetScreenSwitch(bool enabled)
         {
-            if (_hidStream == null || !_hasSentFrame || _currentScreenSwitch == enabled)
+            if (_hidRaw == null || !_hasSentFrame || _currentScreenSwitch == enabled)
                 return;
 
             try
@@ -348,7 +339,7 @@ namespace InfoPanel.VmaxPanel
                 byte[] response = [];
                 foreach (var featureReport in GetScreenSwitchFeatureReports(enabled))
                 {
-                    response = SendFeatureReport(_hidStream, featureReport);
+                    response = SendFeatureReport(_hidRaw, featureReport);
                     ApplyStartupDelay(featureReport);
                 }
 
@@ -374,7 +365,7 @@ namespace InfoPanel.VmaxPanel
 
         private void PollStreamingStatusIfDue()
         {
-            if (_hidStream == null)
+            if (_hidRaw == null)
                 return;
 
             var now = DateTime.UtcNow;
@@ -385,7 +376,7 @@ namespace InfoPanel.VmaxPanel
 
             try
             {
-                var response = SendFeatureReport(_hidStream, StreamingStatusFeatureReport);
+                var response = SendFeatureReport(_hidRaw, StreamingStatusFeatureReport);
                 Logger.Debug("VmaxUsbDevice: Streaming status response {Response}", BitConverter.ToString(response));
             }
             catch (Exception ex)
@@ -402,8 +393,8 @@ namespace InfoPanel.VmaxPanel
             _writer?.Dispose();
             _writer = null;
 
-            _hidStream?.Dispose();
-            _hidStream = null;
+            _hidRaw?.Dispose();
+            _hidRaw = null;
 
             try
             {

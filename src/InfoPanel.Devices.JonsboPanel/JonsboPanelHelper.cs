@@ -131,7 +131,7 @@ namespace InfoPanel.JonsboPanel
                     JonsboPanelModelDatabase.MS9132_VENDOR_ID, JonsboPanelModelDatabase.MS9132_PRODUCT_ID)
                     .FirstOrDefault();
                 if (hid == null) return null;
-                var raw = LinuxHidRawFeature.Open(hid);
+                var raw = LinuxHidRawFeature.Open(hid.DevicePath);
                 if (raw == null) return null;
 
                 using (raw)

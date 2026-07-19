@@ -1,20 +1,20 @@
-using HidSharp;
 using Serilog;
 using System;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 
-namespace InfoPanel.JonsboPanel
+namespace InfoPanel
 {
     /// <summary>
-    /// Direct hidraw feature-report I/O for the MS9132's 8-byte unnumbered reports.
-    /// HidSharp's Linux GetFeature issues HIDIOCGFEATURE with length-1 (8), which the
-    /// kernel rejects with EOVERFLOW for this device; the chip needs the full 9-byte
-    /// convention ([0]=report number 0, then 8 data bytes) on both set and get -
-    /// verified against the real DS339 hardware.
+    /// Direct hidraw feature-report I/O for MacroSilicon MS9132-class chips with
+    /// 8-byte unnumbered reports (Jonsbo DS339, VMAX 4.6"). HidSharp's Linux
+    /// GetFeature issues HIDIOCGFEATURE with length-1 (8), which the kernel rejects
+    /// with EOVERFLOW for these devices; the chip needs the full 9-byte convention
+    /// ([0]=report number 0, then 8 data bytes) on both set and get - verified
+    /// against real DS339 hardware.
     /// </summary>
-    internal sealed class LinuxHidRawFeature : IDisposable
+    public sealed class LinuxHidRawFeature : IDisposable
     {
         private static readonly ILogger Logger = Log.ForContext<LinuxHidRawFeature>();
 
@@ -36,14 +36,16 @@ namespace InfoPanel.JonsboPanel
 
         private LinuxHidRawFeature(int fd) => _fd = fd;
 
-        /// <summary>Opens the /dev/hidrawN node backing a HidSharp device.</summary>
-        public static LinuxHidRawFeature? Open(HidDevice hidDevice)
+        /// <summary>
+        /// Opens the /dev/hidrawN node for a HID device path (accepts HidSharp's
+        /// sysfs-style path ending in .../hidraw/hidrawN, or /dev/hidrawN directly).
+        /// </summary>
+        public static LinuxHidRawFeature? Open(string devicePath)
         {
-            // HidSharp's Linux DevicePath is the sysfs path ending in .../hidraw/hidrawN.
-            var name = hidDevice.DevicePath.Split('/').LastOrDefault() ?? "";
+            var name = devicePath.Split('/').LastOrDefault() ?? "";
             if (!name.StartsWith("hidraw", StringComparison.Ordinal))
             {
-                Logger.Warning("LinuxHidRawFeature: Unexpected device path {Path}", hidDevice.DevicePath);
+                Logger.Warning("LinuxHidRawFeature: Unexpected device path {Path}", devicePath);
                 return null;
             }
 
