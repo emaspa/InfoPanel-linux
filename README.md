@@ -260,7 +260,7 @@ CDC serial JPEG protocol at 2 Mbaud (VID `33C3`):
 ### Jonsbo
 
 Displays shipped with Jonsbo AIO coolers; protocols reverse-engineered from
-the OEM JONSBO-AIO app (see [upstream PR #152](https://github.com/habibrehmansg/infopanel/pull/152)):
+the OEM JONSBO-AIO app:
 
 | Model | Resolution | Connection |
 |---|---|---|
