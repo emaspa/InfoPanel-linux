@@ -49,7 +49,7 @@ bad editing session is never fatal.
 
 - **Desktop overlays**: transparent, repositionable windows rendered
   through X11/XWayland, one per active profile.
-- **USB LCD panels**: six device families with per-device profile
+- **USB LCD panels**: seven device families with per-device profile
   assignment, rotation, brightness, and live frame rate and latency
   readouts. Devices are supervised: they self-heal their USB binding after
   a replug and back off cleanly when unplugged.
@@ -256,6 +256,19 @@ CDC serial JPEG protocol at 2 Mbaud (VID `33C3`):
 | Model | Resolution | USB ID |
 |---|---|---|
 | VMAX 4.6" LCD (AuyiHomu HY-001, HY-002) | 320×960 | `345F:9132` |
+
+### Jonsbo
+
+Displays shipped with Jonsbo AIO coolers; protocols reverse-engineered from
+the OEM JONSBO-AIO app (see [upstream PR #152](https://github.com/habibrehmansg/infopanel/pull/152)):
+
+| Model | Resolution | Connection |
+|---|---|---|
+| Jonsbo DS916 | 462×1920 | Serial `33C3:F101` (HLVMAX, raw JPEG frames) |
+| Jonsbo DS339 | 376×960 | USB `345F:9132` (MacroSilicon MS9132, HID + bulk BGR888) |
+
+The DS339 shares its USB ID with the VMAX 4.6"; the device scan reads the
+panel EDID to tell them apart.
 
 ### Turing Smart Screen
 

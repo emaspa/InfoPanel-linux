@@ -224,6 +224,7 @@ namespace InfoPanel.Services
                 "Thermaltake" => SetProfile(_settings.ThermaltakePanelDevices.FirstOrDefault(d => d.DeviceId == binding.DeviceId), d => d.ProfileGuid = binding.ProfileGuid),
                 "Jl" => SetProfile(_settings.JlPanelDevices.FirstOrDefault(d => d.DeviceId == binding.DeviceId), d => d.ProfileGuid = binding.ProfileGuid),
                 "Vmax" => SetProfile(_settings.VmaxPanelDevices.FirstOrDefault(d => d.DeviceId == binding.DeviceId), d => d.ProfileGuid = binding.ProfileGuid),
+                "Jonsbo" => SetProfile(_settings.JonsboPanelDevices.FirstOrDefault(d => d.DeviceId == binding.DeviceId), d => d.ProfileGuid = binding.ProfileGuid),
                 _ => false,
             };
 

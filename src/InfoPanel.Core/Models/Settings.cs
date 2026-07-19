@@ -112,6 +112,16 @@ namespace InfoPanel.Models
         [ObservableProperty]
         private bool _vmaxPanelMultiDeviceMode = false;
 
+        private readonly ObservableCollection<JonsboPanelDevice> _jonsboPanelDevices = [];
+
+        public ObservableCollection<JonsboPanelDevice> JonsboPanelDevices
+        {
+            get { return _jonsboPanelDevices; }
+        }
+
+        [ObservableProperty]
+        private bool _jonsboPanelMultiDeviceMode = false;
+
         private readonly ObservableCollection<HotkeyBinding> _hotkeyBindings = [];
 
         public ObservableCollection<HotkeyBinding> HotkeyBindings
@@ -171,6 +181,7 @@ namespace InfoPanel.Models
             ThermaltakePanelDevices.CollectionChanged += ThermaltakePanelDevices_CollectionChanged;
             JlPanelDevices.CollectionChanged += JlPanelDevices_CollectionChanged;
             VmaxPanelDevices.CollectionChanged += VmaxPanelDevices_CollectionChanged;
+            JonsboPanelDevices.CollectionChanged += JonsboPanelDevices_CollectionChanged;
         }
 
         private void BeadaPanelDevices_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -344,6 +355,35 @@ namespace InfoPanel.Models
             if (e.PropertyName != nameof(VmaxPanelDevice.RuntimeProperties))
             {
                 OnPropertyChanged(nameof(VmaxPanelDevices));
+            }
+        }
+
+        private void JonsboPanelDevices_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.OldItems != null)
+            {
+                foreach (JonsboPanelDevice device in e.OldItems)
+                {
+                    device.PropertyChanged -= JonsboDevice_PropertyChanged;
+                }
+            }
+
+            if (e.NewItems != null)
+            {
+                foreach (JonsboPanelDevice device in e.NewItems)
+                {
+                    device.PropertyChanged += JonsboDevice_PropertyChanged;
+                }
+            }
+
+            OnPropertyChanged(nameof(JonsboPanelDevices));
+        }
+
+        private void JonsboDevice_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(JonsboPanelDevice.RuntimeProperties))
+            {
+                OnPropertyChanged(nameof(JonsboPanelDevices));
             }
         }
     }

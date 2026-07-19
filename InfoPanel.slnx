@@ -5,6 +5,7 @@
     <Project Path="src/InfoPanel.Core/InfoPanel.Core.csproj" />
     <Project Path="src/InfoPanel.Devices.BeadaPanel/InfoPanel.Devices.BeadaPanel.csproj" />
     <Project Path="src/InfoPanel.Devices.JlPanel/InfoPanel.Devices.JlPanel.csproj" />
+    <Project Path="src/InfoPanel.Devices.JonsboPanel/InfoPanel.Devices.JonsboPanel.csproj" />
     <Project Path="src/InfoPanel.Devices.Thermalright/InfoPanel.Devices.Thermalright.csproj" />
     <Project Path="src/InfoPanel.Devices.Thermaltake/InfoPanel.Devices.Thermaltake.csproj" />
     <Project Path="src/InfoPanel.Devices.TuringPanel/InfoPanel.Devices.TuringPanel.csproj" />

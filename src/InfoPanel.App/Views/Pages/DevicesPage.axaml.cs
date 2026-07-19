@@ -10,6 +10,7 @@ using InfoPanel.ThermalrightPanel;
 using InfoPanel.ThermaltakePanel;
 using InfoPanel.JlPanel;
 using InfoPanel.VmaxPanel;
+using InfoPanel.JonsboPanel;
 using LibUsbDotNet.Main;
 using InfoPanel.TuringPanel;
 using Serilog;
@@ -251,6 +252,36 @@ namespace InfoPanel.Views.Pages
                     device.JpegQuality, q => { device.JpegQuality = q; _app.Host.SaveSettings(); });
             }
 
+            AddFamilyHeader("Jonsbo", settings.JonsboPanelMultiDeviceMode,
+                v => { settings.JonsboPanelMultiDeviceMode = v; _app.Host.SaveSettings(); });
+            foreach (var device in settings.JonsboPanelDevices.ToList())
+            {
+                AddRow(
+                    title: device.ModelInfo?.Name ?? device.Model.ToString(),
+                    subtitle: Subtitle(device.DeviceId, device.DeviceLocation,
+                        device.DisplayWidth > 0 ? $"renders at {device.DisplayWidth}×{device.DisplayHeight}" : null),
+                    isEnabled: device.Enabled,
+                    setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
+                    profileGuid: device.ProfileGuid,
+                    setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
+                    status: () => device.RuntimeProperties.IsRunning
+                        ? RunningStatus(device.ProfileGuid, device.RuntimeProperties.FrameRate, device.RuntimeProperties.FrameTime)
+                        : !device.Enabled ? "disabled"
+                        : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
+                    remove: () => { settings.JonsboPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
+                    rotation: device.Rotation,
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                // The DS339 streams raw BGR888, so JPEG quality only applies to the
+                // DS916 serial transport.
+                int? jpegQuality = device.Model == JonsboPanelModel.DS916 ? device.JpegQuality : null;
+                Action<int>? setJpegQuality = device.Model == JonsboPanelModel.DS916
+                    ? q => { device.JpegQuality = q; _app.Host.SaveSettings(); }
+                    : null;
+                AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
+                    device.TargetFrameRate, f => { device.TargetFrameRate = f; _app.Host.SaveSettings(); },
+                    jpegQuality, setJpegQuality);
+            }
+
             AddHotkeysSection(settings);
         }
 
@@ -282,6 +313,7 @@ namespace InfoPanel.Views.Pages
             foreach (var d in settings.ThermaltakePanelDevices) deviceChoices.Add(new("Thermaltake", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.JlPanelDevices) deviceChoices.Add(new("Jl", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.VmaxPanelDevices) deviceChoices.Add(new("Vmax", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
+            foreach (var d in settings.JonsboPanelDevices) deviceChoices.Add(new("Jonsbo", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
 
             addButton.IsEnabled = deviceChoices.Count > 0;
             addButton.Click += (_, _) =>
@@ -926,8 +958,43 @@ namespace InfoPanel.Views.Pages
                     }
                 }
 
-                // VMAX / AuyiHomu
-                var vmax = await Task.Run(VmaxPanelHelper.ScanDevices);
+                // Jonsbo AIO (DS916 HLVMAX serial, DS339 MS9132)
+                var jonsbo = await Task.Run(JonsboPanelHelper.ScanDevices);
+                var ds339Confirmed = jonsbo.Any(f => f.Model == JonsboPanelModel.DS339 && f.Ms9132Confirmed);
+                var ms9132Ambiguous = jonsbo.Any(f => f.Model == JonsboPanelModel.DS339 && !f.Ms9132Confirmed);
+                foreach (var found in jonsbo)
+                {
+                    var existing = settings.JonsboPanelDevices.FirstOrDefault(d => d.DeviceId == found.DeviceId);
+                    if (existing == null)
+                    {
+                        // The MS9132 bridge is shared with the VMAX 4.6"; when the EDID
+                        // probe could not confirm which panel is attached, don't shadow
+                        // an existing VMAX configuration with a Jonsbo entry.
+                        if (found.Model == JonsboPanelModel.DS339 && !found.Ms9132Confirmed
+                            && settings.VmaxPanelDevices.Count > 0)
+                            continue;
+
+                        settings.JonsboPanelDevices.Add(new JonsboPanelDevice
+                        {
+                            DeviceId = found.DeviceId,
+                            DeviceLocation = found.DeviceLocation,
+                            Model = found.Model,
+                        });
+                        added++;
+                    }
+                    else
+                    {
+                        existing.DeviceLocation = found.DeviceLocation;
+                        updated++;
+                    }
+                }
+
+                // VMAX / AuyiHomu - shares the MS9132 bridge (345F:9132) with the Jonsbo
+                // DS339, so skip when the EDID identified the panel as a DS339, or when
+                // it is unreadable but the device is already configured as a DS339.
+                var skipVmax = ds339Confirmed
+                    || (ms9132Ambiguous && settings.JonsboPanelDevices.Any(d => d.Model == JonsboPanelModel.DS339));
+                var vmax = skipVmax ? new List<VmaxPanelDiscoveryInfo>() : await Task.Run(VmaxPanelHelper.ScanDevices);
                 foreach (var found in vmax)
                 {
                     var existing = settings.VmaxPanelDevices.FirstOrDefault(d => d.DeviceId == found.DeviceId);

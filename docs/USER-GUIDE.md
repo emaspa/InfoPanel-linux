@@ -52,7 +52,7 @@ Third-party .NET plugins built for InfoPanel for Windows load as-is: drop the pl
 
 ## Devices
 
-The Devices page detects supported USB LCD panels: BeadaPanel, Turing Smart Screen (including Lian Li and Rev 4.6"), Thermalright (40+ models), Thermaltake / ASRock, JL / Hongtai and VMAX. For each panel you can assign a profile, set rotation and brightness, and watch the live frame rate and latency.
+The Devices page detects supported USB LCD panels: BeadaPanel, Turing Smart Screen (including Lian Li and Rev 4.6"), Thermalright (40+ models), Thermaltake / ASRock, JL / Hongtai, VMAX and Jonsbo (DS916, DS339). For each panel you can assign a profile, set rotation and brightness, and watch the live frame rate and latency.
 
 If a panel is not detected, confirm the udev rules are installed and the panel is listed by `lsusb`. See the README for the full supported model tables.
 
