@@ -130,24 +130,17 @@ namespace InfoPanel.JonsboPanel
                 hid ??= DeviceList.Local.GetHidDevices(
                     JonsboPanelModelDatabase.MS9132_VENDOR_ID, JonsboPanelModelDatabase.MS9132_PRODUCT_ID)
                     .FirstOrDefault();
-                if (hid == null || !hid.TryOpen(out var stream)) return null;
+                if (hid == null) return null;
+                var raw = LinuxHidRawFeature.Open(hid);
+                if (raw == null) return null;
 
-                using (stream)
+                using (raw)
                 {
-                    stream.WriteTimeout = 1000;
-                    stream.ReadTimeout = 1000;
-
                     int ReadEdidByte(int offset)
                     {
                         ushort address = (ushort)(0xC000 + offset);
-                        var request = new byte[9];
-                        request[1] = 0xB5;
-                        request[2] = (byte)(address >> 8);
-                        request[3] = (byte)(address & 0xFF);
-                        stream.SetFeature(request);
-                        var reply = new byte[9];
-                        stream.GetFeature(reply);
-                        return reply[4];
+                        raw.SetFeature([0xB5, (byte)(address >> 8), (byte)(address & 0xFF), 0, 0, 0, 0, 0]);
+                        return raw.GetFeature()[4];
                     }
 
                     // EDID header sanity: 00 FF FF FF FF FF FF 00.

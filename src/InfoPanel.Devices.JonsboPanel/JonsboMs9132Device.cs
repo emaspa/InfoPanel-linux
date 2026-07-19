@@ -39,7 +39,7 @@ namespace InfoPanel.JonsboPanel
         private const int ChunkSize = 65536;
         private const int WriteTimeoutMs = 5000;
 
-        private HidStream? _hidStream;
+        private LinuxHidRawFeature? _hidRaw;
         private UsbDevice? _usbDevice;
         private UsbEndpointWriter? _writer;
         private bool _disposed;
@@ -51,7 +51,8 @@ namespace InfoPanel.JonsboPanel
             var dev = new JonsboMs9132Device();
             try
             {
-                // Control plane: the HID interface, via the kernel hidraw driver.
+                // Control plane: the HID interface, via direct hidraw feature ioctls
+                // (HidSharp's Linux GetFeature uses a transfer length this chip rejects).
                 var hidDevice = DeviceList.Local.GetHidDevices(VENDOR_ID, PRODUCT_ID).FirstOrDefault();
                 if (hidDevice == null)
                 {
@@ -60,13 +61,13 @@ namespace InfoPanel.JonsboPanel
                     return null;
                 }
 
-                if (!hidDevice.TryOpen(out var hidStream))
+                dev._hidRaw = LinuxHidRawFeature.Open(hidDevice);
+                if (dev._hidRaw == null)
                 {
-                    Logger.Warning("JonsboMs9132: Cannot open HID interface (udev rules installed?)");
+                    Logger.Warning("JonsboMs9132: Cannot open hidraw node (udev rules installed?)");
                     dev.Dispose();
                     return null;
                 }
-                dev._hidStream = hidStream;
 
                 try { dev.SerialNumber = hidDevice.GetSerialNumber(); } catch { }
 
@@ -83,11 +84,14 @@ namespace InfoPanel.JonsboPanel
                 if (dev._usbDevice is IUsbDevice wholeDevice)
                 {
                     // Detach a bound kernel driver (e.g. the out-of-tree ms912x DRM
-                    // driver) from the vendor interface before claiming it.
+                    // driver) from the vendor interface before claiming it. Do NOT
+                    // call SetConfiguration here: the device is already configured,
+                    // and re-configuring while usbhid holds interface 0 disrupts the
+                    // HID control plane and can wedge the chip off the bus.
                     try { wholeDevice.SetAutoDetachKernelDriver(true); }
                     catch (Exception ex) { Logger.Warning(ex, "SetAutoDetachKernelDriver failed, continuing"); }
-                    wholeDevice.SetConfiguration(1);
-                    wholeDevice.ClaimInterface(InterfaceNumber);
+                    var claimed = wholeDevice.ClaimInterface(InterfaceNumber);
+                    Logger.Information("JonsboMs9132: ClaimInterface({Interface})={Claimed}", InterfaceNumber, claimed);
                 }
 
                 dev._writer = dev._usbDevice.OpenEndpointWriter(WriteEndpointID.Ep04);
@@ -105,20 +109,16 @@ namespace InfoPanel.JonsboPanel
 
         private void WriteControl(byte[] payload8)
         {
-            if (_hidStream == null) throw new InvalidOperationException("HID not open");
-            // Feature report: [reportId=0] + 8 payload bytes.
-            var buffer = new byte[9];
-            Array.Copy(payload8, 0, buffer, 1, Math.Min(payload8.Length, 8));
-            _hidStream.SetFeature(buffer);
+            if (_hidRaw == null) throw new InvalidOperationException("HID not open");
+            _hidRaw.SetFeature(payload8);
         }
 
         /// <summary>Reads a device register via B5 (SET_REPORT request, GET_REPORT reply).</summary>
         public int ReadRegister(ushort address)
         {
-            if (_hidStream == null) throw new InvalidOperationException("HID not open");
+            if (_hidRaw == null) throw new InvalidOperationException("HID not open");
             WriteControl([0xB5, (byte)(address >> 8), (byte)(address & 0xFF), 0, 0, 0, 0, 0]);
-            var buffer = new byte[9];
-            _hidStream.GetFeature(buffer);
+            var buffer = _hidRaw.GetFeature();
             // Reply layout mirrors the request: [reportId] B5 addr_hi addr_lo data0 ...
             return buffer[4];
         }
@@ -132,6 +132,9 @@ namespace InfoPanel.JonsboPanel
 
         /// <summary>
         /// Applies the captured OEM mode-set sequence for the given native resolution and VIC.
+        /// The delays are load-bearing: the chip takes ~100 ms to process power-on and
+        /// silently drops commands sent while busy, leaving the bulk pipe NAKing every
+        /// frame (verified on real DS339 hardware - back-to-back writes lose "video on").
         /// </summary>
         public void SetMode(int width, int height, byte vic)
         {
@@ -139,13 +142,19 @@ namespace InfoPanel.JonsboPanel
             byte hHi = (byte)(height >> 8), hLo = (byte)(height & 0xFF);
 
             WriteControl([0xA6, 0x07, 0x01, 0x02, 0, 0, 0, 0]);   // power on
+            Thread.Sleep(150);
             WriteControl([0xA6, 0x05, 0x00, 0, 0, 0, 0, 0]);      // video off
+            Thread.Sleep(30);
             WriteControl([0xA6, 0x03, 0x03, 0, 0, 0, 0, 0]);
+            Thread.Sleep(30);
             WriteControl([0xA6, 0x01, wHi, wLo, hHi, hLo, 0x11, 0x00]); // in: RGB888
+            Thread.Sleep(30);
             WriteControl([0xA6, 0x02, vic, 0x00, wHi, wLo, hHi, hLo]);  // out: VIC
+            Thread.Sleep(30);
             WriteControl([0xA6, 0x04, 0x01, 0, 0, 0, 0, 0]);
+            Thread.Sleep(30);
             WriteControl([0xA6, 0x05, 0x01, 0, 0, 0, 0, 0]);      // video on
-            Thread.Sleep(100);
+            Thread.Sleep(200);
 
             Logger.Information("JonsboMs9132: Mode set {Width}x{Height} VIC {Vic}", width, height, vic);
         }
@@ -213,8 +222,8 @@ namespace InfoPanel.JonsboPanel
             if (_disposed) return;
             _disposed = true;
             PowerOff();
-            try { _hidStream?.Dispose(); } catch { }
-            _hidStream = null;
+            try { _hidRaw?.Dispose(); } catch { }
+            _hidRaw = null;
             try
             {
                 if (_usbDevice != null)
