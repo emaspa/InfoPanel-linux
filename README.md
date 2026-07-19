@@ -264,7 +264,7 @@ the OEM JONSBO-AIO app (see [upstream PR #152](https://github.com/habibrehmansg/
 
 | Model | Resolution | Connection |
 |---|---|---|
-| Jonsbo DS916 | 462×1920 | Serial `33C3:F101` (HLVMAX, raw JPEG frames) |
+| Jonsbo DS916 ✓ | 462×1920 | Serial `33C3:F101` (HLVMAX, raw JPEG frames) |
 | Jonsbo DS339 ✓ | 376×960 | USB `345F:9132` (MacroSilicon MS9132, HID + bulk UYVY422) |
 
 The DS339 shares its USB ID with the VMAX 4.6"; the device scan reads the
@@ -383,7 +383,7 @@ dotnet run --project src/InfoPanel.App
 To produce the same self-contained tarball as the published releases:
 
 ```bash
-packaging/publish.sh 0.0.9     # builds artifacts/infopanel-0.0.9-linux-x64.tar.gz
+packaging/publish.sh 0.1.0     # builds artifacts/infopanel-0.0.9-linux-x64.tar.gz
 ```
 
 ## Data and paths
