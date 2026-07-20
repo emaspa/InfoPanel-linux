@@ -250,10 +250,14 @@ namespace InfoPanel.Models
             imageB = null;
             blend = 0f;
 
-            if (_images.Count == 0) return;
-            if (_images.Count == 1)
+            // Snapshot: render threads index into this while the designer edits the
+            // ObservableCollection; reading counts and items live can tear.
+            var images = Images.ToArray();
+
+            if (images.Length == 0) return;
+            if (images.Length == 1)
             {
-                imageA = Images[0];
+                imageA = images[0];
                 imageA.Scale = _scale;
                 return;
             }
@@ -261,16 +265,16 @@ namespace InfoPanel.Models
             var sensorReading = GetValue();
             if (!sensorReading.HasValue)
             {
-                imageA = Images[0];
+                imageA = images[0];
                 imageA.Scale = _scale;
                 return;
             }
 
-            var step = 100.0 / (_images.Count - 1);
+            var step = 100.0 / (images.Length - 1);
             var value = sensorReading.Value.ValueNow;
             value = ((value - _minValue) / (_maxValue - _minValue)) * 100;
             var targetIndex = (int)Math.Round(value / step);
-            targetIndex = Math.Clamp(targetIndex, 0, Images.Count - 1);
+            targetIndex = Math.Clamp(targetIndex, 0, images.Length - 1);
 
             var now = DateTime.UtcNow;
             // First evaluation: use a nominal delta (1/60s) so smoothing runs instead of snapping (log evidence: deltaSeconds=0 on first frame caused usedSmoothing=false).
@@ -294,7 +298,7 @@ namespace InfoPanel.Models
                     currentImageIndex = targetIndex;
                 else
                     currentImageIndex += Math.Sign(diff) * maxStep;
-                currentImageIndex = Math.Clamp(currentImageIndex, 0, Images.Count - 1);
+                currentImageIndex = Math.Clamp(currentImageIndex, 0, images.Length - 1);
             }
             else
             {
@@ -303,15 +307,15 @@ namespace InfoPanel.Models
 
             var idxFloor = (int)Math.Floor(currentImageIndex);
             var idxCeil = (int)Math.Ceiling(currentImageIndex);
-            idxFloor = Math.Clamp(idxFloor, 0, Images.Count - 1);
-            idxCeil = Math.Clamp(idxCeil, 0, Images.Count - 1);
+            idxFloor = Math.Clamp(idxFloor, 0, images.Length - 1);
+            idxCeil = Math.Clamp(idxCeil, 0, images.Length - 1);
 
-            imageA = Images[idxFloor];
+            imageA = images[idxFloor];
             imageA.Scale = _scale;
 
             if (idxCeil != idxFloor)
             {
-                imageB = Images[idxCeil];
+                imageB = images[idxCeil];
                 imageB.Scale = _scale;
                 blend = (float)(currentImageIndex - idxFloor);
             }

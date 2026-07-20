@@ -251,7 +251,23 @@ namespace InfoPanel.Drawing
             return $"#{withAlpha.Alpha:X2}{withAlpha.Red:X2}{withAlpha.Green:X2}{withAlpha.Blue:X2}";
         }
 
+        /// <summary>
+        /// Serializes all text shaping/measuring/painting. The typeface cache shares
+        /// SKTypeface instances across every render thread (designer canvas, overlay,
+        /// device tasks, web server), and concurrent glyph shaping on a shared typeface
+        /// crashes natively inside libSkiaSharp (FreeType faces are not thread-safe).
+        /// </summary>
+        private static readonly object _textLock = new();
+
         private void DrawStringCore(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign, bool centerAlign, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width)
+        {
+            lock (_textLock)
+            {
+                DrawStringCoreLocked(text, fontName, fontStyle, fontSize, color, x, y, rightAlign, centerAlign, bold, italic, underline, strikeout, wrap, ellipsis, width);
+            }
+        }
+
+        private void DrawStringCoreLocked(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign, bool centerAlign, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width)
         {
             var tb = new TextBlock
             {
@@ -877,6 +893,14 @@ namespace InfoPanel.Drawing
         }
 
         public (float width, float height) MeasureString(string text, string fontName, string fontStyle, int fontSize, bool bold = false, bool italic = false, bool underline = false, bool strikeout = false, bool wrap = false, bool ellipsis = true, int width = 0, int height = 0)
+        {
+            lock (_textLock)
+            {
+                return MeasureStringLocked(text, fontName, fontStyle, fontSize, bold, italic, underline, strikeout, wrap, ellipsis, width, height);
+            }
+        }
+
+        private (float width, float height) MeasureStringLocked(string text, string fontName, string fontStyle, int fontSize, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width, int height)
         {
             SKTypeface typeface = CreateTypeface(fontName, fontStyle, bold, italic);
 

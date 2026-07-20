@@ -1,3 +1,4 @@
+using Serilog;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -609,7 +610,17 @@ namespace InfoPanel.Designer
                 if (leaseFeature == null) return;
 
                 using var lease = leaseFeature.Lease();
-                owner.RenderCanvas(lease.SkCanvas);
+                try
+                {
+                    owner.RenderCanvas(lease.SkCanvas);
+                }
+                catch (Exception ex)
+                {
+                    // An unhandled exception here would take down the Avalonia
+                    // compositor (and the process); a dropped frame is preferable.
+                    // Transient races are possible while edits mutate items mid-draw.
+                    Log.ForContext<DesignCanvas>().Warning(ex, "Designer render failed, frame dropped");
+                }
             }
 
             public void Dispose() { }

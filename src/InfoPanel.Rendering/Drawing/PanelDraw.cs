@@ -42,7 +42,17 @@ namespace InfoPanel.Drawing
             foreach (var displayItem in RenderContext.GetDisplayItems(profile))
             {
                 if (displayItem.Hidden) continue;
-                Draw(g, preview, scale, cache, cacheHint, displayItem, selectedRectangles);
+                try
+                {
+                    Draw(g, preview, scale, cache, cacheHint, displayItem, selectedRectangles);
+                }
+                catch (Exception ex)
+                {
+                    // Live edits mutate items and dispose cached resources while other
+                    // threads draw them; skip the item for this frame instead of
+                    // failing the whole render (fatal on the compositor thread).
+                    Logger.Debug(ex, "Draw failed for item {Kind}, skipped this frame", displayItem.Kind);
+                }
             }
 
             if (!preview && RenderContext.IsSelectedProfile(profile) && selectedRectangles.Count != 0)

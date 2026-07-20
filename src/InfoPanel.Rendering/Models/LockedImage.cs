@@ -766,6 +766,13 @@ namespace InfoPanel.Models
                     return;
                 }
 
+                // We are on the GL render thread when grContext is set (leased canvas):
+                // the only safe place to free texture images queued by other threads.
+                if (grContext != null)
+                {
+                    SKImageFrameSlot.DrainGlDisposalQueue();
+                }
+
                 var SKBitmapCache = grContext != null ? GetD2DBitmapFrameCache(cacheHint) : GetSKBitmapFrameCache(cacheHint);
 
                 var frame = GetCurrentFrameCount();
@@ -914,6 +921,26 @@ namespace InfoPanel.Models
             public int Width => _bitmap?.Width ?? 0;
             public int Height => _bitmap?.Height ?? 0;
 
+            /// <summary>
+            /// GPU-texture-backed images must be disposed with their GL context current.
+            /// That context belongs to the Avalonia RENDER thread (the leased-canvas
+            /// draws), not the UI dispatcher - posting Dispose to the UI thread freed
+            /// GL textures from the wrong thread, a native-crash source while editing
+            /// profiles with images. Foreign-thread disposals are queued here instead
+            /// and drained at the start of the next GL-thread access.
+            /// </summary>
+            private static readonly System.Collections.Concurrent.ConcurrentQueue<SKImage> _glDisposalQueue = new();
+
+            /// <summary>Call only from the GL render thread (inside a canvas lease).</summary>
+            public static void DrainGlDisposalQueue()
+            {
+                while (_glDisposalQueue.TryDequeue(out var image))
+                {
+                    try { image.Dispose(); }
+                    catch (Exception e) { Log.Error(e, "Error disposing queued GL SKImage"); }
+                }
+            }
+
             private static void DisposeImage(SKImage? image)
             {
                 if (image == null) return;
@@ -922,9 +949,7 @@ namespace InfoPanel.Models
                 {
                     if (image.IsTextureBacked)
                     {
-                        // GPU-texture-backed images must be disposed on the thread owning
-                        // the GL context; UiThread is wired to the UI dispatcher by the app.
-                        InfoPanel.Utils.UiThread.Post(image.Dispose);
+                        _glDisposalQueue.Enqueue(image);
                     }
                     else
                     {
