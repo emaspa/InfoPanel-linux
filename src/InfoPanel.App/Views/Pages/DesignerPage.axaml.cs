@@ -164,7 +164,16 @@ namespace InfoPanel.Views.Pages
         {
             UndoButton.IsEnabled = _session?.Undo.CanUndo == true;
             RedoButton.IsEnabled = _session?.Undo.CanRedo == true;
-            Inspector.Rebuild();
+
+            // Don't tear down the inspector while one of its own editors is mid-commit:
+            // rebuilding closed the color picker flyout on the first slider tick (#6)
+            // and broke slider drags. The editors keep their own displayed values in
+            // sync; canvas edits and undo/redo still rebuild.
+            if (!Inspector.IsCommitting)
+            {
+                Inspector.Rebuild();
+            }
+
             RefreshLayerList();
         }
 
@@ -195,12 +204,15 @@ namespace InfoPanel.Views.Pages
         {
             if (_session == null) return;
 
+            // Front-most item (drawn last) at the top of the list, like every design
+            // tool - so the up/down/top/bottom buttons match what the eye expects (#8).
             var query = LayerSearch.Text?.Trim() ?? "";
-            LayersTree.ItemsSource = query.Length == 0
+            var items = query.Length == 0
                 ? _session.Items
                 : _session.Items.Where(i =>
                     i.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
-                    || i.Kind.Contains(query, StringComparison.OrdinalIgnoreCase)).ToList();
+                    || i.Kind.Contains(query, StringComparison.OrdinalIgnoreCase));
+            LayersTree.ItemsSource = items.Reverse().ToList();
         }
 
         private void LayerSearch_TextChanged(object? sender, TextChangedEventArgs e) => RefreshLayerList();

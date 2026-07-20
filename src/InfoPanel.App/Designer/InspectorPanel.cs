@@ -970,6 +970,15 @@ namespace InfoPanel.Designer
 
         // ================= editor helpers =================
 
+        /// <summary>
+        /// True while a commit initiated by one of this panel's own editors is running.
+        /// The page's Undo.StateChanged handler skips the full inspector rebuild in
+        /// that case: rebuilding would destroy the control mid-interaction (the color
+        /// picker flyout closed on the first slider tick, sliders lost their drag).
+        /// Canvas-driven edits and undo/redo still rebuild normally.
+        /// </summary>
+        public bool IsCommitting { get; private set; }
+
         private void Commit<T>(DesignerSession session, DisplayItem item, string property, Action<T> setter, T oldValue, T newValue)
         {
             if (_rebuilding || EqualityComparer<T>.Default.Equals(oldValue, newValue))
@@ -977,7 +986,15 @@ namespace InfoPanel.Designer
                 return;
             }
 
-            session.Undo.Execute(new SetPropertyAction<T>(item, property, setter, oldValue, newValue));
+            IsCommitting = true;
+            try
+            {
+                session.Undo.Execute(new SetPropertyAction<T>(item, property, setter, oldValue, newValue));
+            }
+            finally
+            {
+                IsCommitting = false;
+            }
         }
 
         private void CommitSize(DesignerSession session, DisplayItem item, int? width = null, int? height = null)
@@ -989,8 +1006,16 @@ namespace InfoPanel.Designer
             var newH = height ?? h;
             if (newW == w && newH == h) return;
 
-            session.Undo.Execute(new SetPropertyAction<(int, int)>(item, "Size",
-                v => ItemGeometry.SetSize(item, v.Item1, v.Item2), (w, h), (newW, newH)));
+            IsCommitting = true;
+            try
+            {
+                session.Undo.Execute(new SetPropertyAction<(int, int)>(item, "Size",
+                    v => ItemGeometry.SetSize(item, v.Item1, v.Item2), (w, h), (newW, newH)));
+            }
+            finally
+            {
+                IsCommitting = false;
+            }
         }
 
         private NumericUpDown IntEditor(double value, Action<int> commit, int? min = null, int? max = null)

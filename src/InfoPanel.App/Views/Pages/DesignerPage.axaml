@@ -71,8 +71,8 @@
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="Del" FontSize="11" Margin="0,0,4,4" Click="LayerDelete_Click" ToolTip.Tip="Delete selected" />
                                 <Button Content="Dup" FontSize="11" Margin="0,0,4,4" Click="LayerDuplicate_Click" ToolTip.Tip="Duplicate selected" />
-                                <Button Content="↑" FontSize="11" Margin="0,0,4,4" Click="LayerUp_Click" ToolTip.Tip="Move up (draw later)" />
-                                <Button Content="↓" FontSize="11" Margin="0,0,4,4" Click="LayerDown_Click" ToolTip.Tip="Move down" />
+                                <Button Content="↑" FontSize="11" Margin="0,0,4,4" Click="LayerUp_Click" ToolTip.Tip="Move up (bring forward)" />
+                                <Button Content="↓" FontSize="11" Margin="0,0,4,4" Click="LayerDown_Click" ToolTip.Tip="Move down (send backward)" />
                             </StackPanel>
                             <StackPanel Orientation="Horizontal">
                                 <Button Content="Top" FontSize="11" Margin="0,0,4,4" Click="LayerTop_Click" ToolTip.Tip="Bring to front" />
