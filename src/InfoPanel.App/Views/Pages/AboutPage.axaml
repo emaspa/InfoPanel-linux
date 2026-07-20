@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.1.1 alpha: designer stability" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.1.2 alpha: designer polish" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Three reported paper cuts: the color picker no longer closes the moment a slider is touched (the inspector rebuilt itself on every edit, killing the open flyout and slider drags), the layers panel lists the front-most item at the top so up and down move items the way you expect, and Home screen profile cards show friendly device names for all panel families instead of internal model identifiers." />
+                        <TextBlock Text="v0.1.1 alpha: designer stability" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Fixes native crashes while editing a profile with panels streaming: text rendering no longer races on shared fonts across render threads, GPU textures are released on the correct thread (editing or animating images could crash the app), gauge image lists are snapshotted during edits, and a failing display item now skips a frame instead of taking the app down." />
                         <TextBlock Text="v0.1.0 alpha: Jonsbo AIO displays" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
