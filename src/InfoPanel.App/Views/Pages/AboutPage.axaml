@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.1.0 alpha: Jonsbo AIO displays" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.1.1 alpha: designer stability" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Fixes native crashes while editing a profile with panels streaming: text rendering no longer races on shared fonts across render threads, GPU textures are released on the correct thread (editing or animating images could crash the app), gauge image lists are snapshotted during edits, and a failing display item now skips a frame instead of taking the app down." />
+                        <TextBlock Text="v0.1.0 alpha: Jonsbo AIO displays" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="New Jonsbo panel family, both models verified on real hardware: the DS916 (9.16 inch, 462x1920, HLVMAX serial with raw JPEG frames) and the DS339 (376x960, MacroSilicon MS9132 with HID control and bulk UYVY frames). The DS339 shares its USB identity with the VMAX 4.6 inch, so the device scan reads the panel EDID to tell them apart. The VMAX path gains the same Linux protocol fixes (direct hidraw feature reports, UYVY pixel format)." />
                         <TextBlock Text="v0.0.9 alpha: panel options everywhere" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />

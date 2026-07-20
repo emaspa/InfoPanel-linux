@@ -383,7 +383,7 @@ dotnet run --project src/InfoPanel.App
 To produce the same self-contained tarball as the published releases:
 
 ```bash
-packaging/publish.sh 0.1.0     # builds artifacts/infopanel-0.0.9-linux-x64.tar.gz
+packaging/publish.sh 0.1.1     # builds artifacts/infopanel-0.0.9-linux-x64.tar.gz
 ```
 
 ## Data and paths
