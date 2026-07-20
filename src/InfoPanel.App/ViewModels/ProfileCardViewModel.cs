@@ -41,17 +41,32 @@ namespace InfoPanel.ViewModels
         {
             get
             {
+                // Friendly device names, matching what the Devices page shows.
                 var outputs = new List<string>();
                 if (Profile.Active) outputs.Add("overlay");
                 outputs.AddRange(host.Settings.ThermalrightPanelDevices
                     .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
-                    .Select(d => d.Model.ToString()));
+                    .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
                 outputs.AddRange(host.Settings.BeadaPanelDevices
                     .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
-                    .Select(d => d.Model ?? "BeadaPanel"));
+                    .Select(d => System.Enum.TryParse<BeadaPanel.BeadaPanelModel>(d.Model, out var beadaModel)
+                        && BeadaPanel.BeadaPanelModelDatabase.Models.TryGetValue(beadaModel, out var bi)
+                        ? bi.Name : d.Model ?? "BeadaPanel"));
                 outputs.AddRange(host.Settings.TuringPanelDevices
                     .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
-                    .Select(d => d.Model ?? "Turing"));
+                    .Select(d => d.ModelInfo?.Name ?? d.Model ?? "Turing"));
+                outputs.AddRange(host.Settings.ThermaltakePanelDevices
+                    .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
+                    .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
+                outputs.AddRange(host.Settings.JlPanelDevices
+                    .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
+                    .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
+                outputs.AddRange(host.Settings.VmaxPanelDevices
+                    .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
+                    .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
+                outputs.AddRange(host.Settings.JonsboPanelDevices
+                    .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
+                    .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
 
                 var where = outputs.Count > 0 ? $" · {string.Join(", ", outputs)}" : "";
                 return $"{Profile.Width}×{Profile.Height}{where}";
