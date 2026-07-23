@@ -817,6 +817,21 @@ namespace InfoPanel.Models
                     else
                     {
                         bitmapFrame.Image = SKImage.FromBitmap(resizedBitmap);
+
+                        // Long animations: keep only the current frame resident, like the
+                        // GPU branch above. Caching every frame of a big GIF at target
+                        // size costs Frames x W x H x 4 bytes (hundreds of MB for long
+                        // animations); re-resizing one frame per tick is ~1 ms.
+                        if (Frames > 8 && bitmapFrame.Image != null)
+                        {
+                            for (int i = 0; i < SKBitmapCache.Length; i++)
+                            {
+                                if (i != frame)
+                                {
+                                    SKBitmapCache[i].Invalidate();
+                                }
+                            }
+                        }
                     }
 
                     if (!cache)

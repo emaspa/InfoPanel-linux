@@ -30,18 +30,34 @@ namespace InfoPanel.Services
             _device = device ?? throw new ArgumentNullException(nameof(device));
         }
 
+        private readonly SharedFrameConsumer _frameConsumer = new();
+
+        /// <summary>Returns null when there is no profile or the content has not changed.</summary>
         public byte[]? GenerateLcdBuffer()
         {
             var profileGuid = _device.ProfileGuid;
 
             if (DeviceRuntime.GetProfile(profileGuid) is Profile profile)
             {
-                var rotation = _device.Rotation;
-                using var bitmap = PanelRenderer.RenderSK(profile, false, colorType: SKColorType.Rgb565, alphaType: SKAlphaType.Opaque);
-
-                using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
-
-                return resizedBitmap.Bytes;
+                var frameInterval = 1000 / Math.Max(1, _device.TargetFrameRate);
+                return _frameConsumer.Produce(profile, frameInterval, bitmap =>
+                {
+                    var rotation = _device.Rotation;
+                    var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+                    try
+                    {
+                        // Wire format is RGB565; the shared frame is Rgba8888.
+                        using var converted = resizedBitmap.Copy(SKColorType.Rgb565);
+                        return converted.Bytes;
+                    }
+                    finally
+                    {
+                        if (!ReferenceEquals(resizedBitmap, bitmap))
+                        {
+                            resizedBitmap.Dispose();
+                        }
+                    }
+                });
             }
 
             return null;
@@ -215,6 +231,12 @@ namespace InfoPanel.Services
                             {
                                 var oldFrame = Interlocked.Exchange(ref _latestFrame, frame);
                                 _frameAvailable.Set();
+                            }
+                            else
+                            {
+                                // Content unchanged: skip encode/send, keep showing the pace.
+                                fpsCounter.Update(0);
+                                _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
                             }
 
                             var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);

@@ -259,6 +259,66 @@ namespace InfoPanel.Drawing
         /// </summary>
         private static readonly object _textLock = new();
 
+        /// <summary>
+        /// LRU cache of laid-out TextBlocks. Sensor text repeats unchanged for many
+        /// consecutive frames, and shaping is both the dominant text cost and a source
+        /// of finalizer churn (each layout allocates native SKTextBlobs with no Dispose).
+        /// Guarded by <see cref="_textLock"/>. Keyed by everything that affects layout.
+        /// </summary>
+        private static readonly Dictionary<TextBlockKey, LinkedListNode<(TextBlockKey Key, TextBlock Block)>> _textBlockCache = new();
+        private static readonly LinkedList<(TextBlockKey Key, TextBlock Block)> _textBlockLru = new();
+        private const int TextBlockCacheCapacity = 1024;
+
+        private readonly record struct TextBlockKey(
+            string Text, string FontName, string FontStyle, float FontSize, string Color,
+            bool Bold, bool Italic, bool Underline, bool Strikeout, bool Wrap, bool Ellipsis,
+            int Width, TextAlignment Alignment);
+
+        private static TextBlock GetOrCreateTextBlock(in TextBlockKey key)
+        {
+            if (_textBlockCache.TryGetValue(key, out var node))
+            {
+                _textBlockLru.Remove(node);
+                _textBlockLru.AddFirst(node);
+                return node.Value.Block;
+            }
+
+            var typeface = CreateTypeface(key.FontName, key.FontStyle, key.Bold, key.Italic);
+
+            var tb = new TextBlock
+            {
+                FontMapper = _fontMapper,
+                EllipsisEnabled = key.Ellipsis,
+                MaxLines = key.Wrap ? 1 : null,
+                MaxWidth = key.Width > 0 ? key.Width : null,
+                Alignment = key.Alignment,
+            };
+
+            var style = new Style
+            {
+                FontFamily = typeface.FamilyName,
+                FontSize = key.FontSize,
+                FontWeight = typeface.FontWeight,
+                FontItalic = typeface.IsItalic,
+                FontWidth = (SKFontStyleWidth)typeface.FontWidth,
+                TextColor = SKColor.Parse(key.Color),
+                Underline = key.Underline ? UnderlineStyle.Solid : UnderlineStyle.None,
+                StrikeThrough = key.Strikeout ? StrikeThroughStyle.Solid : StrikeThroughStyle.None
+            };
+
+            tb.AddText(key.Text, style);
+
+            var newNode = _textBlockLru.AddFirst((key, tb));
+            _textBlockCache[key] = newNode;
+            if (_textBlockCache.Count > TextBlockCacheCapacity)
+            {
+                var last = _textBlockLru.Last!;
+                _textBlockLru.RemoveLast();
+                _textBlockCache.Remove(last.Value.Key);
+            }
+            return tb;
+        }
+
         private void DrawStringCore(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign, bool centerAlign, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width)
         {
             lock (_textLock)
@@ -269,35 +329,13 @@ namespace InfoPanel.Drawing
 
         private void DrawStringCoreLocked(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign, bool centerAlign, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width)
         {
-            var tb = new TextBlock
-            {
-                FontMapper = _fontMapper,
-                EllipsisEnabled = ellipsis,
-                MaxLines = wrap ? 1 : null,
-                MaxWidth = width > 0 ? width : null
-            };
+            var alignment = rightAlign ? TextAlignment.Right
+                : centerAlign && width > 0 ? TextAlignment.Center
+                : TextAlignment.Left;
 
-            if (rightAlign)
-                tb.Alignment = TextAlignment.Right;
-
-            if (centerAlign && width > 0)
-                tb.Alignment = TextAlignment.Center;
-
-            SKTypeface typeface = CreateTypeface(fontName, fontStyle, bold, italic);
-
-            var style = new Style
-            {
-                FontFamily = typeface.FamilyName,
-                FontSize = fontSize * FontScale,
-                FontWeight = typeface.FontWeight,
-                FontItalic = typeface.IsItalic,
-                FontWidth = (SKFontStyleWidth)typeface.FontWidth,
-                TextColor = SKColor.Parse(color),
-                Underline = underline ? UnderlineStyle.Solid : UnderlineStyle.None,
-                StrikeThrough = strikeout ? StrikeThroughStyle.Solid : StrikeThroughStyle.None
-            };
-
-            tb.AddText(text, style);
+            var tb = GetOrCreateTextBlock(new TextBlockKey(
+                text, fontName, fontStyle, fontSize * FontScale, color,
+                bold, italic, underline, strikeout, wrap, ellipsis, width, alignment));
 
             float adjustedX = x;
             if (width == 0 && rightAlign)
@@ -902,28 +940,12 @@ namespace InfoPanel.Drawing
 
         private (float width, float height) MeasureStringLocked(string text, string fontName, string fontStyle, int fontSize, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width, int height)
         {
-            SKTypeface typeface = CreateTypeface(fontName, fontStyle, bold, italic);
-
-            var tb = new TextBlock
-            {
-                FontMapper = _fontMapper,
-                EllipsisEnabled = ellipsis,
-                MaxLines = wrap ? 1 : null,
-                MaxWidth = width > 0 ? width : null
-            };
-
-            var style = new Style
-            {
-                FontFamily = typeface.FamilyName,
-                FontSize = fontSize * FontScale,
-                FontWeight = typeface.FontWeight,
-                FontItalic = typeface.IsItalic,
-                FontWidth = (SKFontStyleWidth)typeface.FontWidth,
-                Underline = underline ? UnderlineStyle.Solid : UnderlineStyle.None,
-                StrikeThrough = strikeout ? StrikeThroughStyle.Solid : StrikeThroughStyle.None
-            };
-
-            tb.AddText(text, style);
+            // Color does not affect layout; a fixed color shares the cache entry with
+            // the eventual draw when the draw color matches, and costs one extra
+            // layout when it does not.
+            var tb = GetOrCreateTextBlock(new TextBlockKey(
+                text, fontName, fontStyle, fontSize * FontScale, "#FF000000",
+                bold, italic, underline, strikeout, wrap, ellipsis, width, TextAlignment.Left));
 
             return (width == 0 ? tb.MeasuredWidth : width, tb.MeasuredHeight);
         }

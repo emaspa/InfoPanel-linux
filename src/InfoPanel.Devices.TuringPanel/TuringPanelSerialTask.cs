@@ -91,21 +91,32 @@ namespace InfoPanel
             }
         }
 
+        private readonly SharedFrameConsumer _frameConsumer = new();
+
+        /// <summary>Returns null when there is no profile or the content has not changed.
+        /// The returned bitmap is an owned Bgra8888 copy (TuringSmartScreenLib's buffer
+        /// layout); callers dispose it as before.</summary>
         public SKBitmap? GenerateLcdBitmap()
         {
             if (DeviceRuntime.GetProfile(_device.ProfileGuid) is Profile profile)
             {
-                var rotation = _device.Rotation;
-                var bitmap = PanelRenderer.RenderSK(profile, false);
-
-                var ensuredBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
-
-                if (!ReferenceEquals(bitmap, ensuredBitmap))
+                var frameInterval = 1000 / Math.Max(1, _device.TargetFrameRate);
+                return _frameConsumer.Produce(profile, frameInterval, bitmap =>
                 {
-                    bitmap.Dispose();
-                }
-
-                return ensuredBitmap;
+                    var rotation = _device.Rotation;
+                    var ensuredBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+                    try
+                    {
+                        return ensuredBitmap.Copy(SKColorType.Bgra8888);
+                    }
+                    finally
+                    {
+                        if (!ReferenceEquals(ensuredBitmap, bitmap))
+                        {
+                            ensuredBitmap.Dispose();
+                        }
+                    }
+                });
             }
 
             return null;

@@ -99,13 +99,19 @@ namespace InfoPanel.Services
                     while (!renderToken.IsCancellationRequested)
                     {
                         var frame = GenerateUyvyFrame();
+                        if (frame == null)
+                        {
+                            // Content unchanged: nothing to send; pace the loop.
+                            await Task.Delay(1000 / Math.Max(1, Math.Min(_device.TargetFrameRate, 30)), renderToken);
+                            continue;
+                        }
                         try
                         {
-                            await frames.Writer.WriteAsync(frame, renderToken);
+                            await frames.Writer.WriteAsync(frame.Value, renderToken);
                         }
                         catch
                         {
-                            ReturnFrame(frame);
+                            ReturnFrame(frame.Value);
                             throw;
                         }
                     }
@@ -174,20 +180,33 @@ namespace InfoPanel.Services
                 ArrayPool<byte>.Shared.Return(frame.Buffer);
         }
 
-        private RenderedFrame GenerateUyvyFrame()
+        private readonly SharedFrameConsumer _frameConsumer = new();
+
+        /// <summary>Returns null when the profile content has not changed (frame skipped).</summary>
+        private RenderedFrame? GenerateUyvyFrame()
         {
             if (DeviceRuntime.GetProfile(_device.ProfileGuid) is Profile profile)
             {
-                using var bitmap = PanelRenderer.RenderSK(profile, false,
-                    colorType: SKColorType.Rgba8888,
-                    alphaType: SKAlphaType.Opaque);
-
-                using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, _device.Rotation);
-
-                var length = resizedBitmap.Width * resizedBitmap.Height * 2;
-                var output = ArrayPool<byte>.Shared.Rent(length);
-                ToUyvy(resizedBitmap, output, _device.Brightness);
-                return new RenderedFrame(output, length);
+                var frameInterval = 1000 / Math.Max(1, Math.Min(_device.TargetFrameRate, 30));
+                var boxed = _frameConsumer.Produce(profile, frameInterval, bitmap =>
+                {
+                    var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, _device.Rotation);
+                    try
+                    {
+                        var length = resizedBitmap.Width * resizedBitmap.Height * 2;
+                        var output = ArrayPool<byte>.Shared.Rent(length);
+                        ToUyvy(resizedBitmap, output, _device.Brightness);
+                        return (object)new RenderedFrame(output, length);
+                    }
+                    finally
+                    {
+                        if (!ReferenceEquals(resizedBitmap, bitmap))
+                        {
+                            resizedBitmap.Dispose();
+                        }
+                    }
+                });
+                return (RenderedFrame?)boxed;
             }
 
             var blackFrame = GenerateBlackUyvy();

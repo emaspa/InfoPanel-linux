@@ -126,7 +126,12 @@ namespace InfoPanel.Services
             return header;
         }
 
-        public byte[] GenerateFrameBuffer()
+        private readonly SharedFrameConsumer _frameConsumer = new();
+
+        private int FrameIntervalMs => 1000 / Math.Max(1, _device.TargetFrameRate);
+
+        /// <summary>Returns null when the profile content has not changed (frame skipped).</summary>
+        public byte[]? GenerateFrameBuffer()
         {
             var pixelFormat = _detectedModel?.PixelFormat ?? ThermalrightPixelFormat.Jpeg;
             return pixelFormat is ThermalrightPixelFormat.Rgb565 or ThermalrightPixelFormat.Rgb565BigEndian
@@ -134,20 +139,25 @@ namespace InfoPanel.Services
                 : GenerateJpegBuffer();
         }
 
-        private byte[] GenerateJpegBuffer()
+        private byte[]? GenerateJpegBuffer()
         {
             var profileGuid = _device.ProfileGuid;
 
             if (DeviceRuntime.GetProfile(profileGuid) is Profile profile)
             {
-                var rotation = _device.Rotation;
+                return _frameConsumer.Produce(profile, FrameIntervalMs, bitmap => EncodeJpegFromShared(bitmap));
+            }
 
-                using var bitmap = PanelRenderer.RenderSK(profile, false,
-                    colorType: SKColorType.Rgba8888,
-                    alphaType: SKAlphaType.Opaque);
+            // No profile - black JPEG as keepalive
+            return _blackFrame ??= GenerateBlackJpeg();
+        }
 
-                using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
-
+        private byte[] EncodeJpegFromShared(SKBitmap bitmap)
+        {
+            var rotation = _device.Rotation;
+            var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+            try
+            {
                 SKBitmap encodeBitmap = resizedBitmap;
                 SKBitmap? dimmed = null;
                 SKBitmap? cropped = null;
@@ -164,6 +174,13 @@ namespace InfoPanel.Services
                     {
                         // Levita Vision has camera on the right side (180° from Wonder/Rainbow's left side)
                         int maskRotationOffset = _device.Model == ThermalrightPanelModel.LevitaVision360 ? 180 : 0;
+
+                        // Never draw the mask onto the shared frame itself
+                        if (ReferenceEquals(encodeBitmap, bitmap))
+                        {
+                            dimmed = encodeBitmap.Copy();
+                            encodeBitmap = dimmed;
+                        }
                         ApplyDisplayMask(encodeBitmap, _device.DisplayMask, _device.Rotation, maskRotationOffset);
                     }
 
@@ -198,41 +215,51 @@ namespace InfoPanel.Services
                     dimmed?.Dispose();
                 }
             }
-
-            // No profile - black JPEG as keepalive
-            return _blackFrame ??= GenerateBlackJpeg();
+            finally
+            {
+                if (!ReferenceEquals(resizedBitmap, bitmap))
+                {
+                    resizedBitmap.Dispose();
+                }
+            }
         }
 
-        private byte[] GenerateRgb565Buffer()
+        private byte[]? GenerateRgb565Buffer()
         {
             var profileGuid = _device.ProfileGuid;
             bool bigEndian = _detectedModel?.PixelFormat == ThermalrightPixelFormat.Rgb565BigEndian;
 
             if (DeviceRuntime.GetProfile(profileGuid) is Profile profile)
             {
-                var rotation = _device.Rotation;
-
-                using var bitmap = PanelRenderer.RenderSK(profile, false,
-                    colorType: SKColorType.Rgba8888,
-                    alphaType: SKAlphaType.Opaque);
-
-                using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
-
-                SKBitmap convertBitmap = resizedBitmap;
-                SKBitmap? dimmed = null;
-                try
+                return _frameConsumer.Produce(profile, FrameIntervalMs, bitmap =>
                 {
-                    if (_device.Brightness < 100)
+                    var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, _device.Rotation);
+                    try
                     {
-                        dimmed = ApplyBrightness(resizedBitmap);
-                        convertBitmap = dimmed;
+                        SKBitmap convertBitmap = resizedBitmap;
+                        SKBitmap? dimmed = null;
+                        try
+                        {
+                            if (_device.Brightness < 100)
+                            {
+                                dimmed = ApplyBrightness(resizedBitmap);
+                                convertBitmap = dimmed;
+                            }
+                            return ConvertRgba8888ToRgb565(convertBitmap, bigEndian);
+                        }
+                        finally
+                        {
+                            dimmed?.Dispose();
+                        }
                     }
-                    return ConvertRgba8888ToRgb565(convertBitmap, bigEndian);
-                }
-                finally
-                {
-                    dimmed?.Dispose();
-                }
+                    finally
+                    {
+                        if (!ReferenceEquals(resizedBitmap, bitmap))
+                        {
+                            resizedBitmap.Dispose();
+                        }
+                    }
+                });
             }
 
             // No profile - black RGB565 as keepalive (0x0000 is black in both endiannesses)
@@ -2000,8 +2027,18 @@ namespace InfoPanel.Services
 
                         stopwatch.Restart();
                         var frame = GenerateFrameBuffer();
-                        Interlocked.Exchange(ref _latestFrame, frame);
-                        _frameAvailable.Set();
+                        if (frame != null)
+                        {
+                            Interlocked.Exchange(ref _latestFrame, frame);
+                            _frameAvailable.Set();
+                        }
+                        else
+                        {
+                            // Content unchanged: no resize/encode/send this frame. Count it
+                            // as a zero-cost frame so the UI keeps showing the panel's pace.
+                            fpsCounter.Update(0);
+                            _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
+                        }
 
                         var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
                         var adaptiveFrameTime = 0;

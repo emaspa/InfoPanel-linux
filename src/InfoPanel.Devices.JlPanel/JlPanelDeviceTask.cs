@@ -129,8 +129,18 @@ namespace InfoPanel.Services
                         stopwatch.Restart();
 
                         var frame = GenerateJpegBuffer();
-                        Interlocked.Exchange(ref latestFrame, frame);
-                        frameAvailable.Set();
+                        if (frame != null)
+                        {
+                            Interlocked.Exchange(ref latestFrame, frame);
+                            frameAvailable.Set();
+                        }
+                        else
+                        {
+                            // Content unchanged: skip encode; the send loop's 1s wait
+                            // timeout keeps the protocol keep-alive flowing.
+                            fpsCounter.Update(0);
+                            _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
+                        }
 
                         var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
                         var elapsedMs = (int)stopwatch.ElapsedMilliseconds;
@@ -209,21 +219,30 @@ namespace InfoPanel.Services
             renderCts.Dispose();
         }
 
-        private byte[] GenerateJpegBuffer()
+        private readonly SharedFrameConsumer _frameConsumer = new();
+
+        /// <summary>Returns null when the profile content has not changed (frame skipped).</summary>
+        private byte[]? GenerateJpegBuffer()
         {
             var modelInfo = _device.ModelInfo;
             int maxBytes = modelInfo?.MaxJpegBytes ?? 80 * 1024;
 
             if (DeviceRuntime.GetProfile(_device.ProfileGuid) is Profile profile)
             {
-                var rotation = _device.Rotation;
+                var frameInterval = 1000 / Math.Max(1, _device.TargetFrameRate);
+                return _frameConsumer.Produce(profile, frameInterval, bitmap => EncodeFromShared(bitmap, maxBytes));
+            }
 
-                using var bitmap = PanelRenderer.RenderSK(profile, false,
-                    colorType: SKColorType.Rgba8888,
-                    alphaType: SKAlphaType.Opaque);
+            return GenerateBlackJpeg();
+        }
 
-                using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+        private byte[] EncodeFromShared(SKBitmap bitmap, int maxBytes)
+        {
+            var rotation = _device.Rotation;
 
+            var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+            try
+            {
                 SKBitmap encodeBitmap = resizedBitmap;
                 SKBitmap? dimmed = null;
                 try
@@ -256,8 +275,13 @@ namespace InfoPanel.Services
                     dimmed?.Dispose();
                 }
             }
-
-            return GenerateBlackJpeg();
+            finally
+            {
+                if (!ReferenceEquals(resizedBitmap, bitmap))
+                {
+                    resizedBitmap.Dispose();
+                }
+            }
         }
 
         private SKBitmap ApplyBrightness(SKBitmap source)

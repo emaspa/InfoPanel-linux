@@ -139,9 +139,19 @@ namespace InfoPanel.Services
                         stopwatch.Restart();
 
                         var frame = GenerateJpegBuffer();
-                        Interlocked.Exchange(ref lastRenderMs, stopwatch.ElapsedMilliseconds);
-                        Interlocked.Exchange(ref latestFrame, frame);
-                        frameAvailable.Set();
+                        if (frame != null)
+                        {
+                            Interlocked.Exchange(ref lastRenderMs, stopwatch.ElapsedMilliseconds);
+                            Interlocked.Exchange(ref latestFrame, frame);
+                            frameAvailable.Set();
+                        }
+                        else
+                        {
+                            // Content unchanged: skip encode; the send loop resends the
+                            // previous frame after 1 s, which keeps the panel awake.
+                            fpsCounter.Update(0);
+                            _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
+                        }
 
                         var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
                         var elapsedMs = (int)stopwatch.ElapsedMilliseconds;
@@ -212,23 +222,32 @@ namespace InfoPanel.Services
             renderCts.Dispose();
         }
 
-        private byte[] GenerateJpegBuffer()
+        private readonly SharedFrameConsumer _frameConsumer = new();
+
+        /// <summary>Returns null when the profile content has not changed (frame skipped).</summary>
+        private byte[]? GenerateJpegBuffer()
         {
             var modelInfo = _device.ModelInfo;
             int maxBytes = modelInfo?.MaxJpegBytes ?? 256 * 1024;
 
             if (DeviceRuntime.GetProfile(_device.ProfileGuid) is Profile profile)
             {
-                var rotation = _device.Rotation;
+                var frameInterval = 1000 / Math.Max(1, _device.TargetFrameRate);
+                return _frameConsumer.Produce(profile, frameInterval, bitmap => EncodeFromShared(bitmap, maxBytes));
+            }
 
-                using var bitmap = PanelRenderer.RenderSK(profile, false,
-                    colorType: SKColorType.Rgba8888,
-                    alphaType: SKAlphaType.Opaque);
+            return GenerateBlackJpeg();
+        }
 
-                // The JPEG must be in the panel's native portrait orientation; the rotation
-                // setting maps the (usually landscape) profile onto it.
-                using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+        private byte[] EncodeFromShared(SKBitmap bitmap, int maxBytes)
+        {
+            var rotation = _device.Rotation;
 
+            // The JPEG must be in the panel's native portrait orientation; the rotation
+            // setting maps the (usually landscape) profile onto it.
+            var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+            try
+            {
                 SKBitmap encodeBitmap = resizedBitmap;
                 SKBitmap? dimmed = null;
                 try
@@ -260,8 +279,13 @@ namespace InfoPanel.Services
                     dimmed?.Dispose();
                 }
             }
-
-            return GenerateBlackJpeg();
+            finally
+            {
+                if (!ReferenceEquals(resizedBitmap, bitmap))
+                {
+                    resizedBitmap.Dispose();
+                }
+            }
         }
 
         private SKBitmap ApplyBrightness(SKBitmap source)
@@ -357,10 +381,16 @@ namespace InfoPanel.Services
             {
                 stopwatch.Restart();
 
-                GenerateUyvyFrame(ref uyvyBuffer);
-                ms.SendFrame(uyvyBuffer!, _panelWidth, _panelHeight);
-
-                fpsCounter.Update(stopwatch.ElapsedMilliseconds);
+                if (GenerateUyvyFrame(ref uyvyBuffer))
+                {
+                    ms.SendFrame(uyvyBuffer!, _panelWidth, _panelHeight);
+                    fpsCounter.Update(stopwatch.ElapsedMilliseconds);
+                }
+                else
+                {
+                    // Content unchanged: the panel holds the last frame.
+                    fpsCounter.Update(0);
+                }
                 _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
 
                 var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
@@ -375,28 +405,48 @@ namespace InfoPanel.Services
         /// native portrait resolution, reusing <paramref name="uyvyBuffer"/> across frames.
         /// The chip consumes UYVY only - RGB payloads desync into flashing garbage.
         /// </summary>
-        private void GenerateUyvyFrame(ref byte[]? uyvyBuffer)
+        private readonly SharedFrameConsumer _ms9132FrameConsumer = new();
+
+        /// <summary>Fills the UYVY buffer; returns false when the content has not changed.</summary>
+        private bool GenerateUyvyFrame(ref byte[]? uyvyBuffer)
         {
             int pixelCount = _panelWidth * _panelHeight;
             uyvyBuffer ??= new byte[pixelCount * 2];
+            var target = uyvyBuffer;
 
-            SKBitmap? rendered = null;
-            try
+            if (DeviceRuntime.GetProfile(_device.ProfileGuid) is Profile profile)
             {
-                if (DeviceRuntime.GetProfile(_device.ProfileGuid) is Profile profile)
+                var frameInterval = 1000 / Math.Max(1, _device.TargetFrameRate);
+                return _ms9132FrameConsumer.Produce(profile, frameInterval, bitmap =>
                 {
-                    using var bitmap = PanelRenderer.RenderSK(profile, false,
-                        colorType: SKColorType.Rgba8888,
-                        alphaType: SKAlphaType.Opaque);
-                    rendered = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, _device.Rotation);
-                }
-                else
-                {
-                    rendered = new SKBitmap(_panelWidth, _panelHeight, SKColorType.Rgba8888, SKAlphaType.Opaque);
-                    rendered.Erase(SKColors.Black);
-                }
+                    var rendered = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, _device.Rotation);
+                    try
+                    {
+                        ConvertToUyvy(rendered, target);
+                    }
+                    finally
+                    {
+                        if (!ReferenceEquals(rendered, bitmap))
+                        {
+                            rendered.Dispose();
+                        }
+                    }
+                    return target;
+                }) != null;
+            }
 
-                int scale256 = Math.Clamp(_device.Brightness, 0, 100) * 256 / 100;
+            // No profile: black frame once per heartbeat is enough
+            using (var black = new SKBitmap(_panelWidth, _panelHeight, SKColorType.Rgba8888, SKAlphaType.Opaque))
+            {
+                black.Erase(SKColors.Black);
+                ConvertToUyvy(black, target);
+            }
+            return true;
+        }
+
+        private void ConvertToUyvy(SKBitmap rendered, byte[] uyvyBuffer)
+        {
+            int scale256 = Math.Clamp(_device.Brightness, 0, 100) * 256 / 100;
                 bool dim = scale256 < 256;
 
                 unsafe
@@ -431,11 +481,6 @@ namespace InfoPanel.Services
                         }
                     }
                 }
-            }
-            finally
-            {
-                rendered?.Dispose();
-            }
         }
     }
 }

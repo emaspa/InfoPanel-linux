@@ -69,46 +69,45 @@ namespace InfoPanel.Services
             _panelHeight = device.ModelInfo.Height;
         }
 
+        private readonly SharedFrameConsumer _frameConsumer = new();
+
+        /// <summary>Returns null when there is no profile or the content has not changed.</summary>
         public byte[]? GenerateLcdBuffer()
         {
             var profileGuid = _device.ProfileGuid;
 
             if (DeviceRuntime.GetProfile(profileGuid) is Profile profile)
             {
-                var rotation = _device.Rotation;
-
-                // The Lian Li 8.8" sends frames as JPEG like the vendor app.
-                if (IsLianLi)
+                var frameInterval = 1000 / Math.Max(1, _device.TargetFrameRate);
+                return _frameConsumer.Produce(profile, frameInterval, bitmap =>
                 {
-                    using var lianLiBitmap = PanelRenderer.RenderSK(profile, false);
-                    using var lianLiResized = SKBitmapExtensions.EnsureBitmapSize(lianLiBitmap, _panelWidth, _panelHeight, rotation);
-                    using var lianLiPixmap = lianLiResized.PeekPixels();
-                    using var lianLiData = lianLiPixmap.Encode(SKEncodedImageFormat.Jpeg, 95);
+                    var rotation = _device.Rotation;
+                    // JPEG like the Windows build (command 101): much cheaper to encode
+                    // and for the panel to decode than PNG, which capped frame rate.
+                    int quality = IsLianLi ? 95 : _device.JpegQuality;
 
-                    if (lianLiData == null || lianLiData.IsEmpty)
+                    var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+                    try
                     {
-                        Logger.Error("TuringPanelDevice {Device}: Failed to encode bitmap to JPEG", _device);
-                        return null;
+                        using var pixmap = resizedBitmap.PeekPixels();
+                        using var data = pixmap.Encode(SKEncodedImageFormat.Jpeg, quality);
+
+                        if (data == null || data.IsEmpty)
+                        {
+                            Logger.Error("TuringPanelDevice {Device}: Failed to encode bitmap to JPEG", _device);
+                            return null!;
+                        }
+
+                        return data.ToArray();
                     }
-
-                    return lianLiData.ToArray();
-                }
-
-                // JPEG like the Windows build (command 101): much cheaper to encode
-                // and for the panel to decode than PNG, which capped frame rate.
-                using var bitmap = PanelRenderer.RenderSK(profile, false);
-                using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
-
-                using var pixmap = resizedBitmap.PeekPixels();
-                using var data = pixmap.Encode(SKEncodedImageFormat.Jpeg, _device.JpegQuality);
-
-                if (data == null || data.IsEmpty)
-                {
-                    Logger.Error("TuringPanelDevice {Device}: Failed to encode bitmap to JPEG", _device);
-                    return null;
-                }
-
-                return data.ToArray();
+                    finally
+                    {
+                        if (!ReferenceEquals(resizedBitmap, bitmap))
+                        {
+                            resizedBitmap.Dispose();
+                        }
+                    }
+                });
             }
 
             return null;
@@ -324,6 +323,12 @@ namespace InfoPanel.Services
                             {
                                 var oldFrame = Interlocked.Exchange(ref _latestFrame, frame);
                                 _frameAvailable.Set();
+                            }
+                            else
+                            {
+                                // Content unchanged: skip encode/send, keep showing the pace.
+                                fpsCounter.Update(0);
+                                _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
                             }
 
                             var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);

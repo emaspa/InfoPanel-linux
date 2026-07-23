@@ -297,11 +297,25 @@ namespace InfoPanel
                         Logger.Debug("WebServer: Serving image for profile {ProfileId}", id);
                         var profile = DeviceRuntime.GetProfiles()[id];
 
-                        using var bitmap = PanelRenderer.RenderSK(profile, false);
-                        using var data = bitmap.Encode(SKEncodedImageFormat.Png, 100);
+                        // Share the render with the panel consumers; encode as JPEG,
+                        // which is several times cheaper than PNG for photographic
+                        // dashboards and matters at browser refresh rates.
+                        byte[]? payload = null;
+                        SharedFrameCache.WithFrame(profile, Math.Max(50, DeviceRuntime.Settings.WebServerRefreshRate), (bitmap, _) =>
+                        {
+                            using var pixmap = bitmap.PeekPixels();
+                            using var data = pixmap.Encode(SKEncodedImageFormat.Jpeg, 90);
+                            payload = data?.ToArray();
+                        });
 
-                        context.Response.ContentType = "image/png";
-                        await context.Response.Body.WriteAsync(data.ToArray());
+                        if (payload == null)
+                        {
+                            context.Response.StatusCode = 500;
+                            return;
+                        }
+
+                        context.Response.ContentType = "image/jpeg";
+                        await context.Response.Body.WriteAsync(payload);
                     }
                     else
                     {

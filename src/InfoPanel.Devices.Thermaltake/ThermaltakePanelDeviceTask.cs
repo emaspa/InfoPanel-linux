@@ -119,8 +119,17 @@ namespace InfoPanel.Services
                         stopwatch.Restart();
 
                         var frame = GenerateJpegBuffer();
-                        Interlocked.Exchange(ref latestFrame, frame);
-                        frameAvailable.Set();
+                        if (frame != null)
+                        {
+                            Interlocked.Exchange(ref latestFrame, frame);
+                            frameAvailable.Set();
+                        }
+                        else
+                        {
+                            // Content unchanged: skip encode/send, keep showing the pace.
+                            fpsCounter.Update(0);
+                            _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
+                        }
 
                         var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
                         var elapsedMs = (int)stopwatch.ElapsedMilliseconds;
@@ -178,39 +187,49 @@ namespace InfoPanel.Services
             renderCts.Dispose();
         }
 
-        private byte[] GenerateJpegBuffer()
+        private readonly SharedFrameConsumer _frameConsumer = new();
+
+        /// <summary>Returns null when the profile content has not changed (frame skipped).</summary>
+        private byte[]? GenerateJpegBuffer()
         {
             var profileGuid = _device.ProfileGuid;
 
             if (DeviceRuntime.GetProfile(profileGuid) is Profile profile)
             {
-                var rotation = _device.Rotation;
-
-                using var bitmap = PanelRenderer.RenderSK(profile, false,
-                    colorType: SKColorType.Rgba8888,
-                    alphaType: SKAlphaType.Opaque);
-
-                using var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
-
-                SKBitmap encodeBitmap = resizedBitmap;
-                SKBitmap? dimmed = null;
-                try
+                var frameInterval = 1000 / Math.Max(1, _device.TargetFrameRate);
+                return _frameConsumer.Produce(profile, frameInterval, bitmap =>
                 {
-                    if (_device.Brightness < 100)
+                    var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, _device.Rotation);
+                    try
                     {
-                        dimmed = ApplyBrightness(resizedBitmap);
-                        encodeBitmap = dimmed;
-                    }
+                        SKBitmap encodeBitmap = resizedBitmap;
+                        SKBitmap? dimmed = null;
+                        try
+                        {
+                            if (_device.Brightness < 100)
+                            {
+                                dimmed = ApplyBrightness(resizedBitmap);
+                                encodeBitmap = dimmed;
+                            }
 
-                int quality = _device.JpegQuality;
-                using var image = SKImage.FromBitmap(encodeBitmap);
-                using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
-                return data.ToArray();
-                }
-                finally
-                {
-                    dimmed?.Dispose();
-                }
+                            int quality = _device.JpegQuality;
+                            using var image = SKImage.FromBitmap(encodeBitmap);
+                            using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
+                            return data.ToArray();
+                        }
+                        finally
+                        {
+                            dimmed?.Dispose();
+                        }
+                    }
+                    finally
+                    {
+                        if (!ReferenceEquals(resizedBitmap, bitmap))
+                        {
+                            resizedBitmap.Dispose();
+                        }
+                    }
+                });
             }
 
             // No profile selected: return a black JPEG

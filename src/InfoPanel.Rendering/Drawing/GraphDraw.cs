@@ -386,30 +386,33 @@ namespace InfoPanel.Drawing
                             {
                                 // Vertical bar - bottom draw
                                 var fillHeight = Math.Min((float)value, innerHeight);
-                                usagePath.AddRoundRect(new SKRoundRect(new SKRect(
+                                using var usageRR = new SKRoundRect(new SKRect(
                                     innerLeft,
                                     innerBottom - fillHeight,
                                     innerRight,
                                     innerBottom
-                                ), innerRadius));
+                                ), innerRadius);
+                                usagePath.AddRoundRect(usageRR);
                             }
                             else
                             {
                                 // Horizontal bar
                                 var fillWidth = Math.Min((float)value, innerWidth);
-                                usagePath.AddRoundRect(new SKRoundRect(new SKRect(
+                                using var usageRR = new SKRoundRect(new SKRect(
                                     innerLeft,
                                     innerTop,
                                     innerLeft + fillWidth,
                                     innerBottom
-                                ), innerRadius));
+                                ), innerRadius);
+                                usagePath.AddRoundRect(usageRR);
                             }
 
                             // Clip the fill to the container's (inset) round rect: at low values
                             // the fill is narrower than the corner radius, and unclipped it pokes
                             // square corners outside the rounded background.
                             using var containerPath = new SKPath();
-                            containerPath.AddRoundRect(new SKRoundRect(new SKRect(innerLeft, innerTop, innerRight, innerBottom), innerRadius));
+                            using var containerRR = new SKRoundRect(new SKRect(innerLeft, innerTop, innerRight, innerBottom), innerRadius);
+                            containerPath.AddRoundRect(containerRR);
                             using var clippedUsagePath = usagePath.Op(containerPath, SKPathOp.Intersect) ?? new SKPath(usagePath);
 
                             // Draw background if enabled
@@ -436,12 +439,13 @@ namespace InfoPanel.Drawing
                                 // Offset by 0.5px so the 1px stroke lands on whole pixels instead of
                                 // splitting across two columns at 50% opacity each.
                                 using var framePath = new SKPath();
-                                framePath.AddRoundRect(new SKRoundRect(new SKRect(
+                                using var frameRR = new SKRoundRect(new SKRect(
                                     frameRect.Left + 0.5f,
                                     frameRect.Top + 0.5f,
                                     frameRect.Left + frameRect.Width - 0.5f,
                                     frameRect.Top + frameRect.Height - 0.5f
-                                ), Math.Max(0, barDisplayItem.CornerRadius - 0.5f)));
+                                ), Math.Max(0, barDisplayItem.CornerRadius - 0.5f));
+                                framePath.AddRoundRect(frameRR);
 
                                 g.DrawPath(framePath, color, 1);
                             }
