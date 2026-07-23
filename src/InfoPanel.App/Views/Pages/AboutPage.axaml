@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.1.2 alpha: designer polish" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.1.3 alpha: performance" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Large CPU and memory reductions: profiles render once per tick and are shared by all panels and the web server, frames whose pixels have not changed skip the resize, encode and USB send entirely (a heartbeat frame keeps panels warm), text layouts are cached instead of re-shaped every frame, and long GIF animations no longer keep every frame in memory. On a bench with three panels streaming, CPU dropped to roughly a quarter of the previous build; mostly static dashboards idle far lower." />
+                        <TextBlock Text="v0.1.2 alpha: designer polish" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Three reported paper cuts: the color picker no longer closes the moment a slider is touched (the inspector rebuilt itself on every edit, killing the open flyout and slider drags), the layers panel lists the front-most item at the top so up and down move items the way you expect, and Home screen profile cards show friendly device names for all panel families instead of internal model identifiers." />
                         <TextBlock Text="v0.1.1 alpha: designer stability" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
