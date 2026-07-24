@@ -30,7 +30,10 @@ namespace InfoPanel.Services
             _device = device ?? throw new ArgumentNullException(nameof(device));
         }
 
-        private readonly SharedFrameConsumer _frameConsumer = new();
+        // Resend the cached payload at full cadence when content is unchanged:
+        // wire behavior stays identical to pre-0.1.3 builds (some panel firmwares
+        // treat a slow stream as stopped); only render/resize/encode is skipped.
+        private readonly SharedFrameConsumer _frameConsumer = new() { ResendCachedOnSkip = true };
 
         /// <summary>Returns null when there is no profile or the content has not changed.</summary>
         public byte[]? GenerateLcdBuffer()

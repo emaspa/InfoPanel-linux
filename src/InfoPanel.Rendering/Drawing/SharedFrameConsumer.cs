@@ -15,9 +15,20 @@ namespace InfoPanel
     {
         private long _lastVersion = -1;
         private long _lastProducedMs;
+        private object? _lastResult;
 
         /// <summary>Interval after which an unchanged frame is produced anyway.</summary>
         public int HeartbeatMs { get; set; } = 1000;
+
+        /// <summary>
+        /// When set, an unchanged frame returns the previously produced payload
+        /// instead of null, so the caller keeps sending at full cadence. Required
+        /// for panels whose firmware treats a slow stream as stopped and falls
+        /// back to the boot logo (Trofeo bulk panels do this below ~1 fps); the
+        /// expensive render/resize/encode is still skipped. Only use with
+        /// immutable payloads (byte[]) that the caller does not pool or dispose.
+        /// </summary>
+        public bool ResendCachedOnSkip { get; set; }
 
         public T? Produce<T>(Profile profile, int maxAgeMs, Func<SKBitmap, T> produce) where T : class
         {
@@ -26,10 +37,15 @@ namespace InfoPanel
             {
                 if (version == _lastVersion && Environment.TickCount64 - _lastProducedMs < HeartbeatMs)
                 {
+                    if (ResendCachedOnSkip)
+                    {
+                        result = _lastResult as T;
+                    }
                     return;
                 }
 
                 result = produce(bitmap);
+                _lastResult = ResendCachedOnSkip ? result : null;
                 _lastVersion = version;
                 _lastProducedMs = Environment.TickCount64;
             });

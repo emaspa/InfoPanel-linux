@@ -222,7 +222,10 @@ namespace InfoPanel.Services
             renderCts.Dispose();
         }
 
-        private readonly SharedFrameConsumer _frameConsumer = new();
+        // Resend the cached payload at full cadence when content is unchanged:
+        // wire behavior stays identical to pre-0.1.3 builds (some panel firmwares
+        // treat a slow stream as stopped); only render/resize/encode is skipped.
+        private readonly SharedFrameConsumer _frameConsumer = new() { ResendCachedOnSkip = true };
 
         /// <summary>Returns null when the profile content has not changed (frame skipped).</summary>
         private byte[]? GenerateJpegBuffer()
@@ -405,7 +408,8 @@ namespace InfoPanel.Services
         /// native portrait resolution, reusing <paramref name="uyvyBuffer"/> across frames.
         /// The chip consumes UYVY only - RGB payloads desync into flashing garbage.
         /// </summary>
-        private readonly SharedFrameConsumer _ms9132FrameConsumer = new();
+        // Same resend-on-skip policy; the cached payload is the reused UYVY buffer.
+        private readonly SharedFrameConsumer _ms9132FrameConsumer = new() { ResendCachedOnSkip = true };
 
         /// <summary>Fills the UYVY buffer; returns false when the content has not changed.</summary>
         private bool GenerateUyvyFrame(ref byte[]? uyvyBuffer)

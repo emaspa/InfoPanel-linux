@@ -126,7 +126,10 @@ namespace InfoPanel.Services
             return header;
         }
 
-        private readonly SharedFrameConsumer _frameConsumer = new();
+        // Trofeo firmware falls back to its boot logo when the stream drops below
+        // ~1 fps, so unchanged frames are resent at full cadence from the cached
+        // payload; only the render/resize/encode is skipped.
+        private readonly SharedFrameConsumer _frameConsumer = new() { ResendCachedOnSkip = true };
 
         private int FrameIntervalMs => 1000 / Math.Max(1, _device.TargetFrameRate);
 
