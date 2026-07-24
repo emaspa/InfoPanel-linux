@@ -141,10 +141,19 @@ InfoPanel.Plugins (net8.0 SDK) + Plugins.Loader + Plugins.Graphics
 
 Key design points:
 
-- **Render pipeline**: profiles render once per tick with SkiaSharp; each
-  output (overlay, panel, web, thumbnails) consumes the same draw path
-  with its own cache hints. Font lookups are memoized per family/weight,
-  which is what sustains full frame rate on 1920-wide panels.
+- **Render pipeline**: each profile renders once per tick into a shared,
+  reused buffer that every consumer (panels, web viewer) reads from, with
+  a content-version check so unchanged frames skip the resize, encode and
+  USB transfer entirely (panels still receive full-cadence frames from the
+  cached payload). Text layouts and font lookups are cached while
+  unchanged, which is what sustains full frame rate on 1920-wide panels
+  at a few percent of CPU.
+- **Demand-driven sensing**: only sensors referenced by a profile that is
+  actually being consumed are polled each second, and a plugin whose
+  sensors are unused for a few minutes stops completely (audio capture,
+  network fetches and worker threads released), restarting within a
+  second of demand returning. The Sensors page and designer always see
+  the full live catalog while open.
 - **Device supervision**: each panel runs a supervised worker with its own
   lifecycle (present, starting, streaming, faulted, cooldown), exponential
   backoff and a bounded frame mailbox, so one wedged device never stalls

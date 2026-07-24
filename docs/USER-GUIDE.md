@@ -50,6 +50,8 @@ Bundled plugins include system info, drives, network, weather (OpenWeatherMap ke
 
 Third-party .NET plugins built for InfoPanel for Windows load as-is: drop the plugin folder into the `plugins` directory next to the executable, or use the import option on the Plugins page.
 
+To keep idle cost low, a plugin whose sensors are not shown on any streaming panel, overlay or web view stops updating, and after 5 minutes stops completely; it restarts automatically within a second when one of its sensors is used again. While stopped, its sensors remain listed with their last values. The Sensors page and the designer always show everything live while open.
+
 ## Devices
 
 The Devices page detects supported USB LCD panels: BeadaPanel, Turing Smart Screen (including Lian Li and Rev 4.6"), Thermalright (40+ models), Thermaltake / ASRock, JL / Hongtai, VMAX and Jonsbo (DS916, DS339). For each panel you can assign a profile, set rotation and brightness, and watch the live frame rate and latency.
