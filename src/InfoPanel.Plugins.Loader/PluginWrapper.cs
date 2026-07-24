@@ -32,10 +32,18 @@ namespace InfoPanel.Plugins.Loader
 
         public bool IsRunning => _task is not null && !_task.IsCompleted && _cts is not null && !_cts.IsCancellationRequested;
 
+        /// <summary>
+        /// Host-supplied gate: when it returns false, periodic updates are skipped
+        /// (demand-driven polling - no display item uses this plugin's sensors).
+        /// The plugin stays loaded and resumes updating as soon as demand returns.
+        /// </summary>
+        public Func<bool>? UpdateGate { get; set; }
+
         public void Update()
         {
             // If the plugin is running or the interval is not set to <0, we don't want to update it manually
             if (IsRunning || Plugin.UpdateInterval.TotalMilliseconds > 0) return;
+            if (UpdateGate?.Invoke() == false) return;
 
             try
             {
@@ -112,9 +120,12 @@ namespace InfoPanel.Plugins.Loader
                 {
                     try
                     {
-                        _stopwatch.Restart();
-                        await Plugin.UpdateAsync(cancellationToken);
-                        _updateTimeMilliseconds = _stopwatch.ElapsedMilliseconds;
+                        if (UpdateGate?.Invoke() != false)
+                        {
+                            _stopwatch.Restart();
+                            await Plugin.UpdateAsync(cancellationToken);
+                            _updateTimeMilliseconds = _stopwatch.ElapsedMilliseconds;
+                        }
                     }
                     catch (Exception ex)
                     {

@@ -21,6 +21,33 @@ namespace InfoPanel.Monitors
         private static readonly Lazy<PluginMonitor> _instance = new(() => new PluginMonitor());
         public static PluginMonitor Instance => _instance.Value;
 
+        private static long _demandStampMs;
+        private static HashSet<string> _demandedPluginIds = [];
+
+        /// <summary>True when any used sensor id belongs to this plugin, the plugin's
+        /// images are displayed, or full polling is active (sensor UI visible).</summary>
+        internal static bool IsPluginDemanded(string pluginId)
+        {
+            if (InfoPanel.Models.SensorDemand.PollAll) return true;
+
+            var now = Environment.TickCount64;
+            if (now - _demandStampMs >= 1000)
+            {
+                _demandStampMs = now;
+                var set = new HashSet<string>(InfoPanel.Models.SensorDemand.UsedPluginIds);
+                foreach (var id in InfoPanel.Models.SensorDemand.UsedPluginSensorIds)
+                {
+                    if (SENSORHASH.TryGetValue(id, out var reading) && reading.PluginId != null)
+                    {
+                        set.Add(reading.PluginId);
+                    }
+                }
+                _demandedPluginIds = set;
+            }
+
+            return _demandedPluginIds.Contains(pluginId);
+        }
+
         public static readonly ConcurrentDictionary<string, PluginReading> SENSORHASH = new();
 
         public List<PluginDescriptor> Plugins { get; private set; } = [];
@@ -270,6 +297,10 @@ namespace InfoPanel.Monitors
         {
             await wrapper.Initialize();
             Log.Information("Plugin {PluginName} loaded successfully", wrapper.Name);
+
+            // Demand-driven polling: pause this plugin's updates while none of its
+            // sensors, tables or images are used by a consumed profile.
+            wrapper.UpdateGate = () => IsPluginDemanded(wrapper.Id);
 
             PluginConfigStore.LoadAndApply(wrapper);
             SetupImageProvider(wrapper);

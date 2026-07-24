@@ -30,7 +30,20 @@ public class HwmonMonitor
             return;
         }
 
-        Poll();
+        // First poll ignores demand gating so the full sensor catalog exists in
+        // SENSORHASH (the Sensors page and designer tree enumerate it). Subsequent
+        // polls only read demanded sensors; unused entries keep their startup value
+        // until a sensor-browsing page turns full polling back on.
+        var forced = SensorDemand.ForcePollAll;
+        SensorDemand.ForcePollAll = true;
+        try
+        {
+            Poll();
+        }
+        finally
+        {
+            SensorDemand.ForcePollAll = forced;
+        }
 
         _pollTimer = new System.Timers.Timer(intervalMs);
         _pollTimer.Elapsed += (_, _) => Poll();
@@ -50,6 +63,9 @@ public class HwmonMonitor
 
     private void Poll()
     {
+        // Refresh which sensors are actually displayed; unused ones are skipped below.
+        SensorDemand.RebuildIfDue();
+
         try
         {
             if (Directory.Exists(HwmonPath))
@@ -77,6 +93,7 @@ public class HwmonMonitor
                     var tempFile = Path.Combine(zoneDir, "temp");
                     var typeFile = Path.Combine(zoneDir, "type");
                     if (!File.Exists(tempFile)) continue;
+                    if (!SensorDemand.IsHwmonUsed($"thermal/{Path.GetFileName(zoneDir)}")) continue;
 
                     var rawValue = ReadFileContent(tempFile);
                     if (rawValue == null || !double.TryParse(rawValue.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var numValue))
@@ -126,6 +143,14 @@ public class HwmonMonitor
                 // e.g., "temp1_input" -> index = "1"
                 var index = fileName.Replace(prefix, "").Replace(suffix.TrimStart('_'), "").Trim('_');
 
+                // Check demand before touching the value file: the read itself is the
+                // cost (some EC/SMBus sensors take milliseconds and wake hardware).
+                var sensorKey = $"{hwmonId}/{prefix}{index}";
+                if (!SensorDemand.IsHwmonUsed(sensorKey))
+                {
+                    continue;
+                }
+
                 var rawValue = ReadFileContent(file);
                 if (rawValue == null || !double.TryParse(rawValue.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var numValue))
                     continue;
@@ -135,8 +160,6 @@ public class HwmonMonitor
                 // Try to read label
                 var labelFile = Path.Combine(hwmonDir, $"{prefix}{index}_label");
                 var label = ReadFileContent(labelFile) ?? $"{prefix}{index}";
-
-                var sensorKey = $"{hwmonId}/{prefix}{index}";
 
                 if (SENSORHASH.TryGetValue(sensorKey, out var existing))
                 {

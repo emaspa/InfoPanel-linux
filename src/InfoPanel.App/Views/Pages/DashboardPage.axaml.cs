@@ -41,6 +41,11 @@ namespace InfoPanel.Views.Pages
         public DashboardPage()
         {
             InitializeComponent();
+
+            // Sensor-browsing UI: poll all sensors while this page is visible.
+            bool sensorViewer = false;
+            Loaded += (_, _) => { if (!sensorViewer) { sensorViewer = true; InfoPanel.Models.SensorDemand.AddUiViewer(); } };
+            Unloaded += (_, _) => { if (sensorViewer) { sensorViewer = false; InfoPanel.Models.SensorDemand.RemoveUiViewer(); } };
             ProfileList.ItemsSource = _cards;
 
             Loaded += (_, _) =>

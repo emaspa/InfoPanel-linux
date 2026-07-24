@@ -139,6 +139,25 @@ namespace InfoPanel
             PluginImageSource.Configure(static (pluginId, imageId) =>
                 Monitors.PluginMonitor.IMAGEWRITERS.TryGetValue(pluginId, out var writers)
                     && writers.TryGetValue(imageId, out var writer) ? writer : null);
+
+            // Demand-driven sensor polling (#9): only sensors referenced by consumed
+            // profiles (recently rendered for a panel/web, or shown as an overlay) are
+            // polled; sensor-browsing pages switch to full polling while visible.
+            SensorDemand.DemandProvider = () =>
+            {
+                var consumed = new HashSet<Profile>();
+                var byGuid = new Dictionary<Guid, Profile>();
+                foreach (var p in Profiles) byGuid[p.Guid] = p;
+                foreach (var guid in SharedFrameCache.RecentlyRendered(TimeSpan.FromSeconds(30)))
+                {
+                    if (byGuid.TryGetValue(guid, out var p)) consumed.Add(p);
+                }
+                foreach (var p in Profiles)
+                {
+                    if (p.Active) consumed.Add(p);
+                }
+                return SensorDemand.Collect(consumed, RenderContext.GetDisplayItems);
+            };
         }
 
         public void SaveProfiles() => ConfigPersistence.SaveProfiles([.. Profiles]);

@@ -75,6 +75,25 @@ namespace InfoPanel
             }
         }
 
+        /// <summary>
+        /// Profiles rendered through this cache within the given window: a direct
+        /// signal of which profiles are actively consumed (panels, web viewer),
+        /// used by demand-driven sensor polling.
+        /// </summary>
+        public static List<Guid> RecentlyRendered(TimeSpan window)
+        {
+            var cutoff = Environment.TickCount64 - (long)window.TotalMilliseconds;
+            var result = new List<Guid>();
+            foreach (var kvp in _entries)
+            {
+                if (kvp.Value.RenderedAtMs >= cutoff)
+                {
+                    result.Add(kvp.Key);
+                }
+            }
+            return result;
+        }
+
         private static bool IsFresh(Entry entry, Profile profile, int maxAgeMs)
         {
             return entry.Bitmap != null

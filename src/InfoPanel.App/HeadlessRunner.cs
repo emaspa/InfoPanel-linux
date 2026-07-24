@@ -15,6 +15,7 @@ namespace InfoPanel
             // --dump-sensors: start monitors, poll briefly, print all readings and exit
             if (args.Contains("--dump-sensors"))
             {
+                Models.SensorDemand.ForcePollAll = true;
                 await host.StartSensorsAsync();
                 await Task.Delay(2500);
 
@@ -42,6 +43,11 @@ namespace InfoPanel
 
             // --render-once [dir]: render every profile to PNG and exit (pipeline verification)
             var renderOnceIndex = Array.IndexOf(args, "--render-once");
+            if (renderOnceIndex >= 0)
+            {
+                // Single-shot render of every profile: poll everything.
+                Models.SensorDemand.ForcePollAll = true;
+            }
             if (renderOnceIndex >= 0)
             {
                 await host.StartSensorsAsync();
