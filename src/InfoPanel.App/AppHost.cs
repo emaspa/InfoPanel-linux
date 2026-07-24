@@ -156,7 +156,18 @@ namespace InfoPanel
                 {
                     if (p.Active) consumed.Add(p);
                 }
-                return SensorDemand.Collect(consumed, RenderContext.GetDisplayItems);
+                var snapshot = SensorDemand.Collect(consumed, RenderContext.GetDisplayItems);
+
+                // Stopwatch hotkeys drive the plugin without any display item; keep it
+                // running (idle-stopping it would reset a running stopwatch).
+                if (Settings.StopwatchHotkeyStartKey != "None"
+                    || Settings.StopwatchHotkeyStopKey != "None"
+                    || Settings.StopwatchHotkeyResetKey != "None")
+                {
+                    snapshot.PluginIds.Add(HotkeyManager.StopwatchPluginId);
+                }
+
+                return snapshot;
             };
         }
 

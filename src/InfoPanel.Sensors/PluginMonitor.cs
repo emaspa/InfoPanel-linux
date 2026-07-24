@@ -161,6 +161,9 @@ namespace InfoPanel.Monitors
                    
                     stopwatch.Stop();
                     //Trace.WriteLine($"Plugins updated: {stopwatch.ElapsedMilliseconds}ms");
+
+                    await ManageIdlePluginsAsync();
+
                     await Task.Delay(100, token);
                 }
             }
@@ -221,6 +224,74 @@ namespace InfoPanel.Monitors
             }
 
             return pluginDescriptor;
+        }
+
+        // ================= idle plugin lifecycle (#9) =================
+        //
+        // Beyond gating updates, an interval-driven plugin that no consumed profile
+        // uses for a while is stopped outright (Plugin.Close releases its resources,
+        // e.g. the audio-capture pipe of the spectrum plugin) and restarted within a
+        // second of demand returning. Its sensor entries stay registered so the
+        // sensor tree keeps its catalog and demand mapping keeps working; values
+        // freeze at their last reading while stopped.
+
+        private readonly System.Collections.Generic.Dictionary<string, long> _lastDemandedAtMs = [];
+        private readonly System.Collections.Generic.HashSet<string> _idleStopped = [];
+        private const int IdleStopAfterMs = 5 * 60 * 1000;
+
+        private async Task ManageIdlePluginsAsync()
+        {
+            var now = Environment.TickCount64;
+            foreach (var pluginDescriptor in Plugins)
+            {
+                foreach (var wrapper in pluginDescriptor.PluginWrappers.Values)
+                {
+                    if (!wrapper.IsLoaded && !_idleStopped.Contains(wrapper.Id)) continue;
+                    // Only task-driven plugins hold resources worth releasing; the
+                    // update gate already fully pauses manually-updated ones, and
+                    // their StopAsync would not run Plugin.Close anyway.
+                    if (wrapper.UpdateInterval.TotalMilliseconds <= 0) continue;
+
+                    var demanded = IsPluginDemanded(wrapper.Id);
+                    if (demanded)
+                    {
+                        _lastDemandedAtMs[wrapper.Id] = now;
+                        if (_idleStopped.Remove(wrapper.Id))
+                        {
+                            Log.Information("Plugin {PluginName} resuming (its sensors are in use again)", wrapper.Name);
+                            try
+                            {
+                                await ReloadPluginModule(wrapper);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Error(ex, "Plugin {PluginName} failed to resume", wrapper.Name);
+                            }
+                        }
+                    }
+                    else if (!_idleStopped.Contains(wrapper.Id))
+                    {
+                        if (!_lastDemandedAtMs.TryGetValue(wrapper.Id, out var last))
+                        {
+                            _lastDemandedAtMs[wrapper.Id] = last = now;
+                        }
+                        if (now - last > IdleStopAfterMs)
+                        {
+                            Log.Information("Plugin {PluginName} idle-stopped (no profile uses it; resumes automatically on demand)", wrapper.Name);
+                            try
+                            {
+                                await wrapper.StopAsync();
+                                TeardownImageProvider(wrapper);
+                                _idleStopped.Add(wrapper.Id);
+                            }
+                            catch (Exception ex)
+                            {
+                                Log.Error(ex, "Plugin {PluginName} failed to idle-stop", wrapper.Name);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         public async Task StopPluginModulesAsync(PluginDescriptor pluginDescriptor)
@@ -442,6 +513,7 @@ namespace InfoPanel.Monitors
                 await wrapper.Initialize();
                 Log.Information("Plugin {PluginName} reloaded successfully", wrapper.Name);
 
+                wrapper.UpdateGate = () => IsPluginDemanded(wrapper.Id);
                 PluginConfigStore.LoadAndApply(wrapper);
                 SetupImageProvider(wrapper);
 
