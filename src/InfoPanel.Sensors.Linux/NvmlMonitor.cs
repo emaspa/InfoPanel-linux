@@ -132,10 +132,39 @@ public class NvmlMonitor
                     UpdateSensor($"{prefix}/memory_percent", memPercent, "%");
                 }
 
-                // Fan speed
+                // Fan speed (duty cycle - the only fan metric classic NVML exposes)
                 if (Nvml.nvmlDeviceGetFanSpeed(handle, out uint fanSpeed) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/fan_speed", fanSpeed, "%");
+                }
+
+                // Per-fan tachometer RPM: nvmlDeviceGetFanSpeedRPM exists from driver
+                // R550+; on older drivers the entry point is missing and we stop trying.
+                if (_fanRpmSupported)
+                {
+                    try
+                    {
+                        uint numFans = 1;
+                        Nvml.nvmlDeviceGetNumFans(handle, ref numFans);
+                        numFans = Math.Min(numFans, 8);
+                        for (uint fan = 0; fan < numFans; fan++)
+                        {
+                            var info = new NvmlFanSpeedInfo
+                            {
+                                version = NvmlFanSpeedInfo.Version1,
+                                fan = fan,
+                            };
+                            if (Nvml.nvmlDeviceGetFanSpeedRPM(handle, ref info) == NvmlReturn.Success)
+                            {
+                                UpdateSensor($"{prefix}/fan{fan}_rpm", info.speed, "RPM");
+                            }
+                        }
+                    }
+                    catch (EntryPointNotFoundException)
+                    {
+                        _fanRpmSupported = false;
+                        Log.Debug("NVML: fan RPM API not available in this driver");
+                    }
                 }
             }
             catch (Exception ex)
@@ -182,10 +211,28 @@ public class NvmlMonitor
                     });
                 }
             }
+
+            for (int fan = 0; fan < 8; fan++)
+            {
+                var key = $"{prefix}/fan{fan}_rpm";
+                if (HwmonMonitor.SENSORHASH.ContainsKey(key))
+                {
+                    result.Add(new HwmonSensorInfo
+                    {
+                        SensorId = key,
+                        DeviceName = $"NVIDIA {deviceName}",
+                        Category = "Fan",
+                        Label = $"Fan {fan + 1} RPM",
+                        Unit = "RPM"
+                    });
+                }
+            }
         }
 
         return result;
     }
+
+    private static bool _fanRpmSupported = true;
 
     private static void UpdateSensor(string sensorId, double value, string unit)
     {
@@ -291,4 +338,22 @@ internal static class Nvml
 
     [DllImport(LibName, EntryPoint = "nvmlDeviceGetFanSpeed")]
     public static extern NvmlReturn nvmlDeviceGetFanSpeed(IntPtr device, out uint speed);
+
+    [DllImport(LibName, EntryPoint = "nvmlDeviceGetNumFans")]
+    public static extern NvmlReturn nvmlDeviceGetNumFans(IntPtr device, ref uint numFans);
+
+    [DllImport(LibName, EntryPoint = "nvmlDeviceGetFanSpeedRPM")]
+    public static extern NvmlReturn nvmlDeviceGetFanSpeedRPM(IntPtr device, ref NvmlFanSpeedInfo fanSpeed);
+}
+
+/// <summary>Versioned struct for nvmlDeviceGetFanSpeedRPM (driver R550+).</summary>
+[StructLayout(LayoutKind.Sequential)]
+public struct NvmlFanSpeedInfo
+{
+    /// <summary>NVML versioned-API convention: sizeof(struct) | (version &lt;&lt; 24).</summary>
+    public const uint Version1 = 12 | (1u << 24);
+
+    public uint version;
+    public uint fan;
+    public uint speed; // RPM
 }

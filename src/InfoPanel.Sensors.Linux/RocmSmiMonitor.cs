@@ -180,6 +180,12 @@ public class RocmSmiMonitor
                     }
                 }
 
+                // Fan tachometer (RPM)
+                if (Rsmi.rsmi_dev_fan_rpms_get(i, 0, out long fanRpm) == RsmiStatus.Success)
+                {
+                    UpdateSensor($"{prefix}/fan_rpm", fanRpm, "RPM");
+                }
+
                 // Fan speed (percentage)
                 if (Rsmi.rsmi_dev_fan_speed_get(i, 0, out long fanSpeed) == RsmiStatus.Success &&
                     Rsmi.rsmi_dev_fan_speed_max_get(i, 0, out ulong fanMax) == RsmiStatus.Success && fanMax > 0)
@@ -277,6 +283,7 @@ public class RocmSmiMonitor
                 ("memory_total", "VRAM Total", "Memory", "MB"),
                 ("memory_percent", "VRAM Usage", "Memory", "%"),
                 ("fan_speed", "Fan Speed", "Fan", "%"),
+                ("fan_rpm", "Fan RPM", "Fan", "RPM"),
             })
             {
                 var key = $"{prefix}/{suffix}";
@@ -437,6 +444,9 @@ internal static class Rsmi
 
     [DllImport(LibName)]
     public static extern RsmiStatus rsmi_dev_fan_speed_get(uint dvInd, uint sensorInd, out long speed);
+
+    [DllImport(LibName, EntryPoint = "rsmi_dev_fan_rpms_get")]
+    public static extern RsmiStatus rsmi_dev_fan_rpms_get(uint dvInd, uint sensorInd, out long rpm);
 
     [DllImport(LibName)]
     public static extern RsmiStatus rsmi_dev_fan_speed_max_get(uint dvInd, uint sensorInd, out ulong maxSpeed);
