@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.1.6 alpha: idle plugins power down" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.1.7 alpha: GPU fan RPM sensors" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="NVIDIA GPUs now expose real per-fan tachometer readings (Fan 1 RPM, Fan 2 RPM) alongside the duty-cycle percentage, on driver 550 or newer; older drivers keep the percentage only. AMD GPUs gain an equivalent RPM sensor through ROCm, in addition to the RPM already provided by the kernel driver." />
+                        <TextBlock Text="v0.1.6 alpha: idle plugins power down" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Plugins whose sensors are unused by any streaming panel, overlay or web view for 5 minutes now stop completely, releasing their background resources (audio capture, network fetches, worker threads), and restart within a second when something uses them again. Their sensors stay listed with last-known values, and configured stopwatch hotkeys keep the stopwatch plugin running." />
                         <TextBlock Text="v0.1.5 alpha: demand-driven sensor polling" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
