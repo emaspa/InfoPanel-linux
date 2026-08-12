@@ -1,158 +1,82 @@
 # Third-Party Licenses
 
-This document lists all third-party libraries and their licenses used in InfoPanel.
+InfoPanel Linux is licensed under the GNU General Public License v3.0 (see `LICENSE`).
+It is based on [InfoPanel for Windows](https://github.com/habibrehmansg/infopanel),
+also GPL-3.0.
+
+This document lists the third-party libraries distributed with the InfoPanel Linux
+release build and their licenses.
 
 ## MIT License
 
-The following packages are licensed under the MIT License:
+### Avalonia (including Avalonia.Desktop, Avalonia.Controls.ColorPicker, Avalonia.Fonts.Inter)
+- **Copyright**: © AvaloniaUI OÜ and contributors
+- **Project**: https://avaloniaui.net/
 
-### AutoMapper
-- **License**: MIT License
-- **Copyright**: © 2009 Jimmy Bogard and contributors
-- **Project**: https://automapper.org/
+### FluentAvalonia (FluentAvaloniaUI)
+- **Copyright**: © amwx and contributors
+- **Project**: https://github.com/amwx/FluentAvalonia
 
 ### CommunityToolkit.Mvvm
-- **License**: MIT License
 - **Copyright**: © .NET Foundation and Contributors
 - **Project**: https://github.com/CommunityToolkit/dotnet
 
-### Flurl.Http
-- **License**: MIT License
-- **Copyright**: © 2024 Todd Menier
-- **Project**: https://flurl.dev/
-
-### ini-parser-netstandard
-- **License**: MIT License
-- **Project**: https://github.com/rickyah/ini-parser
-
-### MahApps.Metro
-- **License**: MIT License
-- **Copyright**: © 2021 MahApps
-- **Project**: https://mahapps.com/
-
-### Microsoft.Extensions.Caching.Memory
-- **License**: MIT License
-- **Copyright**: © Microsoft Corporation
-- **Project**: https://github.com/dotnet/runtime
-
-### Microsoft.Extensions.Hosting
-- **License**: MIT License
-- **Copyright**: © Microsoft Corporation
-- **Project**: https://github.com/dotnet/runtime
-
-### NAudio.Wasapi
-- **License**: MIT License
-- **Copyright**: © Mark Heath & Contributors
-- **Project**: https://github.com/naudio/NAudio
-
-### SecureStore
-- **License**: MIT License
-- **Copyright**: © NeoSmart Technologies 2015-2022
-- **Project**: https://github.com/neosmart/SecureStore
-
-### Sentry (including Sentry.Serilog)
-- **License**: MIT License
-- **Copyright**: © Functional Software, Inc. dba Sentry
-- **Project**: https://github.com/getsentry/sentry-dotnet
-
-### SkiaSharp
-- **License**: MIT License
+### SkiaSharp (including SkiaSharp.NativeAssets.Linux)
 - **Copyright**: © 2015-2016 Xamarin, Inc., © 2017-2020 Microsoft Corporation
 - **Project**: https://github.com/mono/SkiaSharp
 
 ### Svg.Skia
-- **License**: MIT License
 - **Copyright**: © Wiesław Šoltés
 - **Project**: https://github.com/wieslawsoltes/Svg.Skia
 
-### System.Diagnostics.PerformanceCounter
-- **License**: MIT License
-- **Copyright**: © Microsoft Corporation
-- **Project**: https://github.com/dotnet/runtime
+### TuringSmartScreenLib (vendored source, including Helpers.SkiaSharp)
+- **Copyright**: © usausa
+- **Project**: https://github.com/usausa/turing-smart-screen
 
-### System.IO.Ports
-- **License**: MIT License
-- **Copyright**: © Microsoft Corporation
-- **Project**: https://github.com/dotnet/runtime
+### NAudio.Core
+- **Copyright**: © Mark Heath & Contributors
+- **Project**: https://github.com/naudio/NAudio
 
-### System.Management
-- **License**: MIT License
-- **Copyright**: © Microsoft Corporation
-- **Project**: https://github.com/dotnet/runtime
+### BouncyCastle.Cryptography
+- **License**: MIT-style Bouncy Castle License
+- **Copyright**: © The Legion of the Bouncy Castle
+- **Project**: https://www.bouncycastle.org/
 
-### TaskScheduler
-- **License**: MIT License
-- **Copyright**: © David Hall
-- **Project**: https://github.com/dahall/TaskScheduler
-
-### WPF-UI
-- **License**: MIT License
-- **Copyright**: © 2021-2024 Leszek Pomianowski and WPF UI Contributors
-- **Project**: https://wpfui.lepo.co/
+### ini-parser-netstandard
+- **Project**: https://github.com/rickyah/ini-parser
 
 ### OpenWeatherMap.Standard
-- **License**: MIT License
 - **Copyright**: © Ken Tucker
 - **Project**: https://github.com/Ken-Tucker/OpenWeatherMap.Standard
 
+### .NET runtime, ASP.NET Core and System.* libraries (self-contained runtime, Microsoft.Extensions.Caching.Memory, System.IO.Ports)
+- **Copyright**: © Microsoft Corporation and .NET Foundation
+- **Project**: https://github.com/dotnet/runtime, https://github.com/dotnet/aspnetcore
+
 ## Apache License 2.0
 
-The following packages are licensed under the Apache License 2.0:
-
-### HidSharp
-- **License**: Apache License 2.0
-- **Copyright**: © 2012 James F. Bellinger
-- **Project**: https://www.zer7.com/software/hidsharp
-
-### Serilog (including extensions)
-- **License**: Apache License 2.0
+### Serilog (including Serilog.Sinks.Console, Serilog.Sinks.File)
 - **Copyright**: © Serilog Contributors
 - **Project**: https://serilog.net/
 
-## BSD 3-Clause License
+### HidSharp
+- **Copyright**: © 2012 James F. Bellinger
+- **Project**: https://www.zer7.com/software/hidsharp
 
-The following packages are licensed under the BSD 3-Clause License:
+### Topten.RichTextKit
+- **Copyright**: © 2019-2020 Topten Software
+- **Project**: https://github.com/toptensoftware/RichTextKit
 
-### gong-wpf-dragdrop
-- **License**: BSD 3-Clause License
-- **Copyright**: © Jan Karger (punker76)
-- **Project**: https://github.com/punker76/gong-wpf-dragdrop
-
-## LGPL Licenses
-
-The following packages are licensed under LGPL:
-
-### FlyleafLib
-- **License**: LGPL-3.0-or-later
-- **Copyright**: © SuRGeoNix
-- **Project**: https://github.com/SuRGeoNix/Flyleaf
+## LGPL
 
 ### LibUsbDotNet
 - **License**: LGPL v2 / GPL v2 (dual licensed)
 - **Copyright**: © LibUsbDotNet Contributors
 - **Project**: https://github.com/LibUsbDotNet/LibUsbDotNet
 
-## Other Licenses
+## Fonts
 
-### BouncyCastle.NetCore
-- **License**: MIT X Consortium-based license
-- **Additional**: Modified BZIP2 library component under Apache License 2.0
-- **Copyright**: © The Legion of the Bouncy Castle
-- **Project**: https://www.bouncycastle.org/
-
-### FFmpeg (used by FlyleafLib)
-- **License**: GPL 2+
-- **Copyright**: © FFmpeg developers
-- **Project**: https://ffmpeg.org/
-
-## Additional Libraries
-
-### Windows Libraries
-Some functionality uses Windows system libraries which are covered under the Windows SDK license terms.
-
-### .NET Runtime Libraries
-Various System.* packages are part of the .NET runtime and are licensed under MIT by Microsoft Corporation.
-
----
-
-*This document was last updated on January 13, 2025.*
+### Inter (bundled via Avalonia.Fonts.Inter)
+- **License**: SIL Open Font License 1.1
+- **Copyright**: © Rasmus Andersson
+- **Project**: https://rsms.me/inter/

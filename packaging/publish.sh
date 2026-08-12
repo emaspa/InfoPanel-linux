@@ -15,6 +15,9 @@ dotnet publish src/InfoPanel.App/InfoPanel.App.csproj \
     -p:PublishSingleFile=false \
     -o "$OUT/infopanel"
 
+# GPLv3 section 4 requires a copy of the license with every distribution;
+# LICENSES.md carries the bundled third-party notices (MIT/Apache attribution).
+cp LICENSE LICENSES.md "$OUT/"
 cp packaging/infopanel-udev.rules "$OUT/"
 cp packaging/infopanel.desktop "$OUT/"
 cp packaging/infopanel-smart-dump.sh packaging/infopanel-smart.service packaging/infopanel-smart.timer "$OUT/"
