@@ -813,8 +813,22 @@ namespace InfoPanel.Views.Pages
                 var settings = _app.Host.Settings;
                 int added = 0, updated = 0;
 
-                // Thermalright (HID/bulk/SCSI)
-                var thermalright = await Task.Run(ThermalrightPanelHelper.ScanDevices);
+                // Families with no configured devices before this scan: finding their first
+                // panel turns the family's streaming master switch on, so a fresh install
+                // only needs the per-device toggle and a profile to start streaming.
+                var newThermalrightFamily = settings.ThermalrightPanelDevices.Count == 0;
+                var newTuringFamily = settings.TuringPanelDevices.Count == 0;
+                var newBeadaFamily = settings.BeadaPanelDevices.Count == 0;
+                var newThermaltakeFamily = settings.ThermaltakePanelDevices.Count == 0;
+                var newJlFamily = settings.JlPanelDevices.Count == 0;
+                var newJonsboFamily = settings.JonsboPanelDevices.Count == 0;
+                var newVmaxFamily = settings.VmaxPanelDevices.Count == 0;
+
+                // Thermalright (HID/bulk/SCSI). The HID model probe is skipped for panels this
+                // app is currently streaming to (an init command would disrupt the stream).
+                var thermalright = await Task.Run(() => ThermalrightPanelHelper.ScanDevices(
+                    deviceId => settings.ThermalrightPanelDevices.Any(d =>
+                        d.DeviceId == deviceId && Services.ThermalrightPanelTask.Instance.IsDeviceRunning(d.Id))));
                 foreach (var found in thermalright)
                 {
                     var existing = settings.ThermalrightPanelDevices.FirstOrDefault(d => d.DeviceId == found.DeviceId);
@@ -831,11 +845,12 @@ namespace InfoPanel.Views.Pages
                     else
                     {
                         existing.DeviceLocation = found.DeviceLocation;
-                        // The scan only sees the shared VID/PID, so it can neither
-                        // identify ChiZhu models (init exchange required) nor Trofeo
-                        // variants (byte[20] at connect). Never downgrade a runtime
-                        // identification to Unknown or to the base 9.16" guess.
+                        // The scan cannot always identify the exact model behind a shared
+                        // VID/PID (probe skipped or failed - found.ModelAmbiguous), nor
+                        // Trofeo 9.16" variants (byte[20] at connect). Never downgrade a
+                        // runtime identification to Unknown or to a placeholder guess.
                         var keepExisting = found.Model == ThermalrightPanelModel.Unknown
+                            || found.ModelAmbiguous
                             || (found.Model == ThermalrightPanelModel.TrofeoVision916
                                 && existing.Model is ThermalrightPanelModel.TrofeoVision916V2 or ThermalrightPanelModel.TrofeoVision113);
                         if (existing.Model != found.Model && !keepExisting)
@@ -1014,6 +1029,25 @@ namespace InfoPanel.Views.Pages
                         updated++;
                     }
                 }
+
+                // First panel of a previously empty family: enable that family's streaming
+                // master switch. A user who scanned clearly wants the found panel to work;
+                // leaving a second off-by-default switch hidden in the section header cost
+                // at least one newcomer their first streaming attempt.
+                if (newThermalrightFamily && settings.ThermalrightPanelDevices.Count > 0)
+                    settings.ThermalrightPanelMultiDeviceMode = true;
+                if (newTuringFamily && settings.TuringPanelDevices.Count > 0)
+                    settings.TuringPanelMultiDeviceMode = true;
+                if (newBeadaFamily && settings.BeadaPanelDevices.Count > 0)
+                    settings.BeadaPanelMultiDeviceMode = true;
+                if (newThermaltakeFamily && settings.ThermaltakePanelDevices.Count > 0)
+                    settings.ThermaltakePanelMultiDeviceMode = true;
+                if (newJlFamily && settings.JlPanelDevices.Count > 0)
+                    settings.JlPanelMultiDeviceMode = true;
+                if (newJonsboFamily && settings.JonsboPanelDevices.Count > 0)
+                    settings.JonsboPanelMultiDeviceMode = true;
+                if (newVmaxFamily && settings.VmaxPanelDevices.Count > 0)
+                    settings.VmaxPanelMultiDeviceMode = true;
 
                 _app.Host.SaveSettings();
                 ScanStatus.Text = $"Scan complete: {added} new, {updated} known device(s).";

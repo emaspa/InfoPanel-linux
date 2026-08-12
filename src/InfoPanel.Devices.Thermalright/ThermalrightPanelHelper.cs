@@ -21,8 +21,11 @@ namespace InfoPanel.ThermalrightPanel
         /// Scans for all connected Thermalright panel devices.
         /// WinUSB models are discovered via LibUsbDotNet, HID models via HidSharp.
         /// </summary>
+        /// <param name="isHidDeviceStreaming">Optional predicate keyed by the synthesized HID
+        /// device id; when it returns true the model probe is skipped so an actively streaming
+        /// panel does not receive an init command mid-stream.</param>
         /// <returns>List of discovered Thermalright panel device info</returns>
-        public static List<ThermalrightPanelDiscoveryInfo> ScanDevices()
+        public static List<ThermalrightPanelDiscoveryInfo> ScanDevices(Func<string, bool>? isHidDeviceStreaming = null)
         {
             var devices = new List<ThermalrightPanelDiscoveryInfo>();
 
@@ -149,21 +152,40 @@ namespace InfoPanel.ThermalrightPanel
 
                 foreach (var hidDevice in hidDeviceList)
                 {
-                    var modelInfo = ThermalrightPanelModelDatabase.GetModelByVidPid(vendorId, productId);
-
-                    // When multiple models share the same VID/PID (e.g. all Trofeo HID panels on 0416:5302),
-                    // GetModelByVidPid returns null. Use the first matching model so the saved Model enum
-                    // resolves to a valid ModelInfo with the correct transport/protocol/VID/PID.
-                    // The actual model will be determined from the PM byte during HID init.
-                    if (modelInfo == null)
-                    {
-                        modelInfo = ThermalrightPanelModelDatabase.Models.Values
-                            .FirstOrDefault(m => m.VendorId == vendorId && m.ProductId == productId);
-                    }
-
                     // Synthesize a stable device ID and location for HID devices
                     var deviceId = $"HID\\VID_{vendorId:X4}&PID_{productId:X4}";
                     var deviceLocation = hidDevice.DevicePath;
+
+                    var modelInfo = ThermalrightPanelModelDatabase.GetModelByVidPid(vendorId, productId);
+                    var modelAmbiguous = false;
+
+                    // Multiple models share some VID/PIDs (e.g. all Trofeo-protocol HID panels on
+                    // 0416:5302: Trofeo 6.86", Frozen Warframe SE, Assassin, BA120, ...), so
+                    // GetModelByVidPid returns null. Identify the exact model with the same init
+                    // exchange the device task performs at connect, unless the panel is already
+                    // streaming (an init command mid-stream would disrupt it - the runtime
+                    // identification has long since corrected the saved model in that case).
+                    if (modelInfo == null)
+                    {
+                        if (isHidDeviceStreaming?.Invoke(deviceId) == true)
+                        {
+                            Logger.Information("ThermalrightPanelHelper: HID device {DeviceId} is streaming, skipping model probe", deviceId);
+                        }
+                        else
+                        {
+                            modelInfo = ProbeHidModel(hidDevice);
+                        }
+
+                        // Fall back to the first matching model so the saved Model enum resolves
+                        // to a valid ModelInfo with the correct transport/protocol/VID/PID; the
+                        // real model is then determined from the PM byte during HID init.
+                        if (modelInfo == null)
+                        {
+                            modelAmbiguous = true;
+                            modelInfo = ThermalrightPanelModelDatabase.Models.Values
+                                .FirstOrDefault(m => m.VendorId == vendorId && m.ProductId == productId);
+                        }
+                    }
 
                     var discoveryInfo = new ThermalrightPanelDiscoveryInfo
                     {
@@ -173,7 +195,8 @@ namespace InfoPanel.ThermalrightPanel
                         VendorId = vendorId,
                         ProductId = productId,
                         Model = modelInfo?.Model ?? ThermalrightPanelModel.Unknown,
-                        ModelInfo = modelInfo
+                        ModelInfo = modelInfo,
+                        ModelAmbiguous = modelAmbiguous
                     };
 
                     Logger.Information("ThermalrightPanelHelper: Found HID {Model} at {Path}",
@@ -367,6 +390,88 @@ namespace InfoPanel.ThermalrightPanel
         }
 
         /// <summary>
+        /// Trofeo-protocol HID init probe for VID/PIDs shared by multiple models (0416:5302).
+        /// Sends the same init packet the device task uses at connect (DA DB DC DD magic,
+        /// 0x01 at offset 12) and identifies the model from the PM byte (response[5]) and
+        /// sub byte (response[4]), falling back to the identifier string at bytes 20-27.
+        /// Returns null on any failure; the caller keeps the VID/PID-based default.
+        /// </summary>
+        private static ThermalrightPanelModelInfo? ProbeHidModel(HidDevice hidDevice)
+        {
+            const int PACKET_SIZE = 512;
+            try
+            {
+                using var stream = hidDevice.Open();
+                stream.WriteTimeout = 2000;
+                stream.ReadTimeout = 2000;
+
+                for (int attempt = 1; attempt <= 2; attempt++)
+                {
+                    if (attempt > 1)
+                        Thread.Sleep(300);
+
+                    // 0x00 report ID prefix + 512-byte packet, matching HidPanelDevice
+                    var packet = new byte[PACKET_SIZE + 1];
+                    packet[1] = 0xDA;
+                    packet[2] = 0xDB;
+                    packet[3] = 0xDC;
+                    packet[4] = 0xDD;
+                    packet[13] = 0x01; // init flag at data offset 12
+
+                    try
+                    {
+                        stream.Write(packet, 0, packet.Length);
+                        Thread.Sleep(200);
+
+                        var buffer = new byte[PACKET_SIZE + 1];
+                        int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                        if (bytesRead < 7)
+                            continue;
+
+                        // Skip report ID byte
+                        var response = new byte[bytesRead - 1];
+                        Array.Copy(buffer, 1, response, 0, response.Length);
+
+                        if (response[0] != 0xDA || response[1] != 0xDB || response[2] != 0xDC || response[3] != 0xDD)
+                        {
+                            Logger.Debug("ThermalrightPanelHelper: HID probe got invalid magic: {Hex}",
+                                BitConverter.ToString(response, 0, Math.Min(response.Length, 4)));
+                            continue;
+                        }
+
+                        var pm = response[5];
+                        var sub = response[4];
+                        Logger.Information("ThermalrightPanelHelper: HID probe PM=0x{PM:X2} sub=0x{Sub:X2}", pm, sub);
+
+                        var model = ThermalrightPanelModelDatabase.GetModelByPM(pm, sub);
+                        if (model != null)
+                            return model;
+
+                        if (response.Length >= 28)
+                        {
+                            var identifier = new string(Encoding.ASCII.GetString(response, 20, 8)
+                                .Where(c => c >= ' ').ToArray());
+                            Logger.Information("ThermalrightPanelHelper: HID probe identifier: {Id}", identifier);
+                            model = ThermalrightPanelModelDatabase.GetModelByIdentifier(identifier);
+                            if (model != null)
+                                return model;
+                        }
+                    }
+                    catch (TimeoutException)
+                    {
+                        Logger.Debug("ThermalrightPanelHelper: HID probe attempt {Attempt} timed out", attempt);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug(ex, "ThermalrightPanelHelper: HID probe failed");
+            }
+
+            return null;
+        }
+
+        /// <summary>
         /// TrofeoBulk init probe for VID/PID 0x0416:0x5408. Sends the 2048-byte init packet,
         /// reads the 512-byte response, and discriminates by byte[20]:
         ///   0x01 → 9.16" v1, 0x02/0x03 → 9.16" v2, 0x05 → 11.3".
@@ -488,5 +593,12 @@ namespace InfoPanel.ThermalrightPanel
         public ThermalrightPanelModel Model { get; init; }
         public ThermalrightPanelModelInfo? ModelInfo { get; init; }
         public string? DriverIssue { get; init; }
+
+        /// <summary>
+        /// True when the VID/PID is shared by multiple models and the scan-time probe could
+        /// not identify the exact one, so Model is only a placeholder guess. Callers must not
+        /// overwrite a runtime-identified model with it.
+        /// </summary>
+        public bool ModelAmbiguous { get; init; }
     }
 }
