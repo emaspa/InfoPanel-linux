@@ -66,7 +66,11 @@ Native Linux providers, no kernel modules or vendor daemons required:
 - **Intel GPU**: frequency via sysfs plus engine utilization via PMU perf
   events.
 - **AMD GPU**: ROCm SMI (usage, clocks, VRAM, power, temperature).
-- **NVIDIA GPU**: NVML + NvAPI (usage, clocks, VRAM, power, temperature, hotspot and VRAM temperature, core voltage, throttling).
+- **NVIDIA GPU**: NVML + NvAPI (usage, clocks, VRAM, power draw and
+  limit, GPU/hotspot/VRAM temperatures, core voltage, performance state,
+  throttling flags, fan RPM). Hotspot, VRAM temperature and voltage need
+  the proprietary driver 525+; on RTX 50 series the hotspot additionally
+  requires root and is omitted otherwise.
 - **Drive health**: SMART data (health, wear, spare, power-on hours, data
   written) collected by a root systemd timer into `/run/infopanel/smart.json`
   and read by the bundled plugin without elevating the app.
@@ -392,7 +396,7 @@ dotnet run --project src/InfoPanel.App
 To produce the same self-contained tarball as the published releases:
 
 ```bash
-packaging/publish.sh 0.1.9     # builds artifacts/infopanel-0.0.9-linux-x64.tar.gz
+packaging/publish.sh 0.1.9     # builds artifacts/infopanel-0.1.9-linux-x64.tar.gz
 ```
 
 ## Data and paths
@@ -435,9 +439,15 @@ A single instance is enforced via a lock file in the data directory.
   support.
 - [fweepa](https://github.com/fweepa): stopwatch plugin and hotkeys.
 - [Orkunowski](https://github.com/Orkunowski): designer UX improvements.
+- [LACT](https://github.com/ilya-zlobintsev/LACT): the NvAPI-on-Linux
+  approach behind the NVIDIA hotspot, VRAM temperature and voltage
+  sensors.
 - Everyone else: for those that messaged or posted questions, feedback and
   panel designs on Reddit, HWiNFO forums and Discord.
 
 ## License
 
-GPL-3.0
+GPL-3.0, like the original InfoPanel this project is based on. See
+[LICENSE](LICENSE) for the full text and [LICENSES.md](LICENSES.md) for
+the third-party notices of the bundled libraries; both files also ship
+inside every release tarball.
