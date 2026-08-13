@@ -66,7 +66,7 @@ Native Linux providers, no kernel modules or vendor daemons required:
 - **Intel GPU**: frequency via sysfs plus engine utilization via PMU perf
   events.
 - **AMD GPU**: ROCm SMI (usage, clocks, VRAM, power, temperature).
-- **NVIDIA GPU**: NVML (usage, clocks, VRAM, power, temperature).
+- **NVIDIA GPU**: NVML + NvAPI (usage, clocks, VRAM, power, temperature, hotspot and VRAM temperature, core voltage, throttling).
 - **Drive health**: SMART data (health, wear, spare, power-on hours, data
   written) collected by a root systemd timer into `/run/infopanel/smart.json`
   and read by the bundled plugin without elevating the app.
@@ -392,7 +392,7 @@ dotnet run --project src/InfoPanel.App
 To produce the same self-contained tarball as the published releases:
 
 ```bash
-packaging/publish.sh 0.1.8     # builds artifacts/infopanel-0.0.9-linux-x64.tar.gz
+packaging/publish.sh 0.1.9     # builds artifacts/infopanel-0.0.9-linux-x64.tar.gz
 ```
 
 ## Data and paths

@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.1.8 alpha: Thermalright device detection fixes" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.1.9 alpha: NVIDIA hotspot, VRAM temperature and more" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Ten new NVIDIA sensors: hotspot temperature, VRAM temperature and core voltage (read through the driver's NvAPI interface, available on the proprietary driver 525 or newer), plus SM and Video clocks, power limit, power as a percentage of the limit, performance state and thermal/power throttling flags. On RTX 50 series cards the hotspot is only readable with root privileges and is omitted otherwise; all other sensors work as a normal user. Sensors your driver or GPU does not support simply do not appear." />
+                        <TextBlock Text="v0.1.8 alpha: Thermalright device detection fixes" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Thermalright HID panels that share one USB ID (Frozen Warframe SE, Assassin, BA120 and others on 0416:5302) are now identified as the correct model directly at scan time instead of showing as a Trofeo Vision 6.86&quot; until first connect, and a rescan no longer reverts an identified model to the placeholder. Scanning a family's first panel also enables that family's streaming switch automatically, so a new panel only needs its row toggle and a profile to start streaming." />
                         <TextBlock Text="v0.1.7 alpha: GPU fan RPM sensors" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
