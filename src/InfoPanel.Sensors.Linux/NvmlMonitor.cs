@@ -17,6 +17,13 @@ public class NvmlMonitor
     private IntPtr[] _deviceHandles = [];
     private string[] _deviceNames = [];
 
+    // NvAPI (libnvidia-api.so.1) side channel for hotspot/VRAM temperature and
+    // core voltage; absent on the open drivers and proprietary drivers < R525.
+    private NvApi? _nvApi;
+    private IntPtr[] _nvApiHandles = [];
+    private int[] _nvApiThermalsMasks = [];
+    private bool[] _isBlackwell = [];
+
     private NvmlMonitor() { }
 
     public void Initialize()
@@ -60,6 +67,8 @@ public class NvmlMonitor
 
             _available = true;
             Log.Information("NVML initialized: {Count} GPU(s) found", _deviceCount);
+
+            InitializeNvApi();
         }
         catch (DllNotFoundException)
         {
@@ -71,6 +80,74 @@ public class NvmlMonitor
         }
     }
 
+    /// <summary>
+    /// Matches each NVML device to its NvAPI handle by PCI bus number and caches
+    /// the per-device thermal sensor mask and architecture generation.
+    /// </summary>
+    private void InitializeNvApi()
+    {
+        try
+        {
+            _nvApi = NvApi.TryCreate();
+            if (_nvApi == null) return;
+
+            _nvApiHandles = new IntPtr[_deviceCount];
+            _nvApiThermalsMasks = new int[_deviceCount];
+            _isBlackwell = new bool[_deviceCount];
+
+            for (int i = 0; i < _deviceCount; i++)
+            {
+                if (_deviceHandles[i] == IntPtr.Zero) continue;
+
+                var apiHandle = IntPtr.Zero;
+                if (Nvml.nvmlDeviceGetPciInfo_v3(_deviceHandles[i], out NvmlPciInfo pci) == NvmlReturn.Success)
+                {
+                    apiHandle = _nvApi.FindGpuByBusId(pci.bus);
+                }
+                if (apiHandle == IntPtr.Zero && _deviceCount == 1)
+                {
+                    apiHandle = _nvApi.SingleGpuHandle;
+                }
+                if (apiHandle == IntPtr.Zero) continue;
+
+                _nvApiHandles[i] = apiHandle;
+                _nvApiThermalsMasks[i] = _nvApi.CalculateThermalsMask(apiHandle);
+
+                // Blackwell (arch id 10+) moved the hotspot out of the thermals query
+                // and uses GDDR7; nvmlDeviceGetArchitecture needs driver R450+.
+                try
+                {
+                    if (Nvml.nvmlDeviceGetArchitecture(_deviceHandles[i], out uint arch) == NvmlReturn.Success)
+                    {
+                        _isBlackwell[i] = arch != uint.MaxValue && arch >= 10;
+                    }
+                }
+                catch (EntryPointNotFoundException) { }
+
+                Log.Information("NvApi: GPU {Index} matched (thermals mask 0x{Mask:X}, blackwell={Blackwell})",
+                    i, _nvApiThermalsMasks[i], _isBlackwell[i]);
+
+                // Blackwell reports the hotspot only through a GPU register read, which the
+                // driver restricts to root (thermals slot 9 still answers, but with the edge
+                // temperature - verified on real hardware - so it must not be used instead).
+                if (_isBlackwell[i])
+                {
+                    var (hotspot, _) = _nvApi.ReadTemperatures(apiHandle, _nvApiThermalsMasks[i], isBlackwell: true);
+                    if (!hotspot.HasValue)
+                    {
+                        Log.Information("NvApi: GPU {Index}: hotspot temperature unavailable (Blackwell exposes it via a register read that requires root)", i);
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Debug(ex, "NvApi setup failed");
+            _nvApi?.Dispose();
+            _nvApi = null;
+        }
+    }
+
     public void Shutdown()
     {
         if (_initialized)
@@ -79,6 +156,9 @@ public class NvmlMonitor
             _initialized = false;
             _available = false;
         }
+
+        _nvApi?.Dispose();
+        _nvApi = null;
     }
 
     public void Poll()
@@ -113,6 +193,16 @@ public class NvmlMonitor
                     UpdateSensor($"{prefix}/memory_utilization", util.memory, "%");
                 }
 
+                // Power limit and draw as a percentage of it
+                if (Nvml.nvmlDeviceGetPowerManagementLimit(handle, out uint limitMw) == NvmlReturn.Success && limitMw > 0)
+                {
+                    UpdateSensor($"{prefix}/power_limit", Math.Round(limitMw / 1000.0, 1), "W");
+                    if (powerMw > 0)
+                    {
+                        UpdateSensor($"{prefix}/power_percent", Math.Round(powerMw * 100.0 / limitMw, 1), "%");
+                    }
+                }
+
                 // Clock speeds
                 if (Nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Graphics, out uint graphicsClock) == NvmlReturn.Success)
                 {
@@ -121,6 +211,27 @@ public class NvmlMonitor
                 if (Nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Mem, out uint memClock) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/clock_memory", memClock, "MHz");
+                }
+                if (Nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Sm, out uint smClock) == NvmlReturn.Success)
+                {
+                    UpdateSensor($"{prefix}/clock_sm", smClock, "MHz");
+                }
+                if (Nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Video, out uint videoClock) == NvmlReturn.Success)
+                {
+                    UpdateSensor($"{prefix}/clock_video", videoClock, "MHz");
+                }
+
+                // Performance state: P0 (max performance) .. P15 (min), reported as the number
+                if (Nvml.nvmlDeviceGetPerformanceState(handle, out uint pstate) == NvmlReturn.Success && pstate <= 15)
+                {
+                    UpdateSensor($"{prefix}/pstate", pstate, "");
+                }
+
+                // Throttling: thermal (SW/HW thermal slowdown) and power (cap / power brake)
+                if (Nvml.nvmlDeviceGetCurrentClocksThrottleReasons(handle, out ulong throttle) == NvmlReturn.Success)
+                {
+                    UpdateSensor($"{prefix}/throttle_thermal", (throttle & 0x60UL) != 0 ? 1 : 0, "");
+                    UpdateSensor($"{prefix}/throttle_power", (throttle & 0x84UL) != 0 ? 1 : 0, "");
                 }
 
                 // Memory usage
@@ -166,6 +277,26 @@ public class NvmlMonitor
                         Log.Debug("NVML: fan RPM API not available in this driver");
                     }
                 }
+
+                // NvAPI extras: hotspot temperature, VRAM temperature, core voltage
+                if (_nvApi != null && i < _nvApiHandles.Length && _nvApiHandles[i] != IntPtr.Zero)
+                {
+                    var (hotspot, vram) = _nvApi.ReadTemperatures(_nvApiHandles[i], _nvApiThermalsMasks[i], _isBlackwell[i]);
+                    if (hotspot.HasValue)
+                    {
+                        UpdateSensor($"{prefix}/temperature_hotspot", hotspot.Value, "°C");
+                    }
+                    if (vram.HasValue)
+                    {
+                        UpdateSensor($"{prefix}/temperature_vram", vram.Value, "°C");
+                    }
+
+                    var voltageMv = _nvApi.ReadVoltageMv(_nvApiHandles[i]);
+                    if (voltageMv.HasValue)
+                    {
+                        UpdateSensor($"{prefix}/voltage", Math.Round(voltageMv.Value / 1000.0, 3), "V");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -187,11 +318,21 @@ public class NvmlMonitor
             foreach (var (suffix, label, category, unit) in new[]
             {
                 ("temperature", "Temperature", "Temperature", "°C"),
+                ("temperature_hotspot", "Hotspot Temperature", "Temperature", "°C"),
+                ("temperature_vram", "VRAM Temperature", "Temperature", "°C"),
                 ("power", "Power Draw", "Power", "W"),
+                ("power_limit", "Power Limit", "Power", "W"),
+                ("power_percent", "Power (% of limit)", "Power", "%"),
+                ("voltage", "Core Voltage", "Voltage", "V"),
                 ("utilization", "GPU Utilization", "Utilization", "%"),
                 ("memory_utilization", "Memory Controller", "Utilization", "%"),
                 ("clock_graphics", "Graphics Clock", "Clock", "MHz"),
                 ("clock_memory", "Memory Clock", "Clock", "MHz"),
+                ("clock_sm", "SM Clock", "Clock", "MHz"),
+                ("clock_video", "Video Clock", "Clock", "MHz"),
+                ("pstate", "Performance State", "Status", ""),
+                ("throttle_thermal", "Thermal Throttling", "Status", ""),
+                ("throttle_power", "Power Throttling", "Status", ""),
                 ("memory_used", "Memory Used", "Memory", "MB"),
                 ("memory_total", "Memory Total", "Memory", "MB"),
                 ("memory_percent", "Memory Usage", "Memory", "%"),
@@ -344,6 +485,35 @@ internal static class Nvml
 
     [DllImport(LibName, EntryPoint = "nvmlDeviceGetFanSpeedRPM")]
     public static extern NvmlReturn nvmlDeviceGetFanSpeedRPM(IntPtr device, ref NvmlFanSpeedInfo fanSpeed);
+
+    [DllImport(LibName, EntryPoint = "nvmlDeviceGetPowerManagementLimit")]
+    public static extern NvmlReturn nvmlDeviceGetPowerManagementLimit(IntPtr device, out uint limit);
+
+    [DllImport(LibName, EntryPoint = "nvmlDeviceGetPerformanceState")]
+    public static extern NvmlReturn nvmlDeviceGetPerformanceState(IntPtr device, out uint pstate);
+
+    [DllImport(LibName, EntryPoint = "nvmlDeviceGetCurrentClocksThrottleReasons")]
+    public static extern NvmlReturn nvmlDeviceGetCurrentClocksThrottleReasons(IntPtr device, out ulong reasons);
+
+    [DllImport(LibName, EntryPoint = "nvmlDeviceGetPciInfo_v3")]
+    public static extern NvmlReturn nvmlDeviceGetPciInfo_v3(IntPtr device, out NvmlPciInfo pci);
+
+    [DllImport(LibName, EntryPoint = "nvmlDeviceGetArchitecture")]
+    public static extern NvmlReturn nvmlDeviceGetArchitecture(IntPtr device, out uint arch);
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct NvmlPciInfo
+{
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 16)]
+    public byte[] busIdLegacy;
+    public uint domain;
+    public uint bus;
+    public uint device;
+    public uint pciDeviceId;
+    public uint pciSubSystemId;
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 32)]
+    public byte[] busId;
 }
 
 /// <summary>Versioned struct for nvmlDeviceGetFanSpeedRPM (driver R550+).</summary>
