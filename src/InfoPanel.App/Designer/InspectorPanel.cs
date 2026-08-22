@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Media;
 using InfoPanel.Models;
+using InfoPanel.Utils;
 
 namespace InfoPanel.Designer
 {
@@ -52,6 +53,10 @@ namespace InfoPanel.Designer
 
         private void OnSelectionChanged(object? sender, EventArgs e) => Rebuild();
 
+        // subscriptions made by the profile section (e.g. display dropdown following
+        // the overlay being dragged to another screen), detached on every rebuild
+        private readonly List<Action> _profileSectionCleanups = [];
+
         public void Rebuild()
         {
             _rebuilding = true;
@@ -59,6 +64,12 @@ namespace InfoPanel.Designer
             {
                 _gaugePreviewTimer?.Stop();
                 _gaugePreviewTimer = null;
+
+                foreach (var cleanup in _profileSectionCleanups)
+                {
+                    cleanup();
+                }
+                _profileSectionCleanups.Clear();
 
                 _root.Children.Clear();
                 _gaugeFrameCache.Clear();
@@ -88,6 +99,8 @@ namespace InfoPanel.Designer
                         };
                         _root.Children.Add(Field("Trigger programs", triggers));
                         _root.Children.Add(Label("Comma-separated process names. When program-specific profiles are enabled in Settings, this overlay only shows while one of these apps is in the foreground."));
+
+                        BuildDisplayAssignment(profile);
                     }
 
                     return;
@@ -176,6 +189,84 @@ namespace InfoPanel.Designer
         }
 
         // ================= sections =================
+
+        /// <summary>
+        /// Dropdown assigning the profile's overlay to a monitor. Selecting one sets
+        /// Profile.TargetWindow and parks the overlay at that monitor's top-left; a
+        /// running overlay moves immediately through DisplayWindow's TargetWindow
+        /// reposition path. Dragging the overlay onto another screen updates the
+        /// dropdown in return.
+        /// </summary>
+        private void BuildDisplayAssignment(Profile profile)
+        {
+            if (TopLevel.GetTopLevel(this) is not Window window) return;
+            var monitors = ScreenHelper.GetAllMonitors(window);
+            if (monitors.Count == 0) return;
+
+            var combo = new ComboBox
+            {
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                PlaceholderText = "Not assigned",
+            };
+            foreach (var monitor in monitors)
+            {
+                combo.Items.Add($"{monitor.DeviceName} ({(int)monitor.Bounds.Width}×{(int)monitor.Bounds.Height}){(monitor.IsPrimary ? " · primary" : "")}");
+            }
+
+            var syncing = false;
+            void SyncSelection()
+            {
+                syncing = true;
+                try
+                {
+                    var assigned = FindAssignedMonitor(profile, monitors);
+                    combo.SelectedIndex = assigned != null ? monitors.IndexOf(assigned) : -1;
+                }
+                finally
+                {
+                    syncing = false;
+                }
+            }
+            SyncSelection();
+
+            combo.SelectionChanged += (_, _) =>
+            {
+                if (syncing || combo.SelectedIndex < 0 || combo.SelectedIndex >= monitors.Count) return;
+                var monitor = monitors[combo.SelectedIndex];
+
+                profile.TargetWindow = new TargetWindow(
+                    (int)monitor.Bounds.Left, (int)monitor.Bounds.Top,
+                    (int)monitor.Bounds.Width, (int)monitor.Bounds.Height,
+                    monitor.DeviceName);
+                profile.WindowX = 0;
+                profile.WindowY = 0;
+                (Avalonia.Application.Current as App)?.Host.SaveProfiles();
+            };
+
+            System.ComponentModel.PropertyChangedEventHandler handler = (_, e) =>
+            {
+                if (e.PropertyName == nameof(Profile.TargetWindow))
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(SyncSelection);
+                }
+            };
+            profile.PropertyChanged += handler;
+            _profileSectionCleanups.Add(() => profile.PropertyChanged -= handler);
+
+            _root.Children.Add(Field("Display", combo));
+            _root.Children.Add(Label("Assigns the overlay to a monitor, parked at its top-left. Dragging the overlay onto another screen updates this automatically."));
+        }
+
+        private static MonitorInfo? FindAssignedMonitor(Profile profile, List<MonitorInfo> monitors)
+        {
+            if (profile.TargetWindow is not TargetWindow target) return null;
+
+            // Same matching order as DisplayWindow.SetWindowPositionRelativeToScreen
+            return monitors.FirstOrDefault(m => m.DeviceName == target.DeviceName
+                    && (int)m.Bounds.Width == target.Width && (int)m.Bounds.Height == target.Height)
+                ?? monitors.FirstOrDefault(m => m.DeviceName == target.DeviceName)
+                ?? monitors.FirstOrDefault(m => (int)m.Bounds.Width == target.Width && (int)m.Bounds.Height == target.Height);
+        }
 
         private void BuildCommonSection(DesignerSession session, DisplayItem item)
         {
