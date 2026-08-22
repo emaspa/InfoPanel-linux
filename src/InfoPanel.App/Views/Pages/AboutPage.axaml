@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.1.9 alpha: NVIDIA hotspot, VRAM temperature and more" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.2.0 alpha: Lian Li panels, display assignment" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Lian Li panels get their own device family covering the Universal Screen 8.8&quot; and 9.2&quot; and the HydroShift II OLED Curve and LCD; an 8.8&quot; previously configured under the Turing family migrates automatically with its settings. Profiles gain a Display dropdown in the designer to assign the overlay to a monitor (dragging the overlay still works and updates the dropdown). Also fixes Thermalright HID panels (Trofeo 6.86&quot;, Frozen Warframe and similar) wedging on bright, detailed themes by capping JPEG frames at the firmware's buffer size." />
+                        <TextBlock Text="v0.1.9 alpha: NVIDIA hotspot, VRAM temperature and more" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Ten new NVIDIA sensors: hotspot temperature, VRAM temperature and core voltage (read through the driver's NvAPI interface, available on the proprietary driver 525 or newer), plus SM and Video clocks, power limit, power as a percentage of the limit, performance state and thermal/power throttling flags. On RTX 50 series cards the hotspot is only readable with root privileges and is omitted otherwise; all other sensors work as a normal user. Sensors your driver or GPU does not support simply do not appear." />
                         <TextBlock Text="v0.1.8 alpha: Thermalright device detection fixes" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
