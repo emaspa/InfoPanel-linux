@@ -24,10 +24,8 @@ namespace InfoPanel.Services
 
         public TuringPanelDevice Device => _device;
 
-        private bool IsLianLi => _device.ModelInfo?.Model == TuringPanelModel.LIANLI_88INCH_USB;
-
-        /// <summary>Adapts the fork's TuringDevice to the shared IUsbScreenDevice loop (frames are PNG).</summary>
-        private sealed class TuringScreenAdapter(TuringDevice inner) : IUsbScreenDevice
+        /// <summary>Adapts the fork's TuringDevice to the shared screen-device loop.</summary>
+        private sealed class TuringScreenAdapter(TuringDevice inner) : IDisposable
         {
             public bool Sync()
             {
@@ -85,9 +83,7 @@ namespace InfoPanel.Services
                 return _frameConsumer.Produce(profile, frameInterval, bitmap =>
                 {
                     var rotation = _device.Rotation;
-                    // JPEG like the Windows build (command 101): much cheaper to encode
-                    // and for the panel to decode than PNG, which capped frame rate.
-                    int quality = IsLianLi ? 95 : _device.JpegQuality;
+                    int quality = _device.JpegQuality;
 
                     var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
                     try
@@ -114,49 +110,6 @@ namespace InfoPanel.Services
             }
 
             return null;
-        }
-
-        private static byte[] EncodeSolidFrame(int width, int height, SKColor color, SKEncodedImageFormat format, int quality)
-        {
-            using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Premul));
-            bitmap.Erase(color);
-
-            using var pixmap = bitmap.PeekPixels();
-            using var data = pixmap.Encode(format, quality);
-            return data?.ToArray() ?? [];
-        }
-
-        private void PrepareLianLiImageLayers(LianLiUsbScreenDevice lianLiDevice)
-        {
-            try
-            {
-                // Match the vendor ApplyTemplate() prep sequence:
-                // SyncClockOnly, StopClock, clear PNG overlay, clear JPG background,
-                // then set the frame rate like the Linux driver does.
-                var syncClockOk = lianLiDevice.SyncClockOnly();
-                Thread.Sleep(50);
-
-                var stopClockOk = lianLiDevice.StopClock();
-                Thread.Sleep(50);
-
-                var clearPng = EncodeSolidFrame(_panelWidth, _panelHeight, SKColors.Transparent, SKEncodedImageFormat.Png, 100);
-                var clearPngOk = clearPng.Length > 0 && lianLiDevice.DrawPngLayer(clearPng);
-                Thread.Sleep(50);
-
-                var clearJpeg = EncodeSolidFrame(_panelWidth, _panelHeight, SKColors.Black, SKEncodedImageFormat.Jpeg, 95);
-                var clearJpegOk = clearJpeg.Length > 0 && lianLiDevice.DrawJpegLayer(clearJpeg);
-                Thread.Sleep(50);
-
-                var frameRateOk = lianLiDevice.SetFrameRate(30);
-
-                Logger.Information(
-                    "TuringPanelDevice {Device}: Lian Li prep results: SyncClockOnly={SyncClockOk}, StopClock={StopClockOk}, ClearPng={ClearPngOk}, ClearJpeg={ClearJpegOk}, SetFrameRate={FrameRateOk}",
-                    _device, syncClockOk, stopClockOk, clearPngOk, clearJpegOk, frameRateOk);
-            }
-            catch (Exception ex)
-            {
-                Logger.Warning(ex, "TuringPanelDevice {Device}: Lian Li prep sequence failed", _device);
-            }
         }
 
         private Task<UsbRegistry?> FindTargetDeviceAsync()
@@ -229,37 +182,20 @@ namespace InfoPanel.Services
                     return;
                 }
 
-                IUsbScreenDevice screen;
-                if (IsLianLi)
+                var turingDevice = new TuringDevice();
+                try
                 {
-                    if (!usbRegistry.Open(out var usbDevice))
-                    {
-                        Logger.Error("TuringPanelDevice {Device}: Failed to open USB device", _device);
-                        _device.UpdateRuntimeProperties(errorMessage: "Failed to open USB device");
-                        return;
-                    }
-
-                    screen = new LianLiUsbScreenDevice(usbDevice);
+                    turingDevice.Initialize(usbRegistry);
                 }
-                else
+                catch (TuringDeviceException ex)
                 {
-                    var turingDevice = new TuringDevice();
-                    try
-                    {
-                        turingDevice.Initialize(usbRegistry);
-                    }
-                    catch (TuringDeviceException ex)
-                    {
-                        Logger.Error("TuringPanelDevice {Device}: Failed to initialize - {Error}", _device, ex.Message);
-                        _device.UpdateRuntimeProperties(errorMessage: ex.Message);
-                        turingDevice.Dispose();
-                        return;
-                    }
-
-                    screen = new TuringScreenAdapter(turingDevice);
+                    Logger.Error("TuringPanelDevice {Device}: Failed to initialize - {Error}", _device, ex.Message);
+                    _device.UpdateRuntimeProperties(errorMessage: ex.Message);
+                    turingDevice.Dispose();
+                    return;
                 }
 
-                using var device = screen;
+                using var device = new TuringScreenAdapter(turingDevice);
 
                 Logger.Information("TuringPanelDevice {Device}: Initialized successfully", _device);
                 _device.UpdateRuntimeProperties(isRunning: true);
@@ -287,14 +223,6 @@ namespace InfoPanel.Services
                     // media ignores streamed frames (frozen on an old image).
                     device.StopMedia();
                     Thread.Sleep(200);
-
-                    // Clear the Lian Li image layers (vendor ApplyTemplate prep
-                    // sequence), then set the frame rate.
-                    if (device is LianLiUsbScreenDevice lianLi)
-                    {
-                        PrepareLianLiImageLayers(lianLi);
-                        Thread.Sleep(200);
-                    }
 
                     // Set brightness
                     var brightness = _device.Brightness;

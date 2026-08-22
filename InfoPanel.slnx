@@ -10,6 +10,7 @@
     <Project Path="src/InfoPanel.Devices.Thermaltake/InfoPanel.Devices.Thermaltake.csproj" />
     <Project Path="src/InfoPanel.Devices.TuringPanel/InfoPanel.Devices.TuringPanel.csproj" />
     <Project Path="src/InfoPanel.Devices.VmaxPanel/InfoPanel.Devices.VmaxPanel.csproj" />
+  <Project Path="src/InfoPanel.Devices.LianLiPanel/InfoPanel.Devices.LianLiPanel.csproj" />
     <Project Path="src/InfoPanel.Devices/InfoPanel.Devices.csproj" />
     <Project Path="src/InfoPanel.Extras/InfoPanel.Extras.csproj" />
     <Project Path="src/InfoPanel.Platform.Linux/InfoPanel.Platform.Linux.csproj" />

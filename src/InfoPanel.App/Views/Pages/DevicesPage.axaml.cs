@@ -11,6 +11,7 @@ using InfoPanel.ThermaltakePanel;
 using InfoPanel.JlPanel;
 using InfoPanel.VmaxPanel;
 using InfoPanel.JonsboPanel;
+using InfoPanel.LianLiPanel;
 using LibUsbDotNet.Main;
 using InfoPanel.TuringPanel;
 using Serilog;
@@ -282,6 +283,32 @@ namespace InfoPanel.Views.Pages
                     jpegQuality, setJpegQuality);
             }
 
+            AddFamilyHeader("Lian Li", settings.LianLiPanelMultiDeviceMode,
+                v => { settings.LianLiPanelMultiDeviceMode = v; _app.Host.SaveSettings(); });
+            foreach (var device in settings.LianLiPanelDevices.ToList())
+            {
+                AddRow(
+                    title: device.ModelInfo?.Name ?? device.Model.ToString(),
+                    subtitle: Subtitle(device.DeviceId, device.DeviceLocation,
+                        device.DisplayWidth > 0 ? $"renders at {device.DisplayWidth}×{device.DisplayHeight}" : null),
+                    isEnabled: device.Enabled,
+                    setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
+                    profileGuid: device.ProfileGuid,
+                    setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
+                    status: () => device.RuntimeProperties.IsRunning
+                        ? RunningStatus(device.ProfileGuid, device.RuntimeProperties.FrameRate, device.RuntimeProperties.FrameTime)
+                        : !device.Enabled ? "disabled"
+                        : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
+                    remove: () => { settings.LianLiPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
+                    rotation: device.Rotation,
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
+                    device.TargetFrameRate, f => { device.TargetFrameRate = f; _app.Host.SaveSettings(); },
+                    device.JpegQuality, q => { device.JpegQuality = q; _app.Host.SaveSettings(); });
+                AddMatchingProfileButton(device.ModelInfo?.Name ?? device.Model.ToString(),
+                    device.DisplayWidth, device.DisplayHeight, g => { device.ProfileGuid = g; _app.Host.SaveSettings(); });
+            }
+
             AddHotkeysSection(settings);
         }
 
@@ -314,6 +341,7 @@ namespace InfoPanel.Views.Pages
             foreach (var d in settings.JlPanelDevices) deviceChoices.Add(new("Jl", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.VmaxPanelDevices) deviceChoices.Add(new("Vmax", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.JonsboPanelDevices) deviceChoices.Add(new("Jonsbo", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
+            foreach (var d in settings.LianLiPanelDevices) deviceChoices.Add(new("LianLi", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
 
             addButton.IsEnabled = deviceChoices.Count > 0;
             addButton.Click += (_, _) =>
@@ -823,6 +851,7 @@ namespace InfoPanel.Views.Pages
                 var newJlFamily = settings.JlPanelDevices.Count == 0;
                 var newJonsboFamily = settings.JonsboPanelDevices.Count == 0;
                 var newVmaxFamily = settings.VmaxPanelDevices.Count == 0;
+                var newLianLiFamily = settings.LianLiPanelDevices.Count == 0;
 
                 // Thermalright (HID/bulk/SCSI). The HID model probe is skipped for panels this
                 // app is currently streaming to (an init command would disrupt the stream).
@@ -1030,6 +1059,28 @@ namespace InfoPanel.Views.Pages
                     }
                 }
 
+                // Lian Li (encrypted bulk USB)
+                foreach (var found in await LianLiPanelHelper.GetUsbDevices())
+                {
+                    var existing = settings.LianLiPanelDevices.FirstOrDefault(d => d.DeviceId == found.DeviceId);
+                    if (existing == null)
+                    {
+                        settings.LianLiPanelDevices.Add(found);
+                        added++;
+                    }
+                    else
+                    {
+                        existing.DeviceLocation = found.DeviceLocation;
+                        if (existing.Model != found.Model)
+                        {
+                            Logger.Information("Device {Id} model updated from {Old} to {New}", found.DeviceId, existing.Model, found.Model);
+                            existing.Model = found.Model;
+                        }
+
+                        updated++;
+                    }
+                }
+
                 // First panel of a previously empty family: enable that family's streaming
                 // master switch. A user who scanned clearly wants the found panel to work;
                 // leaving a second off-by-default switch hidden in the section header cost
@@ -1048,6 +1099,8 @@ namespace InfoPanel.Views.Pages
                     settings.JonsboPanelMultiDeviceMode = true;
                 if (newVmaxFamily && settings.VmaxPanelDevices.Count > 0)
                     settings.VmaxPanelMultiDeviceMode = true;
+                if (newLianLiFamily && settings.LianLiPanelDevices.Count > 0)
+                    settings.LianLiPanelMultiDeviceMode = true;
 
                 _app.Host.SaveSettings();
                 ScanStatus.Text = $"Scan complete: {added} new, {updated} known device(s).";

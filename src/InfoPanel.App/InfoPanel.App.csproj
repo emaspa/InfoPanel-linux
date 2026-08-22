@@ -47,6 +47,7 @@
     <ProjectReference Include="..\InfoPanel.Devices.Thermaltake\InfoPanel.Devices.Thermaltake.csproj" />
     <ProjectReference Include="..\InfoPanel.Devices.JlPanel\InfoPanel.Devices.JlPanel.csproj" />
     <ProjectReference Include="..\InfoPanel.Devices.VmaxPanel\InfoPanel.Devices.VmaxPanel.csproj" />
+    <ProjectReference Include="..\InfoPanel.Devices.LianLiPanel\InfoPanel.Devices.LianLiPanel.csproj" />
     <ProjectReference Include="..\InfoPanel.Devices.JonsboPanel\InfoPanel.Devices.JonsboPanel.csproj" />
     <ProjectReference Include="..\InfoPanel.Devices.TuringPanel\InfoPanel.Devices.TuringPanel.csproj" />
     <ProjectReference Include="..\InfoPanel.Platform.Linux\InfoPanel.Platform.Linux.csproj" />

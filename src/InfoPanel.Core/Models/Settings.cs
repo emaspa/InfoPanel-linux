@@ -122,6 +122,16 @@ namespace InfoPanel.Models
         [ObservableProperty]
         private bool _jonsboPanelMultiDeviceMode = false;
 
+        private readonly ObservableCollection<LianLiPanelDevice> _lianLiPanelDevices = [];
+
+        public ObservableCollection<LianLiPanelDevice> LianLiPanelDevices
+        {
+            get { return _lianLiPanelDevices; }
+        }
+
+        [ObservableProperty]
+        private bool _lianLiPanelMultiDeviceMode = false;
+
         private readonly ObservableCollection<HotkeyBinding> _hotkeyBindings = [];
 
         public ObservableCollection<HotkeyBinding> HotkeyBindings
@@ -182,6 +192,7 @@ namespace InfoPanel.Models
             JlPanelDevices.CollectionChanged += JlPanelDevices_CollectionChanged;
             VmaxPanelDevices.CollectionChanged += VmaxPanelDevices_CollectionChanged;
             JonsboPanelDevices.CollectionChanged += JonsboPanelDevices_CollectionChanged;
+            LianLiPanelDevices.CollectionChanged += LianLiPanelDevices_CollectionChanged;
         }
 
         private void BeadaPanelDevices_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -355,6 +366,35 @@ namespace InfoPanel.Models
             if (e.PropertyName != nameof(VmaxPanelDevice.RuntimeProperties))
             {
                 OnPropertyChanged(nameof(VmaxPanelDevices));
+            }
+        }
+
+        private void LianLiPanelDevices_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.OldItems != null)
+            {
+                foreach (LianLiPanelDevice device in e.OldItems)
+                {
+                    device.PropertyChanged -= LianLiDevice_PropertyChanged;
+                }
+            }
+
+            if (e.NewItems != null)
+            {
+                foreach (LianLiPanelDevice device in e.NewItems)
+                {
+                    device.PropertyChanged += LianLiDevice_PropertyChanged;
+                }
+            }
+
+            OnPropertyChanged(nameof(LianLiPanelDevices));
+        }
+
+        private void LianLiDevice_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(LianLiPanelDevice.RuntimeProperties))
+            {
+                OnPropertyChanged(nameof(LianLiPanelDevices));
             }
         }
 

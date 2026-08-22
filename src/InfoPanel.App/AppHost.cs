@@ -22,6 +22,54 @@ namespace InfoPanel
         public HotkeyManager? Hotkeys { get; private set; }
         public Services.ForegroundAppMonitor? ForegroundApps { get; private set; }
 
+        /// <summary>
+        /// The Lian Li Universal Screen 8.8" used to live inside the Turing family
+        /// (model LIANLI_88INCH_USB); it now has its own device family covering all
+        /// Lian Li panels. Move any previously configured entry across so users keep
+        /// their profile assignment and settings.
+        /// </summary>
+        private void MigrateLianLiDevices()
+        {
+            var stale = Settings.TuringPanelDevices
+                .Where(d => d.Model == "LIANLI_88INCH_USB")
+                .ToList();
+            if (stale.Count == 0) return;
+
+            foreach (var old in stale)
+            {
+                Settings.TuringPanelDevices.Remove(old);
+
+                if (!Settings.LianLiPanelDevices.Any(d => d.DeviceId == old.DeviceId))
+                {
+                    Settings.LianLiPanelDevices.Add(new LianLiPanelDevice
+                    {
+                        DeviceId = old.DeviceId ?? string.Empty,
+                        DeviceLocation = old.DeviceLocation ?? string.Empty,
+                        Model = LianLiPanel.LianLiPanelModel.UniversalScreen88Inch,
+                        Enabled = old.Enabled,
+                        ProfileGuid = old.ProfileGuid,
+                        Rotation = old.Rotation,
+                        Brightness = old.Brightness,
+                        TargetFrameRate = old.TargetFrameRate,
+                    });
+                }
+
+                // Keep hotkey bindings working across the family change
+                foreach (var binding in Settings.HotkeyBindings.Where(b => b.DeviceType == "Turing" && b.DeviceId == old.DeviceId))
+                {
+                    binding.DeviceType = "LianLi";
+                }
+            }
+
+            if (Settings.TuringPanelDevices.Count == 0)
+                Settings.TuringPanelMultiDeviceMode = false;
+            if (Settings.LianLiPanelDevices.Any(d => d.Enabled))
+                Settings.LianLiPanelMultiDeviceMode = true;
+
+            Logger.Information("Migrated {Count} Lian Li device(s) from the Turing family", stale.Count);
+            SaveSettings();
+        }
+
         public void Initialize()
         {
             // Platform + rendering seams
@@ -30,6 +78,7 @@ namespace InfoPanel
 
             // Configuration
             Settings = ConfigPersistence.LoadSettings() ?? new Settings();
+            MigrateLianLiDevices();
             foreach (var profile in ConfigPersistence.LoadProfiles() ?? [])
             {
                 Profiles.Add(profile);
@@ -84,6 +133,10 @@ namespace InfoPanel
                         case nameof(Settings.JonsboPanelMultiDeviceMode):
                             await JonsboPanelTask.Instance.StopAsync();
                             if (Settings.JonsboPanelMultiDeviceMode) await JonsboPanelTask.Instance.StartAsync();
+                            break;
+                        case nameof(Settings.LianLiPanelMultiDeviceMode):
+                            await LianLiPanelTask.Instance.StopAsync();
+                            if (Settings.LianLiPanelMultiDeviceMode) await LianLiPanelTask.Instance.StartAsync();
                             break;
                         case nameof(Settings.WebServer):
                             if (Settings.WebServer) await WebServerTask.Instance.StartAsync();
@@ -209,6 +262,7 @@ namespace InfoPanel
             await JlPanelTask.Instance.StartAsync(token);
             await VmaxPanelTask.Instance.StartAsync(token);
             await JonsboPanelTask.Instance.StartAsync(token);
+            await LianLiPanelTask.Instance.StartAsync(token);
 
             if (Settings.WebServer)
             {
@@ -228,6 +282,7 @@ namespace InfoPanel
             await JlPanelTask.Instance.StopAsync(shutdown: true);
             await VmaxPanelTask.Instance.StopAsync(shutdown: true);
             await JonsboPanelTask.Instance.StopAsync(shutdown: true);
+            await LianLiPanelTask.Instance.StopAsync(shutdown: true);
 
             try { await Monitors.PluginMonitor.Instance.StopAsync().WaitAsync(TimeSpan.FromSeconds(3)); } catch { }
             try { HwmonMonitor.Instance.Stop(); } catch { }

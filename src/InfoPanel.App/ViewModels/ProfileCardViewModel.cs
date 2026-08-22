@@ -67,6 +67,9 @@ namespace InfoPanel.ViewModels
                 outputs.AddRange(host.Settings.JonsboPanelDevices
                     .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
                     .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
+                outputs.AddRange(host.Settings.LianLiPanelDevices
+                    .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
+                    .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
 
                 var where = outputs.Count > 0 ? $" · {string.Join(", ", outputs)}" : "";
                 return $"{Profile.Width}×{Profile.Height}{where}";

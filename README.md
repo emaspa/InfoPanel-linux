@@ -49,7 +49,7 @@ bad editing session is never fatal.
 
 - **Desktop overlays**: transparent, repositionable windows rendered
   through X11/XWayland, one per active profile.
-- **USB LCD panels**: seven device families with per-device profile
+- **USB LCD panels**: eight device families with per-device profile
   assignment, rotation, brightness, and live frame rate and latency
   readouts. Devices are supervised: they self-heal their USB binding after
   a replug and back off cleanly when unplugged.
@@ -297,8 +297,21 @@ panel EDID to tell them apart.
 | Turing Smart Screen 9.2" | 464×1920 | USB `1cbe:0092` |
 | Turing Smart Screen 1.6" | 400×400 | USB `1cbe:0016` |
 | Turing Smart Screen 4.6" | 320×960 | USB `1cbe:0046` |
-| Lian Li Universal Screen 8.8" | 480×1920 | USB `1cbe:a088` |
 | Shiny Snake G600 11.3" (Turing 10.2") | 440×1920 | Serial `0525:a4a7` |
+
+### Lian Li
+
+Encrypted bulk USB protocol (DES command packets + JPEG frames):
+
+| Model | Resolution | USB ID |
+|---|---|---|
+| Lian Li Universal Screen 8.8" | 480×1920 | `1cbe:a088` |
+| Lian Li Universal Screen 9.2" | 464×1920 | `1cbe:a092` |
+| Lian Li HydroShift II OLED Curve | 2288×1080 | `1cbe:a068` |
+| Lian Li HydroShift II LCD | 480×480 | `1cbe:a034` |
+
+A Universal Screen 8.8" previously configured under the Turing family is
+migrated to this family automatically, keeping its profile and settings.
 
 ### BeadaPanel (NXElec)
 
@@ -435,6 +448,8 @@ A single instance is enforced via a lock file in the data directory.
 - [mrZoSo](https://github.com/mrZoSo): for the beta testing.
 - [CyberFreek](https://github.com/CyberFreek): Lian Li panel support and
   weather units.
+- [ozgurce](https://github.com/ozgurce): the standalone Lian Li family
+  (Universal Screen and HydroShift II models).
 - [yattuLizard](https://github.com/yattuLizard): VMAX / AuyiHomu panel
   support.
 - [fweepa](https://github.com/fweepa): stopwatch plugin and hotkeys.

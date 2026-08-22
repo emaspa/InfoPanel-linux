@@ -5,24 +5,14 @@ using System;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 
-namespace InfoPanel.TuringPanel
+namespace InfoPanel.LianLiPanel
 {
-    internal interface IUsbScreenDevice : IDisposable
-    {
-        bool Sync();
-        bool StopMedia();
-        bool SetBrightness(byte value);
-        /// <summary>Pushes one full frame. Payload format is device-specific (JPEG for Lian Li, PNG for Turing).</summary>
-        bool DrawFrame(byte[] imageBytes);
-    }
-
     /// <summary>
-    /// Lian Li's LCD USB protocol is Turing-like, but its reference app writes the
-    /// encrypted command packet and image payload as one bulk transfer. The stock
-    /// Turing driver writes them as two transfers, which can make Lian Li panels
+    /// Lian Li's LCD USB protocol expects the encrypted command packet and image
+    /// payload as one bulk transfer. Sending them separately can make these panels
     /// accept a frame briefly and then stop responding.
     /// </summary>
-    public sealed class LianLiUsbScreenDevice : IUsbScreenDevice
+    public sealed class LianLiUsbScreenDevice : IDisposable
     {
         private static readonly ILogger Logger = Log.ForContext<LianLiUsbScreenDevice>();
         private static readonly byte[] KeyIv = "slv3tuzx"u8.ToArray();
@@ -120,7 +110,7 @@ namespace InfoPanel.TuringPanel
             return DrawImageLayer(PushJpegCommand, imageBytes);
         }
 
-        public bool DrawFrame(byte[] imageBytes)
+        public bool DrawJpeg(byte[] imageBytes)
         {
             if (imageBytes == null) throw new ArgumentNullException(nameof(imageBytes));
 
@@ -153,13 +143,13 @@ namespace InfoPanel.TuringPanel
         }
 
         /// <summary>
-        /// Poll QueryBlock every 50ms until the device buffer level drains to
+        /// Poll QueryBlock every 2ms until the device buffer level drains to
         /// <paramref name="threshold"/> or below. Mirrors the Linux driver's
         /// wait_buffer() (max ~2s).
         /// </summary>
         private void WaitForBufferDrain(byte threshold)
         {
-            for (var i = 0; i < 40; i++)
+            for (var i = 0; i < 1000; i++)
             {
                 var level = QueryBlock();
                 if (level == null || level <= threshold)
@@ -167,7 +157,7 @@ namespace InfoPanel.TuringPanel
                     return;
                 }
 
-                System.Threading.Thread.Sleep(50);
+                System.Threading.Thread.Sleep(2);
             }
 
             Logger.Debug("LianLi buffer drain wait timed out after 2s");

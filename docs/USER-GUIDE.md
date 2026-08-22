@@ -54,7 +54,7 @@ To keep idle cost low, a plugin whose sensors are not shown on any streaming pan
 
 ## Devices
 
-The Devices page detects supported USB LCD panels: BeadaPanel, Turing Smart Screen (including Lian Li and Rev 4.6"), Thermalright (40+ models), Thermaltake / ASRock, JL / Hongtai, VMAX and Jonsbo (DS916, DS339). For each panel you can assign a profile, set rotation and brightness, and watch the live frame rate and latency. To stream, a panel needs its row's Enabled switch on and a profile assigned; each family also has a streaming master switch in its section header, which turns on automatically when a scan finds the family's first panel.
+The Devices page detects supported USB LCD panels: BeadaPanel, Turing Smart Screen (including Rev 4.6"), Thermalright (40+ models), Thermaltake / ASRock, JL / Hongtai, VMAX, Jonsbo (DS916, DS339) and Lian Li (Universal Screen 8.8"/9.2", HydroShift II). For each panel you can assign a profile, set rotation and brightness, and watch the live frame rate and latency. To stream, a panel needs its row's Enabled switch on and a profile assigned; each family also has a streaming master switch in its section header, which turns on automatically when a scan finds the family's first panel.
 
 Some panels share one USB ID across many models (for example most Thermalright HID panels). The scan identifies the exact model by briefly talking to the panel; if that is not possible the row shows a placeholder model until the first connection, when the panel reports what it really is.
 
