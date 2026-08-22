@@ -48,7 +48,9 @@ bad editing session is never fatal.
 ### Outputs
 
 - **Desktop overlays**: transparent, repositionable windows rendered
-  through X11/XWayland, one per active profile.
+  through X11/XWayland, one per active profile. Each profile can be
+  assigned to a specific monitor from the designer, or simply dragged
+  where it should live.
 - **USB LCD panels**: eight device families with per-device profile
   assignment, rotation, brightness, and live frame rate and latency
   readouts. Devices are supervised: they self-heal their USB binding after

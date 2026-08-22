@@ -34,7 +34,7 @@ The Designer is where profiles are built. Pick a profile from the top-left picke
 - Drag to move, use handles to resize, arrow keys nudge (Shift for 10 px).
 - **Layers** panel: reorder (z-order), duplicate, delete.
 - **Sensors** panel: pick a hardware or plugin sensor, then add it as a value, graph, bar, gauge or image. Plugin sensors that carry an image (like Audio Spectrum) become live image items.
-- The inspector on the right edits every property of the selected item. With nothing selected it shows profile options, including **Trigger programs** (see below).
+- The inspector on the right edits every property of the selected item. With nothing selected it shows profile options: **Trigger programs** (see below) and **Display**, which assigns the profile's overlay to a monitor (dragging the overlay onto another screen updates it too).
 - **Undo/Redo** cover every edit. Changes autosave about 2 seconds after you stop editing.
 - **Restore** rolls the profile back to how it looked before this editing session began. Restoring again swaps back, so nothing is ever lost to a bad session.
 
