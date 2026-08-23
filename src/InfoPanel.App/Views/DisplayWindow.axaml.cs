@@ -316,22 +316,10 @@ namespace InfoPanel.Views
         public static bool HasTargetMonitor(Profile profile, Window reference)
         {
             var screens = ScreenHelper.GetAllMonitors(reference);
-            if (profile.TargetWindow is TargetWindow targetWindow)
+            if (profile.TargetWindow is TargetWindow targetWindow
+                && ScreenHelper.MatchTargetWindow(targetWindow, screens, profile.StrictWindowMatching) != null)
             {
-                if (screens.Any(s => s.DeviceName == targetWindow.DeviceName
-                    && s.Bounds.Width == targetWindow.Width
-                    && s.Bounds.Height == targetWindow.Height))
-                {
-                    return true;
-                }
-
-                if (!profile.StrictWindowMatching
-                    && (screens.Any(s => s.DeviceName == targetWindow.DeviceName)
-                        || screens.Any(s => s.Bounds.Width == targetWindow.Width
-                            && s.Bounds.Height == targetWindow.Height)))
-                {
-                    return true;
-                }
+                return true;
             }
 
             return !profile.StrictWindowMatching && screens.Count > 0;
@@ -344,18 +332,7 @@ namespace InfoPanel.Views
 
             if (Profile.TargetWindow is TargetWindow targetWindow)
             {
-                targetScreen ??= screens.FirstOrDefault(s =>
-                    s.DeviceName == targetWindow.DeviceName
-                    && s.Bounds.Width == targetWindow.Width
-                    && s.Bounds.Height == targetWindow.Height);
-
-                if (!Profile.StrictWindowMatching)
-                {
-                    targetScreen ??= screens.FirstOrDefault(s => s.DeviceName == targetWindow.DeviceName);
-                    targetScreen ??= screens.FirstOrDefault(s =>
-                        s.Bounds.Width == targetWindow.Width
-                        && s.Bounds.Height == targetWindow.Height);
-                }
+                targetScreen = ScreenHelper.MatchTargetWindow(targetWindow, screens, Profile.StrictWindowMatching);
             }
 
             if (!Profile.StrictWindowMatching)

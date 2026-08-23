@@ -210,7 +210,7 @@ namespace InfoPanel.Designer
             };
             foreach (var monitor in monitors)
             {
-                combo.Items.Add($"{monitor.DeviceName} ({(int)monitor.Bounds.Width}×{(int)monitor.Bounds.Height}){(monitor.IsPrimary ? " · primary" : "")}");
+                combo.Items.Add(monitor.Label);
             }
 
             var syncing = false;
@@ -234,12 +234,7 @@ namespace InfoPanel.Designer
                 if (syncing || combo.SelectedIndex < 0 || combo.SelectedIndex >= monitors.Count) return;
                 var monitor = monitors[combo.SelectedIndex];
 
-                profile.TargetWindow = new TargetWindow(
-                    (int)monitor.Bounds.Left, (int)monitor.Bounds.Top,
-                    (int)monitor.Bounds.Width, (int)monitor.Bounds.Height,
-                    monitor.DeviceName);
-                profile.WindowX = 0;
-                profile.WindowY = 0;
+                ScreenHelper.AssignTargetWindow(profile, monitor);
                 (Avalonia.Application.Current as App)?.Host.SaveProfiles();
             };
 
@@ -260,12 +255,7 @@ namespace InfoPanel.Designer
         private static MonitorInfo? FindAssignedMonitor(Profile profile, List<MonitorInfo> monitors)
         {
             if (profile.TargetWindow is not TargetWindow target) return null;
-
-            // Same matching order as DisplayWindow.SetWindowPositionRelativeToScreen
-            return monitors.FirstOrDefault(m => m.DeviceName == target.DeviceName
-                    && (int)m.Bounds.Width == target.Width && (int)m.Bounds.Height == target.Height)
-                ?? monitors.FirstOrDefault(m => m.DeviceName == target.DeviceName)
-                ?? monitors.FirstOrDefault(m => (int)m.Bounds.Width == target.Width && (int)m.Bounds.Height == target.Height);
+            return ScreenHelper.MatchTargetWindow(target, monitors, strict: false);
         }
 
         private void BuildCommonSection(DesignerSession session, DisplayItem item)

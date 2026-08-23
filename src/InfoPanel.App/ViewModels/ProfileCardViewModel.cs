@@ -37,6 +37,50 @@ namespace InfoPanel.ViewModels
             }
         }
 
+        private const string NoDisplay = "Not assigned";
+
+        private static List<Utils.MonitorInfo> Monitors() =>
+            Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow is { } main
+                ? Utils.ScreenHelper.GetAllMonitors(main)
+                : [];
+
+        /// <summary>Overlay display choices for the card's settings expander.</summary>
+        public IReadOnlyList<string> DisplayChoices =>
+            [NoDisplay, .. Monitors().Select(m => m.Label)];
+
+        /// <summary>Guards against ComboBox writing null when its popup/state churns.</summary>
+        public string? DisplaySelection
+        {
+            get
+            {
+                var monitors = Monitors();
+                var assigned = Profile.TargetWindow is { } target
+                    ? Utils.ScreenHelper.MatchTargetWindow(target, monitors, strict: false)
+                    : null;
+                return assigned?.Label ?? NoDisplay;
+            }
+            set
+            {
+                if (string.IsNullOrEmpty(value) || value == DisplaySelection) return;
+
+                if (value == NoDisplay)
+                {
+                    Profile.TargetWindow = null;
+                }
+                else
+                {
+                    var monitor = Monitors().FirstOrDefault(m => m.Label == value);
+                    if (monitor == null) return;
+                    Utils.ScreenHelper.AssignTargetWindow(Profile, monitor);
+                }
+
+                host.SaveProfiles();
+                OnPropertyChanged();
+            }
+        }
+
         public string Subtitle
         {
             get
