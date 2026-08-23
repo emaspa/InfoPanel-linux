@@ -391,8 +391,10 @@ the About page shows what changed and links the download.
 
 Requirements and optional dependencies:
 
-- **USB panels**: the bundled udev rules plus membership in the `plugdev`
-  group.
+- **USB panels**: the bundled udev rules (world-accessible device nodes; no
+  group membership needed. udev 261+ silently rejects rules that assign
+  device nodes to non-system groups like the old `plugdev`, which is why the
+  rules no longer use it).
 - **Intel GPU engine utilization**: `sysctl kernel.perf_event_paranoid=-1`
   (see comments in `packaging/infopanel-udev.rules`).
 - **Video/RTSP display items**: a system `ffmpeg` binary.

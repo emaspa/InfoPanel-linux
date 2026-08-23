@@ -12,7 +12,7 @@ InfoPanel turns hardware monitoring data into designable dashboards shown on des
    ./install.sh
    ```
    The installer copies the app to `~/.local/opt/infopanel`, adds an `infopanel` launcher to `~/.local/bin`, creates a desktop entry, installs the udev rules for USB panel access (asks for sudo), and, if `smartmontools` is installed, sets up the systemd timer that feeds the SMART drive health sensors.
-3. Make sure your user is in the `plugdev` group and replug your panel once so the udev rules apply, then run `infopanel`. Configuration is stored in `~/.local/share/InfoPanel/`.
+3. Replug your panel once (or reboot) so the udev rules apply, then run `infopanel`. No group membership is needed. Configuration is stored in `~/.local/share/InfoPanel/`.
 
 Optional: enable "Start at login" in Settings to install an XDG autostart entry.
 
