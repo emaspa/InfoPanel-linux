@@ -368,6 +368,22 @@ directions:
 
 ## Installing
 
+### Arch Linux (AUR)
+
+```bash
+yay -S infopanel-bin
+```
+
+Installs [infopanel-bin from the AUR](https://aur.archlinux.org/packages/infopanel-bin)
+system-wide: the app in `/opt/infopanel` with a `/usr/bin/infopanel`
+launcher, a desktop entry, the udev rules, and the SMART sensor systemd
+units (enable with `systemctl enable --now infopanel-smart.timer` if you
+have `smartmontools`). Replug your panels once after installing so the
+udev rules apply. Updates arrive through `yay` like any other package.
+The PKGBUILD lives in [`aur/`](aur/).
+
+### Tarball (any distribution)
+
 Download the latest `infopanel-<version>-linux-x64.tar.gz` from
 [Releases](https://github.com/emaspa/InfoPanel-linux/releases). The
 tarball is self-contained, so no .NET runtime is needed.
