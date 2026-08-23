@@ -6,3 +6,8 @@ obj/
 publish/
 *.binlog
 artifacts/
+aur/src/
+aur/pkg/
+aur/*.tar.gz
+aur/*.pkg.tar.zst
+artifacts/
