@@ -25,6 +25,8 @@ InfoPanel checks GitHub Releases once at startup (a single anonymous request, no
 The app opens on the Dashboard: profile cards with live thumbnails, quick navigation, and community links. Each profile card has:
 
 - **Active** toggle: shows or hides the profile's desktop overlay.
+- **Profile settings** expander with a **Display** dropdown assigning the
+  overlay to a monitor (or "Not assigned"), plus font and color options.
 - **Duplicate / Delete** buttons and an **Import** option for `.infopanel` profile exports.
 
 ## Designer
