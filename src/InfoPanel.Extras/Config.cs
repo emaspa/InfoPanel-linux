@@ -10,7 +10,37 @@ namespace InfoPanel.Extras
         private static readonly Lazy<Config> _instance = new(() => new Config());
         public static Config Instance => _instance.Value;
 
-        private readonly static string _configFilePath = $"{Assembly.GetExecutingAssembly().ManifestModule.FullyQualifiedName}.ini";
+        private readonly static string _configFilePath = ResolveConfigPath();
+
+        private static string ResolveConfigPath()
+        {
+            // Historical location: next to the plugin assembly. Works for the
+            // tarball install in the user's home, but system packages put the
+            // plugin in a read-only location (/opt, /usr/lib), where writing
+            // the defaults throws and takes the whole plugin down with it.
+            var legacy = $"{Assembly.GetExecutingAssembly().ManifestModule.FullyQualifiedName}.ini";
+            try
+            {
+                if (File.Exists(legacy))
+                {
+                    return legacy;
+                }
+
+                var dir = Path.GetDirectoryName(legacy)!;
+                var probe = Path.Combine(dir, ".infopanel-write-probe");
+                File.WriteAllText(probe, string.Empty);
+                File.Delete(probe);
+                return legacy;
+            }
+            catch
+            {
+                var dataDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "InfoPanel", "plugins");
+                Directory.CreateDirectory(dataDir);
+                return Path.Combine(dataDir, Path.GetFileName(legacy));
+            }
+        }
 
         public readonly static string SECTION_WEATHER = "Weather"; 
         public readonly static string SECTION_SYSTEM_INFO = "System Info";
