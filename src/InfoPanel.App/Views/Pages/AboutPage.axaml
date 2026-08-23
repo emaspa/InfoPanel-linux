@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.2.1 alpha: panel frame rates, video loop fix" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.2.2 alpha: fix Extras plugins on packaged installs" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="The Extras plugins (MangoHud FPS, SMART drive health, Weather, System Info) failed to load when InfoPanel is installed system-wide (AUR package, /opt): their shared config was written next to the plugin assembly, which is read-only there. The config now falls back to the user data directory; an existing config next to the plugin keeps working." />
+                        <TextBlock Text="v0.2.1 alpha: panel frame rates, video loop fix" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Major frame rate work: profiles with video roughly triple their panel frame rate (frame pacing, per-resolution shared rendering, JPEG encode moved off the render lock, per-frame video resize caching), and looping videos no longer freeze at the loop boundary. Keepalive resends of unchanged content are throttled, fixing a flood that could crash Trofeo bulk panel firmware (recoverable only by replug). udev rules no longer use the plugdev group, which udev 261+ silently rejects, taking panel permissions with it; no group membership is needed anymore. Overlays whose monitor is missing no longer leave a ghost taskbar entry." />
                         <TextBlock Text="v0.2.0 alpha: Lian Li panels, display assignment" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
