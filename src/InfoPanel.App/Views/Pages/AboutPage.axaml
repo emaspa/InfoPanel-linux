@@ -42,7 +42,9 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.2.2 alpha: fix Extras plugins on packaged installs" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.2.3 alpha: smooth UI, display assignment, plugin config fix" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Major UI responsiveness work: overlays no longer run the full profile draw on the compositor's render thread (they blit a frame rendered off-thread), plugin images cache their per-frame resizes like video does, and dashboard thumbnails render off the UI thread without a PNG round-trip. Scrolling and animations stay smooth with overlays and panels active. Profiles gain a Display dropdown on the dashboard tiles, and monitor assignment now identifies displays by output name and native resolution (stable under Wayland/XWayland scaling) instead of scaled X11 bounds. Stored plugin config is applied before plugin initialization, so structural settings like the audio spectrum's band count and image size actually take effect instead of silently running on defaults." />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="The Extras plugins (MangoHud FPS, SMART drive health, Weather, System Info) failed to load when InfoPanel is installed system-wide (AUR package, /opt): their shared config was written next to the plugin assembly, which is read-only there. The config now falls back to the user data directory; an existing config next to the plugin keeps working." />
                         <TextBlock Text="v0.2.1 alpha: panel frame rates, video loop fix" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
