@@ -307,6 +307,36 @@ namespace InfoPanel.Views
 
         // ================= placement =================
 
+        /// <summary>
+        /// Whether the profile's overlay has a monitor to appear on, using the same
+        /// matching rules as <see cref="SetWindowPositionRelativeToScreen"/>. Checked
+        /// BEFORE creating the overlay window: showing a window and hiding it after
+        /// the fact leaves a ghost taskbar entry on some window managers (KWin).
+        /// </summary>
+        public static bool HasTargetMonitor(Profile profile, Window reference)
+        {
+            var screens = ScreenHelper.GetAllMonitors(reference);
+            if (profile.TargetWindow is TargetWindow targetWindow)
+            {
+                if (screens.Any(s => s.DeviceName == targetWindow.DeviceName
+                    && s.Bounds.Width == targetWindow.Width
+                    && s.Bounds.Height == targetWindow.Height))
+                {
+                    return true;
+                }
+
+                if (!profile.StrictWindowMatching
+                    && (screens.Any(s => s.DeviceName == targetWindow.DeviceName)
+                        || screens.Any(s => s.Bounds.Width == targetWindow.Width
+                            && s.Bounds.Height == targetWindow.Height)))
+                {
+                    return true;
+                }
+            }
+
+            return !profile.StrictWindowMatching && screens.Count > 0;
+        }
+
         private void SetWindowPositionRelativeToScreen()
         {
             var screens = ScreenHelper.GetAllMonitors(this);
