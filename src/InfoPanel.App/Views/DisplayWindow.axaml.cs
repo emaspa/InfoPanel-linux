@@ -77,6 +77,20 @@ namespace InfoPanel.Views
 
         private void OnTimerElapsed(object? sender, System.Timers.ElapsedEventArgs e)
         {
+            // Warm the shared frame HERE, on the timer's thread-pool thread, so the
+            // paint below (compositor render thread) only blits the cached bitmap.
+            // Full profile rendering on the render thread saturated it and made
+            // every UI animation in the app janky while an overlay was active.
+            var interval = Math.Max(1, 1000 / Math.Max(1, RenderContext.TargetFrameRate));
+            try
+            {
+                SharedFrameCache.WithFrame(Profile, interval, static (_, _) => { });
+            }
+            catch
+            {
+                // transient render failures (profile edits) are fine; paint uses the last frame
+            }
+
             Dispatcher.UIThread.Post(() =>
             {
                 var skiaElement = this.FindControl<SkiaCanvas>("SkiaElement");
@@ -93,8 +107,25 @@ namespace InfoPanel.Views
 
             canvas.Clear();
 
-            SkiaGraphics skiaGraphics = new(canvas, Profile.FontScale);
-            PanelDraw.Run(Profile, skiaGraphics, cacheHint: $"DISPLAY-{Profile.Guid}", fpsCounter: _fpsCounter);
+            // Blit the shared frame (rendered off-thread by the timer) instead of
+            // re-running the full profile draw on the compositor's render thread.
+            // A large maxAge avoids re-rendering here: the timer keeps it fresh.
+            var blitted = false;
+            SharedFrameCache.WithFrame(Profile, maxAgeMs: 10_000, (bitmap, _) =>
+            {
+                canvas.DrawBitmap(bitmap, 0, 0);
+                blitted = true;
+            });
+
+            if (!blitted)
+            {
+                SkiaGraphics skiaGraphics = new(canvas, Profile.FontScale);
+                PanelDraw.Run(Profile, skiaGraphics, cacheHint: $"DISPLAY-{Profile.Guid}", fpsCounter: _fpsCounter);
+            }
+            else
+            {
+                _fpsCounter.Update(0);
+            }
         }
 
         // ================= interaction (v1 model) =================

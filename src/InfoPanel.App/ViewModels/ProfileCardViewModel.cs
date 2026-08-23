@@ -144,16 +144,34 @@ namespace InfoPanel.ViewModels
             }
         }
 
-        /// <summary>Renders a fresh thumbnail (~quarter scale) off the live profile state.</summary>
-        public void RefreshThumbnail()
+        /// <summary>
+        /// Renders a fresh thumbnail (~quarter scale) off the live profile state.
+        /// The render runs on a worker thread and the pixels are copied straight
+        /// into an Avalonia bitmap: the previous PNG encode/decode round-trip on
+        /// the UI thread stalled the whole UI for hundreds of milliseconds per
+        /// dashboard refresh with many profiles.
+        /// </summary>
+        public async Task RefreshThumbnailAsync()
         {
             try
             {
-                using var bitmap = PanelRenderer.RenderSK(Profile, preview: true);
-                using var image = SKImage.FromBitmap(bitmap);
-                using var data = image.Encode(SKEncodedImageFormat.Png, 90);
-                using var stream = new MemoryStream(data.ToArray());
-                Thumbnail = new Bitmap(stream);
+                var rendered = await Task.Run(() =>
+                {
+                    using var bitmap = PanelRenderer.RenderSK(Profile, preview: true);
+                    var writeable = new Avalonia.Media.Imaging.WriteableBitmap(
+                        new Avalonia.PixelSize(bitmap.Width, bitmap.Height),
+                        new Avalonia.Vector(96, 96),
+                        Avalonia.Platform.PixelFormat.Bgra8888,
+                        Avalonia.Platform.AlphaFormat.Premul);
+                    using (var fb = writeable.Lock())
+                    using (var pixmap = bitmap.PeekPixels())
+                    {
+                        var info = new SKImageInfo(bitmap.Width, bitmap.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+                        pixmap.ReadPixels(info, fb.Address, fb.RowBytes);
+                    }
+                    return writeable;
+                });
+                Thumbnail = rendered;
             }
             catch
             {
