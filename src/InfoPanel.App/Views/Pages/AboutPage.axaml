@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.2.0 alpha: Lian Li panels, display assignment" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.2.1 alpha: panel frame rates, video loop fix" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Major frame rate work: profiles with video roughly triple their panel frame rate (frame pacing, per-resolution shared rendering, JPEG encode moved off the render lock, per-frame video resize caching), and looping videos no longer freeze at the loop boundary. Keepalive resends of unchanged content are throttled, fixing a flood that could crash Trofeo bulk panel firmware (recoverable only by replug). udev rules no longer use the plugdev group, which udev 261+ silently rejects, taking panel permissions with it; no group membership is needed anymore. Overlays whose monitor is missing no longer leave a ghost taskbar entry." />
+                        <TextBlock Text="v0.2.0 alpha: Lian Li panels, display assignment" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Lian Li panels get their own device family covering the Universal Screen 8.8&quot; and 9.2&quot; and the HydroShift II OLED Curve and LCD; an 8.8&quot; previously configured under the Turing family migrates automatically with its settings. Profiles gain a Display dropdown in the designer to assign the overlay to a monitor (dragging the overlay still works and updates the dropdown). Also fixes Thermalright HID panels (Trofeo 6.86&quot;, Frozen Warframe and similar) wedging on bright, detailed themes by capping JPEG frames at the firmware's buffer size." />
                         <TextBlock Text="v0.1.9 alpha: NVIDIA hotspot, VRAM temperature and more" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
