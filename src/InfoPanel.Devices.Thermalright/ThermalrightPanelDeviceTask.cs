@@ -131,7 +131,11 @@ namespace InfoPanel.Services
         // payload; only the render/resize/encode is skipped.
         private readonly SharedFrameConsumer _frameConsumer = new() { ResendCachedOnSkip = true };
 
-        private int FrameIntervalMs => 1000 / Math.Max(1, _device.TargetFrameRate);
+        // Freshness window for the shared frame cache. Slightly under the target
+        // interval: the extract/encode stages and poll granularity sit on top of
+        // this gate in the frame pipeline, so using the full interval as the gate
+        // consistently lands the real cadence 15-25ms above the target.
+        private int FrameIntervalMs => Math.Max(1, 1000 / Math.Max(1, _device.TargetFrameRate) - 12);
 
         /// <summary>Returns null when the profile content has not changed (frame skipped).</summary>
         public byte[]? GenerateFrameBuffer()
@@ -148,82 +152,107 @@ namespace InfoPanel.Services
 
             if (DeviceRuntime.GetProfile(profileGuid) is Profile profile)
             {
-                return _frameConsumer.Produce(profile, FrameIntervalMs, bitmap => EncodeJpegFromShared(bitmap));
+                // Two-stage: bitmap work (resize/brightness/mask/crop) runs under the
+                // shared-frame read lock, the JPEG encode outside it so the profile
+                // renderer is not blocked for the encode duration.
+                // Render the shared frame directly at panel resolution when the
+                // aspect ratio matches, no rotation is set, and the panel is
+                // smaller than the profile: avoids "render large then downscale"
+                // and shrinks the per-frame video resample inside the draw.
+                int renderW = 0, renderH = 0;
+                if ((_device.Rotation == LCD_ROTATION.RotateNone || _device.Rotation == LCD_ROTATION.Rotate180FlipNone)
+                    && _panelWidth < profile.Width
+                    && Math.Abs((double)profile.Width / profile.Height - (double)_panelWidth / _panelHeight) < 0.01)
+                {
+                    renderW = _panelWidth;
+                    renderH = _panelHeight;
+                }
+
+                return _frameConsumer.Produce(profile, FrameIntervalMs,
+                    bitmap => PrepareFrameBitmap(bitmap),
+                    prepared => EncodePreparedFrame(prepared),
+                    renderW, renderH);
             }
 
             // No profile - black JPEG as keepalive
             return _blackFrame ??= GenerateBlackJpeg();
         }
 
-        private byte[] EncodeJpegFromShared(SKBitmap bitmap)
+        // Throttles the pace-only fps counter updates for unchanged content
+        private long _fpsPaceDueMs;
+
+        /// <summary>
+        /// Bitmap stages (resize/brightness/mask/crop). Runs under the shared-frame
+        /// read lock; always returns an owned bitmap that must be disposed by the
+        /// caller (never the shared frame itself).
+        /// </summary>
+        private SKBitmap PrepareFrameBitmap(SKBitmap bitmap)
         {
-            var rotation = _device.Rotation;
-            var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
+            var result = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, _device.Rotation);
+            if (ReferenceEquals(result, bitmap))
+            {
+                // Same size, no rotation: copy so the shared frame never escapes the lock
+                result = bitmap.Copy();
+            }
+
+            if (_device.Brightness < 100)
+            {
+                var dimmed = ApplyBrightness(result);
+                result.Dispose();
+                result = dimmed;
+            }
+
+            // Apply display mask overlay (punch-hole cover for Wonder/Rainbow/Levita Vision 360)
+            if (_device.DisplayMask != ThermalrightDisplayMask.None)
+            {
+                // Levita Vision has camera on the right side (180° from Wonder/Rainbow's left side)
+                int maskRotationOffset = _device.Model == ThermalrightPanelModel.LevitaVision360 ? 180 : 0;
+                ApplyDisplayMask(result, _device.DisplayMask, _device.Rotation, maskRotationOffset);
+            }
+
+            // Crop to target height if flicker fix is enabled (TrofeoBulk: render at 480, crop to 462)
+            int cropHeight = (_device.FlickerFix && _flickerFixCropHeight > 0) ? _flickerFixCropHeight : 0;
+            if (cropHeight > 0 && cropHeight < result.Height)
+            {
+                var cropped = new SKBitmap(_panelWidth, cropHeight, result.ColorType, result.AlphaType);
+                using (var canvas = new SKCanvas(cropped))
+                {
+                    canvas.DrawBitmap(result, 0, 0);
+                }
+                result.Dispose();
+                result = cropped;
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// JPEG encode with adaptive quality. Runs outside the shared-frame lock.
+        /// Disposes <paramref name="prepared"/>.
+        /// </summary>
+        private byte[] EncodePreparedFrame(SKBitmap prepared)
+        {
             try
             {
-                SKBitmap encodeBitmap = resizedBitmap;
-                SKBitmap? dimmed = null;
-                SKBitmap? cropped = null;
-                try
+                int quality = _device.JpegQuality;
+
+                byte[] result = EncodeJpegSkia(prepared, quality);
+
+                // Adaptive quality: if JPEG exceeds device buffer limit, re-encode smaller
+                // (TRCC drops frames >= 450KB and reduces quality by 5; we re-encode in-place)
+                if (_maxJpegSize > 0 && result.Length > _maxJpegSize)
                 {
-                    if (_device.Brightness < 100)
+                    for (quality -= 5; quality >= 50 && result.Length > _maxJpegSize; quality -= 5)
                     {
-                        dimmed = ApplyBrightness(resizedBitmap);
-                        encodeBitmap = dimmed;
+                        result = EncodeJpegSkia(prepared, quality);
                     }
-
-                    // Apply display mask overlay (punch-hole cover for Wonder/Rainbow/Levita Vision 360)
-                    if (_device.DisplayMask != ThermalrightDisplayMask.None)
-                    {
-                        // Levita Vision has camera on the right side (180° from Wonder/Rainbow's left side)
-                        int maskRotationOffset = _device.Model == ThermalrightPanelModel.LevitaVision360 ? 180 : 0;
-
-                        // Never draw the mask onto the shared frame itself
-                        if (ReferenceEquals(encodeBitmap, bitmap))
-                        {
-                            dimmed = encodeBitmap.Copy();
-                            encodeBitmap = dimmed;
-                        }
-                        ApplyDisplayMask(encodeBitmap, _device.DisplayMask, _device.Rotation, maskRotationOffset);
-                    }
-
-                    // Crop to target height if flicker fix is enabled (TrofeoBulk: render at 480, crop to 462)
-                    int cropHeight = (_device.FlickerFix && _flickerFixCropHeight > 0) ? _flickerFixCropHeight : 0;
-                    if (cropHeight > 0 && cropHeight < encodeBitmap.Height)
-                    {
-                        cropped = new SKBitmap(_panelWidth, cropHeight, encodeBitmap.ColorType, encodeBitmap.AlphaType);
-                        using var canvas = new SKCanvas(cropped);
-                        canvas.DrawBitmap(encodeBitmap, 0, 0);
-                        encodeBitmap = cropped;
-                    }
-
-                    int quality = _device.JpegQuality;
-
-                    byte[] result = EncodeJpegSkia(encodeBitmap, quality);
-
-                    // Adaptive quality: if JPEG exceeds device buffer limit, re-encode smaller
-                    // (TRCC drops frames >= 450KB and reduces quality by 5; we re-encode in-place)
-                    if (_maxJpegSize > 0 && result.Length > _maxJpegSize)
-                    {
-                        for (quality -= 5; quality >= 50 && result.Length > _maxJpegSize; quality -= 5)
-                        {
-                            result = EncodeJpegSkia(encodeBitmap, quality);
-                        }
-                    }
-                    return result;
                 }
-                finally
-                {
-                    cropped?.Dispose();
-                    dimmed?.Dispose();
-                }
+
+                return result;
             }
             finally
             {
-                if (!ReferenceEquals(resizedBitmap, bitmap))
-                {
-                    resizedBitmap.Dispose();
-                }
+                prepared.Dispose();
             }
         }
 
@@ -2030,6 +2059,7 @@ namespace InfoPanel.Services
                 {
                     var stopwatch = new Stopwatch();
                     bool lastFlickerFix = _device.FlickerFix;
+                    var nextDueMs = Environment.TickCount64;
 
                     while (!renderToken.IsCancellationRequested)
                     {
@@ -2042,32 +2072,51 @@ namespace InfoPanel.Services
 
                         stopwatch.Restart();
                         var frame = GenerateFrameBuffer();
-                        if (frame != null)
+                        var isCached = _frameConsumer.LastWasCached;
+                        var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
+
+                        if (frame != null && (!isCached || Environment.TickCount64 >= nextDueMs))
                         {
                             Interlocked.Exchange(ref _latestFrame, frame);
                             _frameAvailable.Set();
+                            if (isCached)
+                            {
+                                // Keepalive resend of unchanged content: a few per
+                                // second is plenty (Trofeo firmware only reverts to
+                                // its boot logo below ~1 fps) and resending at full
+                                // target cadence floods chunked-write protocols.
+                                nextDueMs = Environment.TickCount64 + Math.Max(targetFrameTime, 250);
+                            }
+                        }
+                        else if (frame == null || isCached)
+                        {
+                            // Content unchanged: no resize/encode/send this frame (or
+                            // only a throttled keepalive). Count it as a zero-cost
+                            // frame at the target cadence so the UI shows the panel's
+                            // pace instead of the much lower actual send rate.
+                            if (Environment.TickCount64 >= _fpsPaceDueMs)
+                            {
+                                _fpsPaceDueMs = Environment.TickCount64 + targetFrameTime;
+                                fpsCounter.Update(0);
+                                _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
+                            }
+                        }
+
+                        if (!isCached)
+                        {
+                            // Fresh frame: its render cost paces us when slower than
+                            // the target; when faster, the shared frame stays fresh
+                            // and the next iterations fall into the poll branch until
+                            // it goes stale. nextDueMs throttles cached keepalives.
+                            nextDueMs = Environment.TickCount64 + targetFrameTime;
                         }
                         else
                         {
-                            // Content unchanged: no resize/encode/send this frame. Count it
-                            // as a zero-cost frame so the UI keeps showing the panel's pace.
-                            fpsCounter.Update(0);
-                            _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
-                        }
-
-                        var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
-                        var adaptiveFrameTime = 0;
-
-                        var elapsedMs = (int)stopwatch.ElapsedMilliseconds;
-
-                        if (elapsedMs < targetFrameTime)
-                        {
-                            adaptiveFrameTime = targetFrameTime - elapsedMs;
-                        }
-
-                        if (adaptiveFrameTime > 0)
-                        {
-                            await Task.Delay(adaptiveFrameTime, token);
+                            // Cache not stale yet or content unchanged: poll again
+                            // shortly. Sleeping a full frame interval here on top of
+                            // a render that already overran it is what capped panels
+                            // at roughly half their achievable rate.
+                            await Task.Delay(5, token);
                         }
                     }
                 }
