@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.2.3 alpha: smooth UI, display assignment, plugin config fix" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.2.4 alpha: fix USB panels dropping to their boot logo" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="A thread-safety bug in the frame-rate counter could crash a panel's render thread mid-session (seen daily on the Trofeo Vision 9.16&quot;), and the device task then hung half-alive: the panel stopped receiving frames, fell back to its boot logo, and only a manual disable/enable brought it back. The counter is now thread-safe, and a crashed render loop takes the whole device task down so the supervisor reconnects the panel automatically within a second. Fixed across all USB panel drivers (Thermalright, Beada, Turing, JL, Jonsbo, Lian Li, Thermaltake)." />
+                        <TextBlock Text="v0.2.3 alpha: smooth UI, display assignment, plugin config fix" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Major UI responsiveness work: overlays no longer run the full profile draw on the compositor's render thread (they blit a frame rendered off-thread), plugin images cache their per-frame resizes like video does, and dashboard thumbnails render off the UI thread without a PNG round-trip. Scrolling and animations stay smooth with overlays and panels active. Profiles gain a Display dropdown on the dashboard tiles, and monitor assignment now identifies displays by output name and native resolution (stable under Wayland/XWayland scaling) instead of scaled X11 bounds. Stored plugin config is applied before plugin initialization, so structural settings like the audio spectrum's band count and image size actually take effect instead of silently running on defaults." />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
