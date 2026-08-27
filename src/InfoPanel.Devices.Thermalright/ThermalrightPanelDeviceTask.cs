@@ -2136,7 +2136,11 @@ namespace InfoPanel.Services
                 {
                     var stopwatch = new Stopwatch();
 
-                    while (!token.IsCancellationRequested)
+                    // renderToken, not token: a dead render task must take this
+                    // loop down with it so DoWorkAsync returns and the panel
+                    // supervisor restarts the device (otherwise the panel sits
+                    // on its boot logo until manually toggled).
+                    while (!renderToken.IsCancellationRequested)
                     {
                         if (_frameAvailable.WaitOne(100))
                         {
