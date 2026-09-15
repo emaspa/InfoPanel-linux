@@ -7,6 +7,7 @@ namespace InfoPanel.Sensors;
 /// <summary>One captured publication and cache per lookup; publication invalidates positive and negative results atomically.</summary>
 public sealed class SensorIdResolver
 {
+    internal const int CacheLimit = 4096;
     private sealed class Publication(SensorCatalogSnapshot snapshot)
     {
         public SensorCatalogSnapshot Snapshot { get; } = snapshot;
@@ -14,6 +15,7 @@ public sealed class SensorIdResolver
     }
     private Publication? _current;
     public SensorCatalogSnapshot? Snapshot => Volatile.Read(ref _current)?.Snapshot;
+    internal int CachedReferenceCount => Volatile.Read(ref _current)?.Cache.Count ?? 0;
     public void Publish(SensorCatalogSnapshot snapshot) => Interlocked.Exchange(ref _current, new Publication(snapshot));
 
     public SensorResolution Resolve(SensorReference reference)
@@ -22,7 +24,15 @@ public sealed class SensorIdResolver
         if (reference.SourceType == SensorType.Hwmon && reference.Id?.StartsWith("system/", StringComparison.Ordinal) == true)
             return new(SensorResolutionStatus.Resolved, reference.Id, null, publication?.Snapshot.Generation ?? 0, SensorMatchReason.Exact);
         if (publication == null) return new(SensorResolutionStatus.NotReady, null, null, 0);
-        return publication.Cache.GetOrAdd(reference, r => Resolve(r, publication.Snapshot));
+        if (publication.Cache.TryGetValue(reference, out var cached)) return cached;
+        var result = Resolve(reference, publication.Snapshot);
+        // An unchanged catalog can live for the entire session while profiles are
+        // imported or bindings edited. Keep even negative-cache growth bounded.
+        lock (publication.Cache)
+        {
+            if (publication.Cache.Count < CacheLimit) publication.Cache.TryAdd(reference, result);
+        }
+        return result;
     }
 
     private static SensorResolution Resolve(SensorReference reference, SensorCatalogSnapshot catalog)
@@ -37,6 +47,9 @@ public sealed class SensorIdResolver
         var stable = SensorId.TryParse(reference.Id, out var parsed);
         var legacy = SensorId.IsLegacy(reference.Id);
         if (!stable && !legacy) return Missing(); // Unknown versions and foreign ids must never be guessed.
+        // Location/weak identities have no durable evidence for relocation. A
+        // matching label on another endpoint must not steal a missing binding.
+        if (stable && !parsed!.HasStrongIdentity) return Missing();
         var source = stable ? parsed!.Source : reference.Id.StartsWith("thermal/", StringComparison.Ordinal) ? "thermal" : "hwmon";
         var channel = stable ? parsed!.Channel : source == "thermal" ? "temp" : reference.Id.Split('/')[1];
         var chip = stable ? parsed!.Chip : string.IsNullOrWhiteSpace(reference.ChipName) ? null : SensorId.NormalizeChipName(reference.ChipName);

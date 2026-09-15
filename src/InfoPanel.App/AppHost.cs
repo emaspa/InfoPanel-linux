@@ -250,8 +250,11 @@ namespace InfoPanel
             };
         }
 
-        private void OnCatalogChanged(object? sender, SensorCatalogSnapshot catalog) =>
+        private void OnCatalogChanged(object? sender, SensorCatalogSnapshot catalog)
+        {
+            RenderingServices.OnHardwareCatalogChanged(catalog);
             UiThread.Post(ReconcileHardwareBindings);
+        }
 
         private void ReconcileHardwareBindings()
         {

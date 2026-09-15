@@ -77,6 +77,16 @@ Native Linux providers, no kernel modules or vendor daemons required:
   written) collected by a root systemd timer into `/run/infopanel/smart.json`
   and read by the bundled plugin without elevating the app.
 
+Hardware sensor bindings use stable identities derived from device serials,
+PCI or platform locations, and thermal-zone identity. Changes to Linux's
+`hwmonN` and `thermal_zoneN` numbering no longer break these bindings.
+Older profiles are upgraded when InfoPanel can identify one matching sensor;
+successful migrations are saved automatically. Missing or ambiguous bindings
+keep their original IDs and show an unresolved status with a **Replace Sensor**
+hint in the designer inspector. Identical devices with no distinguishing
+identity may require manual rebinding. Disk, network and GPU IDs under
+`system/...` are unchanged and still have provider-specific naming limitations.
+
 ### Plugins
 
 The .NET plugin system is binary-compatible with InfoPanel for Windows:
@@ -124,7 +134,10 @@ both are fully global.
 
 `infopanel --headless` runs sensors, panels and the web server with no UI,
 for kiosk or server use. `--render-once <dir>` renders every profile to
-PNG and exits; `--dump-sensors` prints all live sensor readings.
+PNG and exits; `--dump-sensors` prints canonical sensor IDs, labels and current
+availability. Add `--verbose` to include the current legacy alias and identity
+strength. Serial-based IDs in dumps and exported profiles can contain device
+serial numbers.
 
 ## Architecture
 
@@ -160,6 +173,11 @@ Key design points:
   network fetches and worker threads released), restarting within a
   second of demand returning. The Sensors page and designer always see
   the full live catalog while open.
+- **Hardware discovery**: a shared sensor catalog is built at startup and
+  refreshed every 10 seconds. One worker serializes discovery and polling;
+  identity and labels are read during discovery, and ordinary polls read only
+  demanded input values. New or reconnected sensors appear automatically,
+  and disconnected sensors stop displaying their previous readings.
 - **Device supervision**: each panel runs a supervised worker with its own
   lifecycle (present, starting, streaming, faulted, cooldown), exponential
   backoff and a bounded frame mailbox, so one wedged device never stalls
@@ -354,6 +372,9 @@ directions:
   different backends (HWiNFO/LibreHardwareMonitor on Windows, hwmon here),
   so hardware-bound items keep their layout but need re-binding to the
   equivalent Linux sensor with the designer's Replace Sensor action.
+  Stable Linux hardware IDs preserve bindings across Linux enumeration
+  changes. Older Linux versions can load these profiles but may require
+  hardware rebinding; plugin bindings remain portable.
 - **Plugins**: third-party plugin binaries built for the Windows app load
   unchanged (the SDK targets net8.0 and keeps its public surface). The
   configuration framework and image-provider contract match the 1.4.x
@@ -436,7 +457,7 @@ A single instance is enforced via a lock file in the data directory.
 |---|---|
 | `--headless` | run sensors, panels and web server without a UI |
 | `--render-once <dir>` | render every profile to PNG in `<dir>` and exit |
-| `--dump-sensors` | print all live sensor readings and exit |
+| `--dump-sensors` | print canonical sensor IDs, labels and availability, then exit; add `--verbose` for legacy aliases and identity strength |
 | `--verbose` | debug-level logging |
 
 ## Credits

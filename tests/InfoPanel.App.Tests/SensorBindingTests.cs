@@ -206,6 +206,67 @@ public sealed class SensorBindingTests : IDisposable
     }
 
     [Fact]
+    public void DashboardExportUsesLiveSnapshotWithoutSavingSource()
+    {
+        var profile = new Profile { Name = "Export regression" };
+        ConfigPersistence.SaveDisplayItems(profile, [new SensorDisplayItem
+        {
+            Name = "Saved", SensorType = SensorType.Hwmon, LibreSensorId = "hwmon4/curr5", SensorName = "Pin 5"
+        }]);
+        var source = Path.Combine(ConfigPersistence.ProfilesFolder, profile.Guid + ".xml");
+        var before = File.ReadAllBytes(source);
+        Publish(WireView);
+        ConfigPersistence.PostLoadHook = (_, items) =>
+        {
+            SensorBindingMigration.Migrate(items);
+            items[0].Name = "Live edit";
+        };
+        DisplayItemStore.Instance.GetOrLoad(profile);
+        ConfigPersistence.PostLoadHook = null;
+        var file = Views.Pages.DashboardPage.ExportProfile(profile, _tempDir);
+        Assert.NotNull(file);
+        Assert.Equal(before, File.ReadAllBytes(source));
+        Assert.False(Directory.Exists(ConfigPersistence.AutosaveFolder));
+        using var archive = System.IO.Compression.ZipFile.OpenRead(file!);
+        using var entry = archive.GetEntry("DisplayItems.xml")!.Open();
+        var xml = System.Xml.Linq.XDocument.Load(entry);
+        Assert.Equal("Live edit", Assert.Single(xml.Descendants("Name")).Value);
+        Assert.Equal(WireViewId, Assert.Single(xml.Descendants("LibreSensorId")).Value);
+    }
+
+    [Fact]
+    public void Graph_RemovalAndReplugBetweenRendersDropHistory()
+    {
+        Publish(WireView);
+        var old = GraphDraw.GetGraphDataQueue(WireViewId);
+        old.Enqueue(42);
+        Publish();
+        RenderingServices.OnHardwareCatalogChanged(_resolver.Snapshot!);
+        Publish(WireView);
+        RenderingServices.OnHardwareCatalogChanged(_resolver.Snapshot!);
+        var current = GraphDraw.GetGraphDataQueue(WireViewId);
+        Assert.NotSame(old, current);
+        Assert.Empty(current);
+    }
+
+    [Fact]
+    public async Task Graph_AbandonedHardwareSystemAndPluginQueuesExpire_ConcurrentPluginReadersShareQueue()
+    {
+        Publish(WireView);
+        var hardware = GraphDraw.GetGraphDataQueue(WireViewId);
+        var system = GraphDraw.GetGraphDataQueue("system/test/idle");
+        var plugins = await Task.WhenAll(Enumerable.Range(0, 20).Select(_ => Task.Run(() =>
+            GraphDraw.GetGraphPluginDataQueue("plugin/idle"))));
+        Assert.All(plugins, queue => Assert.Same(plugins[0], queue));
+        GraphDraw.PruneUnusedHistory(Environment.TickCount64);
+        Assert.Same(system, GraphDraw.GetGraphDataQueue("system/test/idle"));
+        GraphDraw.PruneUnusedHistory(Environment.TickCount64 + GraphDraw.HistoryIdleMs);
+        Assert.NotSame(hardware, GraphDraw.GetGraphDataQueue(WireViewId));
+        Assert.NotSame(system, GraphDraw.GetGraphDataQueue("system/test/idle"));
+        Assert.NotSame(plugins[0], GraphDraw.GetGraphPluginDataQueue("plugin/idle"));
+    }
+
+    [Fact]
     public void Graph_LegacyAndStableReferencesShareCanonicalHistory()
     {
         Publish(WireView);

@@ -38,9 +38,15 @@ The Designer is where profiles are built. Pick a profile from the top-left picke
 - **Undo/Redo** cover every edit. Changes autosave about 2 seconds after you stop editing.
 - **Restore** rolls the profile back to how it looked before this editing session began. Restoring again swaps back, so nothing is ever lost to a bad session.
 
+When an older profile is opened, InfoPanel attempts to match its saved hardware bindings to the current sensors. Successful matches are saved automatically. If a binding is missing or ambiguous, its original ID is retained and the inspector shows **Unresolved sensor** with a **Replace Sensor** hint. Select the intended sensor in the Sensors panel and use Replace Sensor to repair the binding; this change supports Undo and Redo. Exports include the current layout and resolved bindings without saving the source profile as part of export.
+
 ## Sensors
 
 The Sensors page lists everything InfoPanel can read on your system: CPU, GPU, memory, drives, network and any plugin-provided values. Values come from Linux hwmon/sysfs, Intel and AMD GPU interfaces, and NVMe SMART data.
+
+Hardware bindings normally survive reboots even when Linux changes `hwmonN` or `thermal_zoneN` numbering. InfoPanel checks for hardware changes every 10 seconds, so a newly connected sensor may take that long to appear. Disconnected sensors show no current value and recover automatically when the same identifiable device returns. Devices with the same chip name appear separately using their hardware identity. Physical relocation or firmware changes can require rebinding for devices identified by location.
+
+Disk, network and GPU metrics under `system/...` keep their existing IDs and remain subject to provider-specific naming changes. Plugin sensor IDs are unchanged. Exported profiles and sensor dumps can contain device serial numbers used in stable IDs.
 
 ## Plugins
 
@@ -83,6 +89,7 @@ Enable the web server in Settings to view live profile renders from any browser 
 - **Panel stopped responding** after a crash: unplug and replug it, or reset it with `usbreset <vid:pid>`.
 - **Overlay not visible on Wayland**: overlays render through XWayland; make sure XWayland is available (it is on standard GNOME and KDE sessions).
 - **Weather shows no data**: set the API key and city in the weather plugin's configuration on the Plugins page.
+- **Sensor missing after a reboot or hardware change**: allow up to 10 seconds for discovery, then check the Sensors page and the selected item's binding status in the designer. InfoPanel will not choose arbitrarily between indistinguishable devices. Use **Replace Sensor** if needed. For diagnostics, run `infopanel --dump-sensors --verbose`: it prints canonical IDs, labels, availability, current legacy aliases and identity strength. Check the logs for the original ID and resolution result. IDs under `system/...` still have the naming limitations described above.
 - Logs live in `~/.local/share/InfoPanel/logs/`.
 
 ## Getting help

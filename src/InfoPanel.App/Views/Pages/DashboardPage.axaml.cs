@@ -181,10 +181,11 @@ namespace InfoPanel.Views.Pages
 
             if (folders.Count == 0 || folders[0].Path is not { IsFile: true } uri) return;
 
-            // make sure the latest edits are on disk before zipping
-            DisplayItemStore.Instance.Save(card.Profile);
-            Persistence.ProfileTransfer.Export(card.Profile, uri.LocalPath);
+            ExportProfile(card.Profile, uri.LocalPath);
         }
+
+        internal static string? ExportProfile(Models.Profile profile, string folder) =>
+            Persistence.ProfileTransfer.Export(profile, folder, DisplayItemStore.Instance.GetSnapshot(profile));
 
         private void ResetPosition_Click(object? sender, RoutedEventArgs e)
         {

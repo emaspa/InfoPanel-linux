@@ -263,6 +263,9 @@ namespace InfoPanel.Models
             var images = Images.ToArray();
 
             if (images.Length == 0) return;
+            var sensorReading = GetValue();
+            if (SensorType == SensorType.Hwmon && !string.IsNullOrEmpty(LibreSensorId) && !sensorReading.HasValue)
+                return;
             if (images.Length == 1)
             {
                 imageA = images[0];
@@ -270,7 +273,6 @@ namespace InfoPanel.Models
                 return;
             }
 
-            var sensorReading = GetValue();
             if (!sensorReading.HasValue)
             {
                 imageA = images[0];

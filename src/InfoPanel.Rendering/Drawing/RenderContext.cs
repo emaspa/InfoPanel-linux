@@ -55,6 +55,9 @@ namespace InfoPanel.Drawing
     /// </summary>
     public static class RenderingServices
     {
+        public static void OnHardwareCatalogChanged(Sensors.SensorCatalogSnapshot catalog) =>
+            GraphDraw.OnHardwareCatalogChanged(catalog);
+
         public static void Register()
         {
             TextMeasure.Configure(static (text, fontScale, fontName, fontStyle, fontSize,

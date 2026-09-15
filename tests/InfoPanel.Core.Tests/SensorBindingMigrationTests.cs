@@ -10,6 +10,21 @@ namespace InfoPanel.Core.Tests;
 [Collection("ConfigPersistence")]
 public sealed class SensorBindingMigrationTests(SensorStateFixture fixture) : SensorStateTest(fixture)
 {
+    [Fact]
+    public void WarningGuardStaysBoundedAcrossImportedItemsAndBindingEdits()
+    {
+        SensorStateFixture.PublishWireView();
+        var item = new SensorDisplayItem();
+        for (var i = 0; i < SensorBindingMigration.WarningLimit + 20; i++)
+        {
+            item.LibreSensorId = $"hwmon{i}/temp1";
+            Assert.Single(SensorBindingMigration.Migrate([item]).Unresolved);
+        }
+        Assert.Equal(SensorBindingMigration.WarningLimit, SensorBindingMigration.WarningCount);
+        SensorBindingMigration.Migrate([item]);
+        Assert.Equal(SensorBindingMigration.WarningLimit, SensorBindingMigration.WarningCount);
+    }
+
     [Theory, MemberData(nameof(SensorBindingTests.HardwareFamilies), MemberType = typeof(SensorBindingTests))]
     public void LegacyBindingMigratesOnceAndKeepsOriginalId(string kind)
     {

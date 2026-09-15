@@ -10,6 +10,29 @@ namespace InfoPanel.Core.Tests;
 [Collection("ConfigPersistence")]
 public sealed class SensorBindingTests(SensorStateFixture fixture) : SensorStateTest(fixture)
 {
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void BoundHardwareGaugeHasNoMinimumFrameWhenUnavailableAndRecovers(int imageCount)
+    {
+        var resolver = SensorStateFixture.PublishWireView();
+        var gauge = new GaugeDisplayItem { LibreSensorId = SensorStateFixture.WireViewId, SensorType = SensorType.Hwmon };
+        for (var i = 0; i < imageCount; i++) gauge.Images.Add(new ImageDisplayItem());
+        SensorReader.ConfigureHwmonSource(_ => null);
+        gauge.EvaluateImageFrame(out var a, out var b, out _);
+        Assert.Null(a);
+        Assert.Null(b);
+        SensorReader.ConfigureHwmonSource(_ => new(0, 0, 0, 0, "A"));
+        gauge.EvaluateImageFrame(out a, out _, out _);
+        Assert.Same(gauge.Images[0], a);
+        resolver.Publish(new(2, []));
+        gauge.EvaluateImageFrame(out a, out _, out _);
+        Assert.Null(a);
+        gauge.SensorType = SensorType.Plugin;
+        gauge.EvaluateImageFrame(out a, out _, out _);
+        Assert.Same(gauge.Images[0], a); // existing plugin placeholder behavior
+    }
+
     public static TheoryData<string> HardwareFamilies => new()
         { "text", "gauge", "graph", "bar", "donut", "image", "http" };
 

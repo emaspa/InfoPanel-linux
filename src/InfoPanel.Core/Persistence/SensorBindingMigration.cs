@@ -17,7 +17,10 @@ public static class SensorBindingMigration
 {
     private static readonly ILogger Logger = Log.ForContext(typeof(SensorBindingMigration));
     private static readonly HashSet<(Guid Item, string Id)> Warned = [];
+    private static readonly Queue<(Guid Item, string Id)> WarningOrder = [];
     private static readonly Lock WarningLock = new();
+    internal const int WarningLimit = 4096;
+    internal static int WarningCount { get { lock (WarningLock) return Warned.Count; } }
 
     public static MigrationReport Migrate(IEnumerable<DisplayItem> items)
     {
@@ -48,7 +51,11 @@ public static class SensorBindingMigration
                     lock (WarningLock)
                     {
                         if (Warned.Add((item.Guid, oldId)))
+                        {
+                            WarningOrder.Enqueue((item.Guid, oldId));
+                            if (WarningOrder.Count > WarningLimit) Warned.Remove(WarningOrder.Dequeue());
                             Logger.Warning("Hardware sensor binding {ItemGuid} {Id} is {Status}", item.Guid, oldId, result.Status);
+                        }
                     }
                     break;
                 case SensorResolutionStatus.Resolved when result.Descriptor is { } descriptor:
@@ -81,6 +88,10 @@ public static class SensorBindingMigration
 
     internal static void ResetForTests()
     {
-        lock (WarningLock) Warned.Clear();
+        lock (WarningLock)
+        {
+            Warned.Clear();
+            WarningOrder.Clear();
+        }
     }
 }

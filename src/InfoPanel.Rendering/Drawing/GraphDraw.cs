@@ -21,8 +21,13 @@ namespace InfoPanel.Drawing
         {
             ExpirationScanFrequency = TimeSpan.FromSeconds(5)
         });
-        private static readonly ConcurrentDictionary<string, Queue<double>> GraphDataCache2 = [];
-        private static readonly ConcurrentDictionary<string, Queue<double>> GraphDataCache3 = [];
+        private sealed class HistoryQueue : Queue<double>
+        {
+            public long LastUsed = Environment.TickCount64;
+        }
+        private static readonly ConcurrentDictionary<string, HistoryQueue> GraphDataCache2 = [];
+        private static readonly ConcurrentDictionary<string, HistoryQueue> GraphDataCache3 = [];
+        internal const long HistoryIdleMs = 300_000;
         private static readonly Stopwatch Stopwatch = new();
         private static readonly object SampleGate = new();
         private static long _catalogGeneration = -1;
@@ -86,39 +91,61 @@ namespace InfoPanel.Drawing
             SensorBinding.Resolve(chart) is { Status: SensorResolutionStatus.Resolved } resolution
                 ? resolution.CanonicalId : null;
 
-        internal static Queue<double> GetGraphDataQueue(string canonicalId) =>
-            GraphDataCache2.GetOrAdd(canonicalId, _ => new Queue<double>());
+        internal static Queue<double> GetGraphDataQueue(string canonicalId) => GetQueue(GraphDataCache2, canonicalId);
+
+        private static Queue<double> GetQueue(ConcurrentDictionary<string, HistoryQueue> cache, string id)
+        {
+            lock (SampleGate)
+            {
+                var queue = cache.GetOrAdd(id, _ => new HistoryQueue());
+                queue.LastUsed = Environment.TickCount64;
+                return queue;
+            }
+        }
+
+        internal static void PruneUnusedHistory(long now)
+        {
+            lock (SampleGate)
+            {
+                foreach (var cache in new[] { GraphDataCache2, GraphDataCache3 })
+                    foreach (var entry in cache)
+                        if (now - entry.Value.LastUsed >= HistoryIdleMs) cache.TryRemove(entry.Key, out _);
+            }
+        }
+
+        // Called on every publication, including while no profile is rendering.
+        internal static void OnHardwareCatalogChanged(SensorCatalogSnapshot catalog)
+        {
+            lock (SampleGate)
+            {
+                foreach (var key in GraphDataCache2.Keys)
+                    if (!key.StartsWith("system/", StringComparison.Ordinal) && !catalog.StableIdIndex.ContainsKey(key))
+                        GraphDataCache2.TryRemove(key, out _);
+                _catalogGeneration = catalog.Generation;
+                PruneUnusedHistory(Environment.TickCount64);
+            }
+        }
 
         // Catalog membership, not reading availability: a failed input read does not
         // retire an otherwise present descriptor's history. system/... is outside the catalog.
         internal static void PruneHardwareHistory()
         {
-            var generation = SensorReader.HwmonCatalogGeneration;
-            if (_catalogGeneration == generation) return;
-            foreach (var key in GraphDataCache2.Keys)
+            lock (SampleGate)
             {
-                if (key.StartsWith("system/", StringComparison.Ordinal)) continue;
-                var resolution = SensorReader.ResolveHwmonSensor(new SensorReference(key));
-                if (resolution.Status != SensorResolutionStatus.Resolved || resolution.CanonicalId != key)
-                    GraphDataCache2.TryRemove(key, out _);
+                var generation = SensorReader.HwmonCatalogGeneration;
+                if (_catalogGeneration == generation) return;
+                foreach (var key in GraphDataCache2.Keys)
+                {
+                    if (key.StartsWith("system/", StringComparison.Ordinal)) continue;
+                    var resolution = SensorReader.ResolveHwmonSensor(new SensorReference(key));
+                    if (resolution.Status != SensorResolutionStatus.Resolved || resolution.CanonicalId != key)
+                        GraphDataCache2.TryRemove(key, out _);
+                }
+                _catalogGeneration = generation;
             }
-            _catalogGeneration = generation;
         }
 
-        private static Queue<double> GetGraphPluginDataQueue(string pluginSensorId)
-        {
-            var key = pluginSensorId;
-
-            GraphDataCache3.TryGetValue(key, out Queue<double>? result);
-
-            if (result == null)
-            {
-                result = new Queue<double>();
-                GraphDataCache3.TryAdd(key, result);
-            }
-
-            return result;
-        }
+        internal static Queue<double> GetGraphPluginDataQueue(string pluginSensorId) => GetQueue(GraphDataCache3, pluginSensorId);
 
         public static void Run(ChartDisplayItem chartDisplayItem, SkiaGraphics g, bool preview = false)
         {
@@ -129,9 +156,10 @@ namespace InfoPanel.Drawing
                 if (elapsedMilliseconds > RenderContext.TargetGraphUpdateRate)
                 {
                     PruneHardwareHistory();
+                    PruneUnusedHistory(Environment.TickCount64);
                     foreach (var key in GraphDataCache2.Keys)
                     {
-                        GraphDataCache2.TryGetValue(key, out Queue<double>? queue);
+                        GraphDataCache2.TryGetValue(key, out var queue);
                         if (queue != null)
                         {
                             if (SensorReader.ReadHwmonSensor(key) is Models.SensorReading hwmonReading)
@@ -147,7 +175,7 @@ namespace InfoPanel.Drawing
 
                     foreach (var key in GraphDataCache3.Keys)
                     {
-                        GraphDataCache3.TryGetValue(key, out Queue<double>? queue);
+                        GraphDataCache3.TryGetValue(key, out var queue);
                         if (queue != null)
                         {
                             if (SensorReader.ReadPluginSensor(key) is Models.SensorReading pluginReading)
@@ -177,18 +205,21 @@ namespace InfoPanel.Drawing
 
                 Queue<double>? queue;
 
-                if (chartDisplayItem.SensorType == Enums.SensorType.Hwmon)
+                lock (SampleGate)
                 {
-                    var key = GetHardwareHistoryKey(chartDisplayItem);
-                    queue = key == null ? null : GetGraphDataQueue(key);
-                }
-                else if (chartDisplayItem.SensorType == Enums.SensorType.Plugin)
-                {
-                    queue = GetGraphPluginDataQueue(chartDisplayItem.PluginSensorId);
-                }
-                else
-                {
-                    queue = null;
+                    if (chartDisplayItem.SensorType == Enums.SensorType.Hwmon)
+                    {
+                        var key = GetHardwareHistoryKey(chartDisplayItem);
+                        queue = key == null ? null : GetGraphDataQueue(key);
+                    }
+                    else if (chartDisplayItem.SensorType == Enums.SensorType.Plugin)
+                    {
+                        queue = GetGraphPluginDataQueue(chartDisplayItem.PluginSensorId);
+                    }
+                    else
+                    {
+                        queue = null;
+                    }
                 }
 
                 // Queue identity changes on rebind/removal/replug, but stays the same

@@ -20,6 +20,39 @@ public class SensorIdResolverTests(SensorStateFixture fixture) : SensorStateTest
     }
 
     [Fact]
+    public void MissingLocationAndWeakBindingsCannotMoveToAnotherMatchingDevice()
+    {
+        foreach (var (anchor, secondary) in new[]
+        {
+            ("platform+coretemp.0", (string?)null), ("pci+0000-01-00.0", null),
+            ("type+acpitz", "acpi+TZ00"), ("name+chip", "meta+original")
+        })
+        {
+            var original = Sensor(anchor: anchor, secondary: secondary);
+            var other = original with { Id = SensorId.Hwmon(original.ChipName,
+                secondary == null ? "platform+other" : anchor, original.Channel, secondary == null ? null : "meta+other") };
+            Assert.Equal(SensorResolutionStatus.Unresolved, Resolver(other).Resolve(new(original.StableId, original.Label)).Status);
+            Assert.Equal(original.StableId, Resolver(original, other).Resolve(new(original.StableId)).CanonicalId);
+        }
+    }
+
+    [Fact]
+    public async Task ResolutionCacheStaysBoundedAcrossEditsWithoutARescan()
+    {
+        var descriptor = Sensor();
+        var resolver = Resolver(descriptor);
+        await Task.WhenAll(Enumerable.Range(0, 4).Select(worker => Task.Run(() =>
+        {
+            for (var i = 0; i < SensorIdResolver.CacheLimit; i++)
+                resolver.Resolve(new("hwmon4/curr5", $"edited-{worker}-{i}"));
+        })));
+        Assert.InRange(resolver.CachedReferenceCount, 1, SensorIdResolver.CacheLimit);
+        Assert.Equal(descriptor.StableId, resolver.Resolve(new(descriptor.LegacyAlias!, descriptor.Label)).CanonicalId);
+        resolver.Publish(new(2, []));
+        Assert.Equal(0, resolver.CachedReferenceCount);
+    }
+
+    [Fact]
     public void NotReadyBeforePublicationAndSystemPassesThrough()
     {
         var resolver = new SensorIdResolver();
