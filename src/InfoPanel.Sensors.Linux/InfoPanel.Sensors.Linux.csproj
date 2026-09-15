@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\InfoPanel.Core\InfoPanel.Core.csproj" />
+    <InternalsVisibleTo Include="InfoPanel.Sensors.Linux.Tests" />
   </ItemGroup>
 
 </Project>

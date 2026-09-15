@@ -1,11 +1,8 @@
 using InfoPanel.Models;
+using InfoPanel.Sensors;
 using Serilog;
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Globalization;
-using System.IO;
-using System.Timers;
 
 namespace InfoPanel.Services;
 
@@ -13,260 +10,202 @@ public class HwmonMonitor
 {
     private static readonly Lazy<HwmonMonitor> _instance = new(() => new HwmonMonitor());
     public static HwmonMonitor Instance => _instance.Value;
+    public static readonly ConcurrentDictionary<string, SensorReading> SENSORHASH = new(StringComparer.Ordinal);
+    private readonly SysfsAccess _sysfs;
+    private readonly HwmonCatalogScanner _scanner;
+    private readonly Func<IEnumerable<HwmonSensorInfo>> _systemInfo;
+    private readonly Action _systemPoll;
+    private readonly Func<long> _clock;
+    private readonly object _gate = new();
+    private readonly object _lifecycle = new();
+    private readonly AutoResetEvent _wake = new(false);
+    private sealed class Worker
+    {
+        public readonly CancellationTokenSource Cancellation = new();
+        public readonly ManualResetEventSlim Started = new();
+        public Thread Thread = null!;
+    }
+    private Worker? _worker;
+    private int _rescanRequested;
+    private long _nextScan;
+    private HwmonPollPlan _plan = new([]);
+    private const int RescanIntervalMs = 10_000;
+    public SensorIdResolver Resolver { get; }
+    public SensorCatalogSnapshot? Catalog => Resolver.Snapshot;
+    public event EventHandler<SensorCatalogSnapshot>? CatalogChanged;
 
-    public static readonly ConcurrentDictionary<string, SensorReading> SENSORHASH = new();
+    private HwmonMonitor() : this(new SysfsAccess(), () => LinuxSystemSensors.Instance.GetSensorInfoList(),
+        () => LinuxSystemSensors.Instance.Poll()) { }
 
-    private System.Timers.Timer? _pollTimer;
-    private const string HwmonPath = "/sys/class/hwmon";
-    private const string ThermalPath = "/sys/class/thermal";
-
-    private HwmonMonitor() { }
+    /// <summary>Injected instances default to no system providers and never initialize host GPU/proc providers.</summary>
+    public HwmonMonitor(SysfsAccess sysfs, Func<IEnumerable<HwmonSensorInfo>>? systemSensorInfo = null,
+        Action? pollSystemSensors = null, SensorIdResolver? resolver = null, Func<long>? clock = null)
+    {
+        _sysfs = sysfs;
+        _scanner = new(sysfs);
+        _systemInfo = systemSensorInfo ?? (() => []);
+        _systemPoll = pollSystemSensors ?? (() => { });
+        _clock = clock ?? (() => Environment.TickCount64);
+        Resolver = resolver ?? new();
+    }
 
     public void Start(int intervalMs = 1000)
     {
-        if (!Directory.Exists(HwmonPath) && !Directory.Exists(ThermalPath))
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(intervalMs);
+        Worker worker;
+        lock (_lifecycle)
         {
-            Log.Warning("Neither hwmon nor thermal path found");
-            return;
+            if (_worker != null) return;
+            worker = new Worker();
+            Interlocked.Exchange(ref _rescanRequested, 1);
+            worker.Thread = new Thread(() => Work(intervalMs, worker)) { IsBackground = true, Name = "Hwmon catalog/poll worker" };
+            _worker = worker;
+            worker.Thread.Start();
         }
-
-        // First poll ignores demand gating so the full sensor catalog exists in
-        // SENSORHASH (the Sensors page and designer tree enumerate it). Subsequent
-        // polls only read demanded sensors; unused entries keep their startup value
-        // until a sensor-browsing page turns full polling back on.
-        var forced = SensorDemand.ForcePollAll;
-        SensorDemand.ForcePollAll = true;
-        try
-        {
-            Poll();
-        }
-        finally
-        {
-            SensorDemand.ForcePollAll = forced;
-        }
-
-        _pollTimer = new System.Timers.Timer(intervalMs);
-        _pollTimer.Elapsed += (_, _) => Poll();
-        _pollTimer.AutoReset = true;
-        _pollTimer.Start();
-
+        // Preserve synchronous startup sampling; no subscriber runs under the lifecycle lock.
+        worker.Started.Wait();
         Log.Information("HwmonMonitor started with {Interval}ms interval", intervalMs);
     }
 
     public void Stop()
     {
-        _pollTimer?.Stop();
-        _pollTimer?.Dispose();
-        _pollTimer = null;
-        SENSORHASH.Clear();
+        Worker? worker;
+        lock (_lifecycle)
+        {
+            worker = _worker;
+            worker?.Cancellation.Cancel();
+            _wake.Set();
+        }
+        // Never join under a lock that a catalog subscriber can enter.
+        if (worker?.Thread != Thread.CurrentThread) worker?.Thread.Join();
+        lock (_lifecycle)
+        {
+            if (_worker != null && _worker != worker) return; // A new run already owns the readings.
+            lock (_gate)
+            {
+                // Only retire this catalog's hardware keys. Other providers own system/... readings.
+                foreach (var entry in _plan.Entries) SENSORHASH.TryRemove(entry.StableId, out _);
+            }
+        }
     }
 
-    private void Poll()
+    public void RequestRescan()
     {
-        // Refresh which sensors are actually displayed; unused ones are skipped below.
+        Interlocked.Exchange(ref _rescanRequested, 1);
+        _wake.Set();
+    }
+
+    private void Work(int intervalMs, Worker worker)
+    {
+        try
+        {
+            RunCycle(forcePollAll: true);
+            worker.Started.Set();
+            var nextPoll = _clock() + intervalMs;
+            while (!worker.Cancellation.IsCancellationRequested)
+            {
+                var delay = (int)Math.Clamp(Math.Min(nextPoll, _nextScan) - _clock(), 0, int.MaxValue);
+                _wake.WaitOne(delay);
+                if (worker.Cancellation.IsCancellationRequested) break;
+                var poll = _clock() >= nextPoll;
+                RunCycle(poll: poll);
+                if (poll) nextPoll = _clock() + intervalMs;
+            }
+        }
+        catch (Exception ex) { Log.Error(ex, "Hwmon worker failed"); }
+        finally
+        {
+            worker.Started.Set();
+            lock (_lifecycle) { if (_worker == worker) _worker = null; }
+        }
+    }
+
+    // Deterministic tick seam: tests advance an injected clock without sleeping or starting host providers.
+    internal void RunCycle(bool forcePollAll = false, bool poll = true)
+    {
+        SensorCatalogSnapshot? changed = null;
+        lock (_gate)
+        {
+            if (Interlocked.Exchange(ref _rescanRequested, 0) != 0 || Catalog == null || _clock() >= _nextScan)
+            {
+                try
+                {
+                    var scan = _scanner.Scan(Catalog);
+                    if (!scan.IsIdentical)
+                    {
+                        foreach (var old in _plan.Entries)
+                        {
+                            if (!scan.Snapshot.StableIdIndex.TryGetValue(old.StableId, out var replacement)
+                                || old.RealPath != replacement.RealPath || old.ValuePath != replacement.ValuePath
+                                || old.Unit != replacement.Unit || old.Divisor != replacement.Divisor)
+                                SENSORHASH.TryRemove(old.StableId, out _);
+                        }
+                        _plan = scan.PollPlan;
+                        Resolver.Publish(scan.Snapshot);
+                        changed = scan.Snapshot;
+                        foreach (var ambiguity in changed.Ambiguities)
+                            Log.Warning("Ambiguous sensor identity {Id}: {Reason}; paths: {Paths}", ambiguity.StableId,
+                                ambiguity.Reason, string.Join(", ", ambiguity.Candidates.Select(d => d.ValuePath)));
+                    }
+                }
+                catch (Exception ex) { Log.Warning(ex, "Hwmon discovery failed; retaining previous catalog"); }
+                _nextScan = _clock() + RescanIntervalMs;
+            }
+            if (poll) Poll(forcePollAll);
+        }
+        // Subscribers see a complete publication and are never called under the poll/scan lock.
+        if (changed != null)
+        {
+            try { CatalogChanged?.Invoke(this, changed); }
+            catch (Exception ex) { Log.Warning(ex, "Hwmon catalog subscriber failed"); }
+        }
+    }
+
+    private void Poll(bool forcePollAll)
+    {
         SensorDemand.RebuildIfDue();
-
-        try
+        foreach (var entry in _plan.Entries)
         {
-            if (Directory.Exists(HwmonPath))
+            if (!forcePollAll && !SensorDemand.IsHwmonUsed(entry.StableId)) continue;
+            string? raw;
+            try { raw = _sysfs.ReadValue(entry.ValuePath); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                foreach (var hwmonDir in Directory.GetDirectories(HwmonPath))
-                {
-                    var deviceName = ReadFileContent(Path.Combine(hwmonDir, "name")) ?? Path.GetFileName(hwmonDir);
-                    var hwmonId = Path.GetFileName(hwmonDir);
-
-                    ReadSensorFiles(hwmonDir, hwmonId, deviceName, "temp", "_input", 1000.0, "°C");
-                    ReadSensorFiles(hwmonDir, hwmonId, deviceName, "fan", "_input", 1.0, "RPM");
-                    ReadSensorFiles(hwmonDir, hwmonId, deviceName, "in", "_input", 1000.0, "V");
-                    ReadSensorFiles(hwmonDir, hwmonId, deviceName, "curr", "_input", 1000.0, "A");
-                    ReadSensorFiles(hwmonDir, hwmonId, deviceName, "power", "_input", 1000000.0, "W");
-                    ReadSensorFiles(hwmonDir, hwmonId, deviceName, "freq", "_input", 1000000.0, "MHz");
-                    ReadSensorFiles(hwmonDir, hwmonId, deviceName, "humidity", "_input", 1000.0, "%");
-                }
+                Log.Debug(ex, "Hwmon value read failed for {Id}", entry.StableId);
+                raw = null;
             }
-
-            // Also read thermal zones as fallback
-            if (Directory.Exists(ThermalPath))
+            if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) || !double.IsFinite(number))
             {
-                foreach (var zoneDir in Directory.GetDirectories(ThermalPath, "thermal_zone*"))
-                {
-                    var tempFile = Path.Combine(zoneDir, "temp");
-                    var typeFile = Path.Combine(zoneDir, "type");
-                    if (!File.Exists(tempFile)) continue;
-                    if (!SensorDemand.IsHwmonUsed($"thermal/{Path.GetFileName(zoneDir)}")) continue;
-
-                    var rawValue = ReadFileContent(tempFile);
-                    if (rawValue == null || !double.TryParse(rawValue.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var numValue))
-                        continue;
-
-                    var value = numValue / 1000.0;
-                    var zoneName = Path.GetFileName(zoneDir);
-                    var zoneType = ReadFileContent(typeFile) ?? zoneName;
-                    var sensorKey = $"thermal/{zoneName}";
-
-                    if (SENSORHASH.TryGetValue(sensorKey, out var existing))
-                    {
-                        var min = Math.Min(existing.ValueMin, value);
-                        var max = Math.Max(existing.ValueMax, value);
-                        SENSORHASH[sensorKey] = new SensorReading(min, max, (min + max) / 2.0, value, "°C");
-                    }
-                    else
-                    {
-                        SENSORHASH[sensorKey] = new SensorReading(value, value, value, value, "°C");
-                    }
-                }
+                SENSORHASH.TryRemove(entry.StableId, out _);
+                continue;
             }
+            var value = number / entry.Divisor;
+            if (SENSORHASH.TryGetValue(entry.StableId, out var existing))
+            {
+                var min = Math.Min(existing.ValueMin, value);
+                var max = Math.Max(existing.ValueMax, value);
+                SENSORHASH[entry.StableId] = new SensorReading(min, max, (min + max) / 2, value, entry.Unit);
+            }
+            else SENSORHASH[entry.StableId] = new SensorReading(value, value, value, value, entry.Unit);
         }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "HwmonMonitor poll error");
-        }
-
-        try
-        {
-            LinuxSystemSensors.Instance.Poll();
-        }
-        catch (Exception ex)
-        {
-            Log.Debug(ex, "LinuxSystemSensors poll error");
-        }
+        var forced = SensorDemand.ForcePollAll;
+        if (forcePollAll) SensorDemand.ForcePollAll = true;
+        try { _systemPoll(); }
+        catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors poll error"); }
+        finally { if (forcePollAll) SensorDemand.ForcePollAll = forced; }
     }
 
-    private static void ReadSensorFiles(string hwmonDir, string hwmonId, string deviceName,
-        string prefix, string suffix, double divisor, string unit)
+    public static List<HwmonSensorInfo> GetOrderedList() => GetOrderedList(Instance);
+    public static List<HwmonSensorInfo> GetOrderedList(HwmonMonitor monitor)
     {
-        try
+        var result = (monitor.Catalog?.Descriptors ?? []).Select(d => new HwmonSensorInfo
         {
-            foreach (var file in Directory.GetFiles(hwmonDir, $"{prefix}*{suffix}"))
-            {
-                var fileName = Path.GetFileNameWithoutExtension(file);
-                // e.g., "temp1_input" -> index = "1"
-                var index = fileName.Replace(prefix, "").Replace(suffix.TrimStart('_'), "").Trim('_');
-
-                // Check demand before touching the value file: the read itself is the
-                // cost (some EC/SMBus sensors take milliseconds and wake hardware).
-                var sensorKey = $"{hwmonId}/{prefix}{index}";
-                if (!SensorDemand.IsHwmonUsed(sensorKey))
-                {
-                    continue;
-                }
-
-                var rawValue = ReadFileContent(file);
-                if (rawValue == null || !double.TryParse(rawValue.Trim(), NumberStyles.Any, CultureInfo.InvariantCulture, out var numValue))
-                    continue;
-
-                var value = numValue / divisor;
-
-                // Try to read label
-                var labelFile = Path.Combine(hwmonDir, $"{prefix}{index}_label");
-                var label = ReadFileContent(labelFile) ?? $"{prefix}{index}";
-
-                if (SENSORHASH.TryGetValue(sensorKey, out var existing))
-                {
-                    // Update min/max
-                    var min = Math.Min(existing.ValueMin, value);
-                    var max = Math.Max(existing.ValueMax, value);
-                    SENSORHASH[sensorKey] = new SensorReading(min, max, (min + max) / 2.0, value, unit);
-                }
-                else
-                {
-                    SENSORHASH[sensorKey] = new SensorReading(value, value, value, value, unit);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log.Debug(ex, "Error reading hwmon files for {Prefix} in {Dir}", prefix, hwmonDir);
-        }
-    }
-
-    private static string? ReadFileContent(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-                return File.ReadAllText(path).Trim();
-        }
-        catch { }
-        return null;
-    }
-
-    public static List<HwmonSensorInfo> GetOrderedList()
-    {
-        var result = new List<HwmonSensorInfo>();
-
-        if (Directory.Exists(HwmonPath))
-        {
-            foreach (var hwmonDir in Directory.GetDirectories(HwmonPath))
-            {
-                var deviceName = ReadFileContent(Path.Combine(hwmonDir, "name")) ?? Path.GetFileName(hwmonDir);
-                var hwmonId = Path.GetFileName(hwmonDir);
-
-                AddSensorInfos(result, hwmonDir, hwmonId, deviceName, "temp", "Temperature", "°C");
-                AddSensorInfos(result, hwmonDir, hwmonId, deviceName, "fan", "Fan", "RPM");
-                AddSensorInfos(result, hwmonDir, hwmonId, deviceName, "in", "Voltage", "V");
-                AddSensorInfos(result, hwmonDir, hwmonId, deviceName, "curr", "Current", "A");
-                AddSensorInfos(result, hwmonDir, hwmonId, deviceName, "power", "Power", "W");
-                AddSensorInfos(result, hwmonDir, hwmonId, deviceName, "freq", "Frequency", "MHz");
-                AddSensorInfos(result, hwmonDir, hwmonId, deviceName, "humidity", "Humidity", "%");
-            }
-        }
-
-        // Also include thermal zones
-        if (Directory.Exists(ThermalPath))
-        {
-            foreach (var zoneDir in Directory.GetDirectories(ThermalPath, "thermal_zone*"))
-            {
-                var tempFile = Path.Combine(zoneDir, "temp");
-                if (!File.Exists(tempFile)) continue;
-
-                var zoneName = Path.GetFileName(zoneDir);
-                var zoneType = ReadFileContent(Path.Combine(zoneDir, "type")) ?? zoneName;
-                var sensorKey = $"thermal/{zoneName}";
-
-                result.Add(new HwmonSensorInfo
-                {
-                    SensorId = sensorKey,
-                    DeviceName = "Thermal Zones",
-                    Category = "Temperature",
-                    Label = zoneType,
-                    Unit = "°C"
-                });
-            }
-        }
-
-        // Add Linux system sensors (CPU, Memory, Disk, Network, Load, Power, RAPL)
-        result.AddRange(LinuxSystemSensors.Instance.GetSensorInfoList());
-
+            SensorId = d.StableId, DeviceName = d.ChipDisplayName, ChipKey = d.ChipKey,
+            Label = d.Label, Category = d.Category, Unit = d.Unit, IdentityStrength = d.IdentityStrength,
+            IsAmbiguous = d.IsAmbiguous, LegacyAlias = d.LegacyAlias
+        }).ToList();
+        result.AddRange(monitor._systemInfo());
         return result;
-    }
-
-    private static void AddSensorInfos(List<HwmonSensorInfo> list, string hwmonDir, string hwmonId,
-        string deviceName, string prefix, string category, string unit)
-    {
-        try
-        {
-            foreach (var file in Directory.GetFiles(hwmonDir, $"{prefix}*_input"))
-            {
-                var fileName = Path.GetFileNameWithoutExtension(file);
-                var index = fileName.Replace(prefix, "").Replace("_input", "").Trim('_');
-
-                var labelFile = Path.Combine(hwmonDir, $"{prefix}{index}_label");
-                var label = ReadFileContent(labelFile) ?? $"{prefix}{index}";
-
-                var sensorKey = $"{hwmonId}/{prefix}{index}";
-
-                list.Add(new HwmonSensorInfo
-                {
-                    SensorId = sensorKey,
-                    DeviceName = deviceName,
-                    Category = category,
-                    Label = label,
-                    Unit = unit
-                });
-            }
-        }
-        catch { }
     }
 }
 
@@ -274,7 +213,11 @@ public class HwmonSensorInfo
 {
     public string SensorId { get; set; } = "";
     public string DeviceName { get; set; } = "";
+    public string ChipKey { get; set; } = "";
     public string Category { get; set; } = "";
     public string Label { get; set; } = "";
     public string Unit { get; set; } = "";
+    public SensorIdentityStrength IdentityStrength { get; set; }
+    public bool IsAmbiguous { get; set; }
+    public string? LegacyAlias { get; set; }
 }

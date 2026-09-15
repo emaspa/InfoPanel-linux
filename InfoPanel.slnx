@@ -30,5 +30,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/InfoPanel.App.Tests/InfoPanel.App.Tests.csproj" />
     <Project Path="tests/InfoPanel.Core.Tests/InfoPanel.Core.Tests.csproj" />
+    <Project Path="tests/InfoPanel.Sensors.Linux.Tests/InfoPanel.Sensors.Linux.Tests.csproj" />
   </Folder>
 </Solution>
