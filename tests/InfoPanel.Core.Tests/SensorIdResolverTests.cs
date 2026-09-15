@@ -5,7 +5,8 @@ using Xunit;
 
 namespace InfoPanel.Core.Tests;
 
-public class SensorIdResolverTests
+[Collection("ConfigPersistence")]
+public class SensorIdResolverTests(SensorStateFixture fixture) : SensorStateTest(fixture)
 {
     private static SensorDescriptor Sensor(string chip = "wireview", string channel = "curr5", string? label = "Pin 5",
         string alias = "hwmon4/curr5", string anchor = "platform+wireview_hwmon", string? secondary = null) =>

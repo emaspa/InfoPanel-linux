@@ -68,6 +68,14 @@ namespace InfoPanel.Models
             }
         }
 
+        private HardwareSensorIdentity? _hardwareSensorIdentity;
+        [System.Xml.Serialization.XmlElement(IsNullable = false)]
+        public HardwareSensorIdentity? HardwareSensorIdentity
+        {
+            get => _hardwareSensorIdentity;
+            set => SetProperty(ref _hardwareSensorIdentity, value);
+        }
+
         private string _libreSensorId = string.Empty;
         public string LibreSensorId
         {
@@ -274,12 +282,20 @@ namespace InfoPanel.Models
             SensorName = name;
         }
 
+        public override object Clone()
+        {
+            var clone = (ChartDisplayItem)MemberwiseClone();
+            clone.Guid = Guid.NewGuid();
+            clone._hardwareSensorIdentity = _hardwareSensorIdentity?.Copy();
+            return clone;
+        }
+
         public SensorReading? GetValue()
         {
             return SensorType switch
             {
                 SensorType.Plugin => SensorReader.ReadPluginSensor(PluginSensorId),
-                SensorType.Hwmon => SensorReader.ReadHwmonSensor(LibreSensorId),
+                SensorType.Hwmon => SensorReader.ReadHwmonSensor(this.GetSensorReference()),
                 _ => null,
             };
         }
@@ -403,7 +419,7 @@ namespace InfoPanel.Models
 
         public override object Clone()
         {
-            var clone = (GraphDisplayItem)MemberwiseClone(); 
+            var clone = (GraphDisplayItem)base.Clone();
             clone.Guid = Guid.NewGuid();
             return clone;
         }
@@ -461,7 +477,7 @@ namespace InfoPanel.Models
 
         public override object Clone()
         {
-            var clone = (BarDisplayItem)MemberwiseClone(); 
+            var clone = (BarDisplayItem)base.Clone();
             clone.Guid = Guid.NewGuid();
             return clone;
         }
@@ -524,7 +540,7 @@ namespace InfoPanel.Models
 
         public override object Clone()
         {
-            var clone = (DonutDisplayItem)MemberwiseClone();
+            var clone = (DonutDisplayItem)base.Clone();
             clone.Guid = Guid.NewGuid();
             return clone;
         }

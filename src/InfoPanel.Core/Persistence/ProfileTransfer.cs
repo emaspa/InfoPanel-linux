@@ -15,10 +15,14 @@ namespace InfoPanel.Persistence
     {
         private static readonly ILogger Logger = Log.ForContext(typeof(ProfileTransfer));
 
-        public static string? Export(Profile profile, string outputFolder)
+        /// <summary>Exports a detached current snapshot, or loads saved items through PostLoadHook when omitted.</summary>
+        public static string? Export(Profile profile, string outputFolder, IEnumerable<DisplayItem>? displayItems = null)
         {
             try
             {
+                var exportItems = displayItems == null
+                    ? ConfigPersistence.LoadDisplayItems(profile)
+                    : DetachItems(profile, displayItems);
                 var baseName = string.Concat(profile.Name.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' ? c : '_'));
                 var exportFilePath = Path.Combine(outputFolder, $"{baseName}-{DateTimeOffset.Now.ToUnixTimeSeconds()}.infopanel");
 
@@ -50,10 +54,12 @@ namespace InfoPanel.Persistence
                         xs.Serialize(wr, exportProfile);
                     }
 
-                    var profilePath = Path.Combine(ConfigPersistence.ProfilesFolder, profile.Guid + ".xml");
-                    if (File.Exists(profilePath))
+                    var itemsEntry = archive.CreateEntry("DisplayItems.xml");
+                    using (var entryStream = itemsEntry.Open())
                     {
-                        archive.CreateEntryFromFile(profilePath, "DisplayItems.xml");
+                        var xs = new XmlSerializer(typeof(List<DisplayItem>), ConfigPersistence.DisplayItemExtraTypes);
+                        using var wr = XmlWriter.Create(entryStream, new XmlWriterSettings { Encoding = Encoding.UTF8, Indent = true });
+                        xs.Serialize(wr, exportItems);
                     }
 
                     var assetFolder = Path.Combine(ConfigPersistence.AssetsFolder, profile.Guid.ToString());
@@ -74,6 +80,20 @@ namespace InfoPanel.Persistence
                 Logger.Error(ex, "Failed to export profile {Name}", profile.Name);
                 return null;
             }
+        }
+
+        private static List<DisplayItem> DetachItems(Profile profile, IEnumerable<DisplayItem> items)
+        {
+            // Clone() is intended for duplication: some types omit layout fields and MemberwiseClone
+            // retains property-change subscribers. An XML snapshot preserves persisted state only.
+            var xs = new XmlSerializer(typeof(List<DisplayItem>), ConfigPersistence.DisplayItemExtraTypes);
+            using var stream = new MemoryStream();
+            xs.Serialize(stream, items.ToList());
+            stream.Position = 0;
+            var detached = (List<DisplayItem>)xs.Deserialize(stream)!;
+            foreach (var item in detached) item.SetProfile(profile);
+            ConfigPersistence.PostLoadHook?.Invoke(profile, detached);
+            return detached;
         }
 
         /// <summary>Imports a .infopanel archive as a new profile (fresh guid). Returns the new profile or null.</summary>

@@ -17,6 +17,17 @@ namespace InfoPanel.Models
 
         public static SensorResolution ResolveHwmonSensor(SensorReference reference) => Volatile.Read(ref _resolver).Resolve(reference);
 
+        public static long HwmonCatalogGeneration => HwmonCatalog?.Generation ?? 0;
+
+        internal static SensorCatalogSnapshot? HwmonCatalog => Volatile.Read(ref _resolver).Snapshot;
+
+        internal static void ResetForTests()
+        {
+            ConfigureResolver(new());
+            _pluginSource = null;
+            _hwmonSource = null;
+        }
+
         public static SensorReading? ReadHwmonSensor(SensorReference reference)
         {
             var resolver = Volatile.Read(ref _resolver);

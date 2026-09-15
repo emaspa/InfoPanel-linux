@@ -36,6 +36,9 @@ namespace InfoPanel.Persistence
         /// <summary>Overrides the data directory (tests, portable mode). Null = default XDG location.</summary>
         public static string? BaseFolderOverride { get; set; }
 
+        /// <summary>Optional owner-thread migration after deserialization and profile attachment. Must not save.</summary>
+        public static Action<Profile, IList<DisplayItem>>? PostLoadHook { get; set; }
+
         public static string BaseFolder =>
             BaseFolderOverride ??
             Environment.GetEnvironmentVariable("INFOPANEL_DATA_DIR") ??
@@ -278,6 +281,7 @@ namespace InfoPanel.Persistence
                             displayItem.SetProfile(profile);
                         }
 
+                        PostLoadHook?.Invoke(profile, displayItems);
                         return displayItems;
                     }
                 }

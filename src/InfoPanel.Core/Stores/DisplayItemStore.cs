@@ -26,8 +26,22 @@ namespace InfoPanel.Stores
         private readonly ConcurrentDictionary<Guid, Debouncer> _saveDebouncers = new();
         private readonly ConcurrentDictionary<Guid, Profile> _profiles = new();
         private readonly Lock _loadLock = new();
+        private int _suppressAutosave;
 
-        private DisplayItemStore() { }
+        internal DisplayItemStore() { }
+
+        /// <summary>Call on the owner thread after catalog publication. Changes persist with the next normal save.</summary>
+        public MigrationReport ReconcileHardwareBindings()
+        {
+            _suppressAutosave++;
+            try
+            {
+                var report = SensorBindingMigration.Migrate(_snapshots.Values.SelectMany(items => items));
+                SensorDemand.Invalidate();
+                return report;
+            }
+            finally { _suppressAutosave--; }
+        }
 
         /// <summary>Live editable collection for a profile (loads from disk on first access; UI thread only).</summary>
         public ObservableCollection<DisplayItem> GetOrLoad(Profile profile)
@@ -104,6 +118,7 @@ namespace InfoPanel.Stores
 
             if (item is GroupDisplayItem group)
             {
+                foreach (var child in group.DisplayItemsCopy) HookItem(profile, child);
                 group.DisplayItems.CollectionChanged += (_, e) =>
                 {
                     if (e.NewItems != null)
@@ -133,6 +148,7 @@ namespace InfoPanel.Stores
         /// <summary>Schedules a debounced save (~2s after the last edit).</summary>
         public void RequestSave(Profile profile)
         {
+            if (_suppressAutosave != 0) return;
             var debouncer = _saveDebouncers.GetOrAdd(profile.Guid, _ => new Debouncer());
             debouncer.Debounce(() => Save(profile), 2000);
         }
@@ -227,6 +243,14 @@ namespace InfoPanel.Stores
                     Save(profile);
                 }
             }
+        }
+
+        internal int ScheduledSaveCount => _saveDebouncers.Count;
+
+        internal void CancelPendingSavesForTests()
+        {
+            foreach (var debouncer in _saveDebouncers.Values) debouncer.Dispose();
+            _saveDebouncers.Clear();
         }
     }
 }

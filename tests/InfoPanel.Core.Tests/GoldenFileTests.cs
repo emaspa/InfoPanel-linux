@@ -12,20 +12,20 @@ namespace InfoPanel.Core.Tests
     /// changing an existing one is a failure.
     /// </summary>
     [Collection("ConfigPersistence")]
-    public class GoldenFileTests : IDisposable
+    public class GoldenFileTests : SensorStateTest
     {
         private readonly string _tempDir;
 
-        public GoldenFileTests()
+        public GoldenFileTests(SensorStateFixture fixture) : base(fixture)
         {
             _tempDir = Path.Combine(Path.GetTempPath(), "infopanel-tests-" + Guid.NewGuid());
             Directory.CreateDirectory(_tempDir);
             ConfigPersistence.BaseFolderOverride = _tempDir;
         }
 
-        public void Dispose()
+        public override void Dispose()
         {
-            ConfigPersistence.BaseFolderOverride = null;
+            base.Dispose();
             try { Directory.Delete(_tempDir, true); } catch { }
         }
 
@@ -124,6 +124,37 @@ namespace InfoPanel.Core.Tests
         // ---- Windows-fork-written files (SensorType names the Linux port lacked) ----
 
         [Fact]
+        public void DisplayItems_MigrationChangesOnlyTheBindingAndSecondSaveIsByteStable()
+        {
+            SensorStateFixture.PublishWireView();
+            SensorStateFixture.EnableMigration();
+            var profile = new Profile();
+            Directory.CreateDirectory(ConfigPersistence.ProfilesFolder);
+            var path = Path.Combine(ConfigPersistence.ProfilesFolder, profile.Guid + ".xml");
+            File.Copy(TestData("displayitems.xml"), path);
+            var originalBytes = File.ReadAllBytes(path);
+
+            var items = ConfigPersistence.LoadDisplayItems(profile);
+            var gauge = Assert.IsType<GaugeDisplayItem>(items[2]);
+            Assert.Equal(SensorStateFixture.WireViewId, gauge.LibreSensorId);
+            Assert.Equal("hwmon4/curr5", gauge.HardwareSensorIdentity!.OriginalId);
+            Assert.Equal("wireview", gauge.HardwareSensorIdentity.ChipName);
+            Assert.Equal("Pin 5", gauge.HardwareSensorIdentity.ChannelLabel);
+            Assert.Equal(originalBytes, File.ReadAllBytes(path));
+
+            ConfigPersistence.SaveDisplayItems(profile, items);
+            var expected = XDocument.Load(TestData("displayitems.xml"));
+            // Change exactly the intended expectation in a detached document, keeping the fixture
+            // and the general compatibility comparison (including sensor ids) unchanged.
+            Assert.Single(expected.Descendants("LibreSensorId")).Value = SensorStateFixture.WireViewId;
+            var updated = XDocument.Load(path);
+            AssertSubtree(expected.Root!, updated.Root!, expected.Root!.Name.LocalName);
+            var firstSave = File.ReadAllBytes(path);
+            ConfigPersistence.SaveDisplayItems(profile, ConfigPersistence.LoadDisplayItems(profile));
+            Assert.Equal(firstSave, File.ReadAllBytes(path));
+        }
+
+        [Fact]
         public void DisplayItems_ForkFileWithLibreAndHwInfoSensors_Loads()
         {
             var profile = new Profile { Guid = Guid.NewGuid() };
@@ -196,6 +227,8 @@ namespace InfoPanel.Core.Tests
         private static void AssertSubtree(XElement expected, XElement actual, string path)
         {
             Assert.True(expected.Name == actual.Name, $"Element name mismatch at {path}: {expected.Name} vs {actual.Name}");
+            foreach (var attribute in expected.Attributes())
+                Assert.Equal(attribute.Value, actual.Attribute(attribute.Name)?.Value);
 
             var expectedChildren = expected.Elements().ToList();
             if (expectedChildren.Count == 0)

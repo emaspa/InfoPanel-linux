@@ -66,6 +66,14 @@ namespace InfoPanel.Models
             }
         }
 
+        private HardwareSensorIdentity? _hardwareSensorIdentity;
+        [System.Xml.Serialization.XmlElement(IsNullable = false)]
+        public HardwareSensorIdentity? HardwareSensorIdentity
+        {
+            get => _hardwareSensorIdentity;
+            set => SetProperty(ref _hardwareSensorIdentity, value);
+        }
+
         private string _libreSensorId = string.Empty;
         public string LibreSensorId
         {
@@ -269,12 +277,19 @@ namespace InfoPanel.Models
             SensorName = name;
         }
 
+        public override object Clone()
+        {
+            var clone = (SensorDisplayItem)base.Clone();
+            clone._hardwareSensorIdentity = _hardwareSensorIdentity?.Copy();
+            return clone;
+        }
+
         public SensorReading? GetValue()
         {
             return SensorType switch
             {
                 Enums.SensorType.Plugin => SensorReader.ReadPluginSensor(PluginSensorId),
-                Enums.SensorType.Hwmon => SensorReader.ReadHwmonSensor(LibreSensorId),
+                Enums.SensorType.Hwmon => SensorReader.ReadHwmonSensor(this.GetSensorReference()),
                 _ => null,
             };
         }

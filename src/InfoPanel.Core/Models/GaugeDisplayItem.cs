@@ -71,6 +71,14 @@ namespace InfoPanel.Models
             }
         }
 
+        private HardwareSensorIdentity? _hardwareSensorIdentity;
+        [System.Xml.Serialization.XmlElement(IsNullable = false)]
+        public HardwareSensorIdentity? HardwareSensorIdentity
+        {
+            get => _hardwareSensorIdentity;
+            set => SetProperty(ref _hardwareSensorIdentity, value);
+        }
+
         private string _libreSensorId = string.Empty;
         public string LibreSensorId
         {
@@ -232,7 +240,7 @@ namespace InfoPanel.Models
             return SensorType switch
             {
                 SensorType.Plugin => SensorReader.ReadPluginSensor(PluginSensorId),
-                SensorType.Hwmon => SensorReader.ReadHwmonSensor(LibreSensorId),
+                SensorType.Hwmon => SensorReader.ReadHwmonSensor(this.GetSensorReference()),
                 _ => null,
             };
         }
@@ -390,6 +398,7 @@ namespace InfoPanel.Models
         {
             var clone = (GaugeDisplayItem)MemberwiseClone();
             clone.Guid = Guid.NewGuid();
+            clone._hardwareSensorIdentity = _hardwareSensorIdentity?.Copy();
             clone.currentImageIndex = 0;
             clone._lastGaugeUpdate = DateTime.MinValue;
 

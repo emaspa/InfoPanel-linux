@@ -17,7 +17,9 @@ namespace InfoPanel.Models
         /// This copy is updated whenever the DisplayItems collection changes.
         /// </summary>
         [XmlIgnore]
-        public ImmutableList<DisplayItem> DisplayItemsCopy { get; private set; }
+        public ImmutableList<DisplayItem> DisplayItemsCopy => Volatile.Read(ref _displayItemsCopy);
+
+        private ImmutableList<DisplayItem> _displayItemsCopy = [];
 
         [ObservableProperty]
         private int _displayItemsCount;
@@ -31,13 +33,13 @@ namespace InfoPanel.Models
             DisplayItems.CollectionChanged += OnDisplayItemsChanged;
             
             // Then create initial copy and set count
-            DisplayItemsCopy = [.. DisplayItems];
+            Volatile.Write(ref _displayItemsCopy, [.. DisplayItems]);
             DisplayItemsCount = DisplayItems.Count;
         }
 
         private void OnDisplayItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
         {
-            DisplayItemsCopy = [.. DisplayItems];
+            Volatile.Write(ref _displayItemsCopy, [.. DisplayItems]);
             DisplayItemsCount = DisplayItems.Count;
         }
 

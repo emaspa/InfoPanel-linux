@@ -1,4 +1,5 @@
 using InfoPanel.Enums;
+using InfoPanel.Sensors;
 using System;
 
 namespace InfoPanel.Models
@@ -11,6 +12,17 @@ namespace InfoPanel.Models
     internal interface ISensorItem: IPluginSensorItem
     {
         string LibreSensorId { get; set; }
+        HardwareSensorIdentity? HardwareSensorIdentity { get; set; }
+    }
+
+    internal static class SensorItemExtensions
+    {
+        internal static SensorReference GetSensorReference(this ISensorItem item)
+        {
+            var identity = item.HardwareSensorIdentity;
+            return new(item.LibreSensorId, item.SensorName, identity?.ChipName,
+                identity?.ChannelLabel, identity?.OriginalId, item.SensorType);
+        }
     }
 
     internal interface IPluginSensorItem
