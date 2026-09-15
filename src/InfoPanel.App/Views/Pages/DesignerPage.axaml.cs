@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
+using InfoPanel.Services;
+using InfoPanel.Sensors;
 using InfoPanel.Designer;
 using InfoPanel.Extensions;
 using InfoPanel.Models;
@@ -13,6 +15,7 @@ namespace InfoPanel.Views.Pages
     {
         private DesignerSession? _session;
         private readonly SensorTreeViewModel _sensorTree = new();
+        private bool _catalogSubscribed;
         private DispatcherTimer? _sensorTimer;
         private bool _syncingLayerSelection;
         private bool _syncingActiveToggle;
@@ -56,11 +59,12 @@ namespace InfoPanel.Views.Pages
                     Canvas.SnapToGrid = SnapToggle.IsChecked == true;
                 }
 
-                if (_sensorTree.Roots.Count == 0)
+                if (!_catalogSubscribed)
                 {
-                    _sensorTree.Rebuild();
-                    SensorTree.ItemsSource = _sensorTree.Roots;
+                    HwmonMonitor.Instance.CatalogChanged += CatalogChanged;
+                    _catalogSubscribed = true;
                 }
+                RebuildSensorTree();
 
                 _sensorTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
                 _sensorTimer.Tick += (_, _) => _sensorTree.RefreshValues();
@@ -71,8 +75,11 @@ namespace InfoPanel.Views.Pages
 
             Unloaded += (_, _) =>
             {
+                HwmonMonitor.Instance.CatalogChanged -= CatalogChanged;
+                _catalogSubscribed = false;
                 _sensorTimer?.Stop();
                 _sensorTimer = null;
+                Inspector.BindSensorRequested -= Inspector_BindSensorRequested;
             };
         }
 
@@ -80,6 +87,19 @@ namespace InfoPanel.Views.Pages
 
         private const double ScrollMargin = 48;
         private bool _syncingScroll;
+
+        private void CatalogChanged(object? sender, SensorCatalogSnapshot catalog) => Dispatcher.UIThread.Post(() =>
+        {
+            if (!_catalogSubscribed) return;
+            RebuildSensorTree();
+            Inspector.Rebuild();
+        });
+
+        private void RebuildSensorTree()
+        {
+            _sensorTree.Rebuild();
+            ApplySensorFilter();
+        }
 
         private void UpdateScrollBars()
         {
@@ -282,9 +302,8 @@ namespace InfoPanel.Views.Pages
 
         private void RefreshSensors_Click(object? sender, RoutedEventArgs e)
         {
-            _sensorTree.Rebuild();
-            SensorTree.ItemsSource = _sensorTree.Roots;
-            SensorSearch.Text = "";
+            HwmonMonitor.Instance.RequestRescan();
+            RebuildSensorTree();
         }
 
         private void SensorTree_SelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -302,19 +321,23 @@ namespace InfoPanel.Views.Pages
             InfoPanel.Utils.TreeViewHelpers.ToggleCategoryOnTap(e);
         }
 
-        private void SensorSearch_TextChanged(object? sender, TextChangedEventArgs e)
+        private void SensorSearch_TextChanged(object? sender, TextChangedEventArgs e) => ApplySensorFilter();
+
+        private void ApplySensorFilter()
         {
+            var selected = _sensorTree.SelectedItem;
             var query = SensorSearch.Text?.Trim() ?? "";
             if (query.Length == 0)
             {
                 SensorTree.ItemsSource = _sensorTree.Roots;
+                SensorTree.SelectedItem = selected;
                 return;
             }
 
             var matches = new List<SensorTreeItem>();
             void Walk(SensorTreeItem node)
             {
-                if (node.IsSensor && node.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
+                if (node.SensorId != null && node.Name.Contains(query, StringComparison.OrdinalIgnoreCase))
                 {
                     matches.Add(node);
                 }
@@ -331,20 +354,11 @@ namespace InfoPanel.Views.Pages
             }
 
             SensorTree.ItemsSource = matches;
+            SensorTree.SelectedItem = selected != null && matches.Contains(selected) ? selected : null;
         }
 
         private SensorTreeItem? SelectedSensorLeaf =>
             _sensorTree.SelectedItem is { IsSensor: true } leaf ? leaf : null;
-
-        private void BindSensorFields(SensorTreeItem leaf, Action<Enums.SensorType, string, string, string> apply)
-        {
-            var isPlugin = leaf.SensorType == Enums.SensorType.Plugin;
-            apply(
-                isPlugin ? Enums.SensorType.Plugin : Enums.SensorType.Hwmon,
-                isPlugin ? "" : leaf.SensorId!,
-                isPlugin ? leaf.SensorId! : "",
-                leaf.Name);
-        }
 
         private void AddBoundItem(DisplayItem item)
         {
@@ -356,7 +370,7 @@ namespace InfoPanel.Views.Pages
         private void AddSensorAsText_Click(object? sender, RoutedEventArgs e)
         {
             if (_session == null || SelectedSensorLeaf is not { } leaf) return;
-            AddBoundItem(CreateSensorItem(leaf, _session.Profile));
+            AddBoundItem(DesignerSensorBinding.CreateSensorItem(leaf, _session.Profile));
         }
 
         private void AddSensorAsBar_Click(object? sender, RoutedEventArgs e)
@@ -366,7 +380,7 @@ namespace InfoPanel.Views.Pages
             if (SelectedSensorLeaf is { } leaf)
             {
                 item.Name = leaf.Name;
-                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+                SensorBinding.Apply(item, DesignerSensorBinding.FromLeaf(leaf));
             }
             AddBoundItem(item);
         }
@@ -378,7 +392,7 @@ namespace InfoPanel.Views.Pages
             if (SelectedSensorLeaf is { } leaf)
             {
                 item.Name = leaf.Name;
-                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+                SensorBinding.Apply(item, DesignerSensorBinding.FromLeaf(leaf));
             }
             AddBoundItem(item);
         }
@@ -390,7 +404,7 @@ namespace InfoPanel.Views.Pages
             if (SelectedSensorLeaf is { } leaf)
             {
                 item.Name = leaf.Name;
-                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+                SensorBinding.Apply(item, DesignerSensorBinding.FromLeaf(leaf));
             }
             AddBoundItem(item);
         }
@@ -402,7 +416,7 @@ namespace InfoPanel.Views.Pages
             if (SelectedSensorLeaf is { } leaf)
             {
                 item.Name = leaf.Name;
-                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+                SensorBinding.Apply(item, DesignerSensorBinding.FromLeaf(leaf));
             }
             AddBoundItem(item);
         }
@@ -424,10 +438,9 @@ namespace InfoPanel.Views.Pages
                     Y = _session.Profile.Height / 3,
                     Width = 100,
                     Height = 100,
-                    SensorType = Enums.SensorType.Plugin,
-                    PluginSensorId = textSensorId,
-                    SensorName = textLeaf.Name,
                 };
+
+                SensorBinding.Apply(httpItem, DesignerSensorBinding.FromLeaf(textLeaf));
 
                 // Live plugin buffers report their true size; use it as the initial box
                 if (PluginImageSource.TryParseUri(valueText, out var pluginId, out var imageId)
@@ -445,7 +458,7 @@ namespace InfoPanel.Views.Pages
             if (SelectedSensorLeaf is { } leaf)
             {
                 item.Name = leaf.Name;
-                BindSensorFields(leaf, (type, libre, plugin, name) => { item.SensorType = type; item.LibreSensorId = libre; item.PluginSensorId = plugin; item.SensorName = name; });
+                SensorBinding.Apply(item, DesignerSensorBinding.FromLeaf(leaf));
             }
             AddBoundItem(item);
         }
@@ -465,91 +478,10 @@ namespace InfoPanel.Views.Pages
                 return;
             }
 
-            var isPlugin = leaf.SensorType == Enums.SensorType.Plugin;
-            var newType = isPlugin ? Enums.SensorType.Plugin : Enums.SensorType.Hwmon;
-            var newLibre = isPlugin ? "" : leaf.SensorId!;
-            var newPlugin = isPlugin ? leaf.SensorId! : "";
-
-            switch (target)
-            {
-                case SensorDisplayItem sensor:
-                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
-                        sensor, "Sensor binding",
-                        v => { sensor.SensorType = v.Item1; sensor.LibreSensorId = v.Item2; sensor.PluginSensorId = v.Item3; sensor.SensorName = v.Item4; },
-                        (sensor.SensorType, sensor.LibreSensorId, sensor.PluginSensorId, sensor.SensorName),
-                        (newType, newLibre, newPlugin, leaf.Name)));
-                    break;
-
-                case ChartDisplayItem chart:
-                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
-                        chart, "Sensor binding",
-                        v => { chart.SensorType = v.Item1; chart.LibreSensorId = v.Item2; chart.PluginSensorId = v.Item3; chart.SensorName = v.Item4; },
-                        (chart.SensorType, chart.LibreSensorId, chart.PluginSensorId, chart.SensorName),
-                        (newType, newLibre, newPlugin, leaf.Name)));
-                    break;
-
-                case GaugeDisplayItem gauge:
-                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
-                        gauge, "Sensor binding",
-                        v => { gauge.SensorType = v.Item1; gauge.LibreSensorId = v.Item2; gauge.PluginSensorId = v.Item3; gauge.SensorName = v.Item4; },
-                        (gauge.SensorType, gauge.LibreSensorId, gauge.PluginSensorId, gauge.SensorName),
-                        (newType, newLibre, newPlugin, leaf.Name)));
-                    break;
-
-                case SensorImageDisplayItem sensorImage:
-                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
-                        sensorImage, "Sensor binding",
-                        v => { sensorImage.SensorType = v.Item1; sensorImage.LibreSensorId = v.Item2; sensorImage.PluginSensorId = v.Item3; sensorImage.SensorName = v.Item4; },
-                        (sensorImage.SensorType, sensorImage.LibreSensorId, sensorImage.PluginSensorId, sensorImage.SensorName),
-                        (newType, newLibre, newPlugin, leaf.Name)));
-                    break;
-
-                case HttpImageDisplayItem httpImage:
-                    _session.Undo.Execute(new SetPropertyAction<(Enums.SensorType, string, string, string)>(
-                        httpImage, "Sensor binding",
-                        v => { httpImage.SensorType = v.Item1; httpImage.LibreSensorId = v.Item2; httpImage.PluginSensorId = v.Item3; httpImage.SensorName = v.Item4; },
-                        (httpImage.SensorType, httpImage.LibreSensorId, httpImage.PluginSensorId, httpImage.SensorName),
-                        (newType, newLibre, newPlugin, leaf.Name)));
-                    break;
-
-                case TableSensorDisplayItem table when isPlugin:
-                    _session.Undo.Execute(new SetPropertyAction<(string, string)>(
-                        table, "Sensor binding",
-                        v => { table.PluginSensorId = v.Item1; table.SensorName = v.Item2; },
-                        (table.PluginSensorId, table.SensorName),
-                        (leaf.SensorId!, leaf.Name)));
-                    break;
-            }
+            DesignerSensorBinding.Replace(_session, target, leaf);
 
             Inspector.Rebuild();
             Canvas.InvalidateVisual();
-        }
-
-        private static SensorDisplayItem CreateSensorItem(SensorTreeItem leaf, Profile profile)
-        {
-            var item = new SensorDisplayItem
-            {
-                Name = leaf.Name,
-                SensorName = leaf.Name,
-                X = profile.Width / 3,
-                Y = profile.Height / 3,
-                Font = profile.Font,
-                FontSize = profile.FontSize,
-                Color = profile.Color,
-            };
-
-            if (leaf.SensorType == Enums.SensorType.Plugin)
-            {
-                item.SensorType = Enums.SensorType.Plugin;
-                item.PluginSensorId = leaf.SensorId!;
-            }
-            else
-            {
-                item.SensorType = Enums.SensorType.Hwmon;
-                item.LibreSensorId = leaf.SensorId!;
-            }
-
-            return item;
         }
 
         // ================= add toolbar =================
@@ -581,7 +513,7 @@ namespace InfoPanel.Views.Pages
 
             if (SelectedSensorLeaf is { } leaf)
             {
-                AddItemAtCenter(CreateSensorItem(leaf, _session.Profile));
+                AddItemAtCenter(DesignerSensorBinding.CreateSensorItem(leaf, _session.Profile));
             }
             else
             {

@@ -5,6 +5,11 @@ using InfoPanel.Platform.Linux;
 using InfoPanel.Services;
 using Serilog;
 using System.Collections.ObjectModel;
+using System.Collections.Concurrent;
+using System.Collections.Immutable;
+using InfoPanel.Sensors;
+using InfoPanel.Stores;
+using InfoPanel.Utils;
 
 namespace InfoPanel
 {
@@ -16,6 +21,10 @@ namespace InfoPanel
     public sealed class AppHost
     {
         private static readonly ILogger Logger = Log.ForContext<AppHost>();
+
+        private ImmutableList<Profile> _profileSnapshot = [];
+        private readonly ConcurrentQueue<DisplayItem> _loadedMigrations = new();
+        private volatile bool _stopping;
 
         public Settings Settings { get; private set; } = new();
         public ObservableCollection<Profile> Profiles { get; } = [];
@@ -76,6 +85,19 @@ namespace InfoPanel
             LinuxPlatform.Register();
             RenderingServices.Register();
 
+            // Register before any profile or item load. The hook also runs on detached
+            // export copies; defer save decisions until membership in the live store is known.
+            SensorReader.ConfigureResolver(HwmonMonitor.Instance.Resolver);
+            ConfigPersistence.PostLoadHook = (_, items) =>
+            {
+                var report = SensorBindingMigration.Migrate(items);
+                foreach (var item in report.Migrated) _loadedMigrations.Enqueue(item);
+                if (report.Migrated.Count > 0 && Avalonia.Application.Current != null)
+                    UiThread.Post(PersistLoadedMigrations);
+            };
+            HwmonMonitor.Instance.CatalogChanged += OnCatalogChanged;
+            Profiles.CollectionChanged += (_, _) => Volatile.Write(ref _profileSnapshot, [.. Profiles]);
+
             // Configuration
             Settings = ConfigPersistence.LoadSettings() ?? new Settings();
             MigrateLianLiDevices();
@@ -83,6 +105,9 @@ namespace InfoPanel
             {
                 Profiles.Add(profile);
             }
+            // Load existing profiles on the owner thread before the first catalog.
+            // Render/demand workers can subsequently consume immutable snapshots.
+            foreach (var profile in Profiles) DisplayItemStore.Instance.GetOrLoad(profile);
             Logger.Information("Loaded {ProfileCount} profiles, {DeviceCount} Thermalright devices",
                 Profiles.Count, Settings.ThermalrightPanelDevices.Count);
 
@@ -198,14 +223,15 @@ namespace InfoPanel
             // polled; sensor-browsing pages switch to full polling while visible.
             SensorDemand.DemandProvider = () =>
             {
+                var profiles = Volatile.Read(ref _profileSnapshot);
                 var consumed = new HashSet<Profile>();
                 var byGuid = new Dictionary<Guid, Profile>();
-                foreach (var p in Profiles) byGuid[p.Guid] = p;
+                foreach (var p in profiles) byGuid[p.Guid] = p;
                 foreach (var guid in SharedFrameCache.RecentlyRendered(TimeSpan.FromSeconds(30)))
                 {
                     if (byGuid.TryGetValue(guid, out var p)) consumed.Add(p);
                 }
-                foreach (var p in Profiles)
+                foreach (var p in profiles)
                 {
                     if (p.Active) consumed.Add(p);
                 }
@@ -223,6 +249,39 @@ namespace InfoPanel
                 return snapshot;
             };
         }
+
+        private void OnCatalogChanged(object? sender, SensorCatalogSnapshot catalog) =>
+            UiThread.Post(ReconcileHardwareBindings);
+
+        private void ReconcileHardwareBindings()
+        {
+            if (_stopping) return;
+            RequestMigrationSaves(DisplayItemStore.Instance.ReconcileHardwareBindings(),
+                DisplayItemStore.Instance.RequestSave);
+            PersistLoadedMigrations();
+        }
+
+        internal static void RequestMigrationSaves(MigrationReport report, Action<Profile> requestSave)
+        {
+            foreach (var profile in report.Migrated.Select(item => item.Profile).OfType<Profile>().DistinctBy(p => p.Guid))
+                requestSave(profile);
+        }
+
+        private void PersistLoadedMigrations()
+        {
+            if (_stopping) return;
+            var liveMigrations = new List<DisplayItem>();
+            while (_loadedMigrations.TryDequeue(out var item))
+            {
+                if (item.Profile is not { } profile || !Volatile.Read(ref _profileSnapshot).Contains(profile)) continue;
+                if (ContainsReference(DisplayItemStore.Instance.GetSnapshot(profile), item)) liveMigrations.Add(item);
+            }
+            RequestMigrationSaves(new MigrationReport(liveMigrations, [], [], []), DisplayItemStore.Instance.RequestSave);
+        }
+
+        private static bool ContainsReference(IEnumerable<DisplayItem> items, DisplayItem target) =>
+            items.Any(item => ReferenceEquals(item, target)
+                || item is GroupDisplayItem group && ContainsReference(group.DisplayItemsCopy, target));
 
         public void SaveProfiles() => ConfigPersistence.SaveProfiles([.. Profiles]);
 
@@ -246,6 +305,7 @@ namespace InfoPanel
             {
                 // HwmonMonitor's poll also drives LinuxSystemSensors and the GPU monitors
                 HwmonMonitor.Instance.Start(Settings.TargetGraphUpdateRate);
+                UiThread.Post(ReconcileHardwareBindings);
             }
             catch (Exception ex)
             {
@@ -272,6 +332,9 @@ namespace InfoPanel
 
         public async Task StopDevicesAsync()
         {
+            _stopping = true;
+            HwmonMonitor.Instance.CatalogChanged -= OnCatalogChanged;
+            ConfigPersistence.PostLoadHook = null;
             try { Hotkeys?.Stop(); } catch { }
             try { ForegroundApps?.Dispose(); } catch { }
             try { await WebServerTask.Instance.StopAsync(shutdown: true); } catch { }

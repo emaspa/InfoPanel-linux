@@ -1,4 +1,5 @@
-﻿using InfoPanel.Models;
+using InfoPanel.Models;
+using InfoPanel.Sensors;
 using InfoPanel.Plugins;
 using Microsoft.Extensions.Caching.Memory;
 using SkiaSharp;
@@ -23,6 +24,9 @@ namespace InfoPanel.Drawing
         private static readonly ConcurrentDictionary<string, Queue<double>> GraphDataCache2 = [];
         private static readonly ConcurrentDictionary<string, Queue<double>> GraphDataCache3 = [];
         private static readonly Stopwatch Stopwatch = new();
+        private static readonly object SampleGate = new();
+        private static long _catalogGeneration = -1;
+        private static readonly IMemoryCache ItemHistoryCache = new MemoryCache(new MemoryCacheOptions());
 
         // Expand the auto-scale range immediately on new extremes; contract it gradually so
         // the scale doesn't yo-yo when a transient spike falls out of the sample window.
@@ -78,19 +82,27 @@ namespace InfoPanel.Drawing
             Stopwatch.Start();
         }
 
-        private static Queue<double> GetGraphDataQueue(string libreSensorId)
+        internal static string? GetHardwareHistoryKey(ChartDisplayItem chart) =>
+            SensorBinding.Resolve(chart) is { Status: SensorResolutionStatus.Resolved } resolution
+                ? resolution.CanonicalId : null;
+
+        internal static Queue<double> GetGraphDataQueue(string canonicalId) =>
+            GraphDataCache2.GetOrAdd(canonicalId, _ => new Queue<double>());
+
+        // Catalog membership, not reading availability: a failed input read does not
+        // retire an otherwise present descriptor's history. system/... is outside the catalog.
+        internal static void PruneHardwareHistory()
         {
-            var key = libreSensorId;
-
-            GraphDataCache2.TryGetValue(key, out Queue<double>? result);
-
-            if (result == null)
+            var generation = SensorReader.HwmonCatalogGeneration;
+            if (_catalogGeneration == generation) return;
+            foreach (var key in GraphDataCache2.Keys)
             {
-                result = new Queue<double>();
-                GraphDataCache2.TryAdd(key, result);
+                if (key.StartsWith("system/", StringComparison.Ordinal)) continue;
+                var resolution = SensorReader.ResolveHwmonSensor(new SensorReference(key));
+                if (resolution.Status != SensorResolutionStatus.Resolved || resolution.CanonicalId != key)
+                    GraphDataCache2.TryRemove(key, out _);
             }
-
-            return result;
+            _catalogGeneration = generation;
         }
 
         private static Queue<double> GetGraphPluginDataQueue(string pluginSensorId)
@@ -110,48 +122,52 @@ namespace InfoPanel.Drawing
 
         public static void Run(ChartDisplayItem chartDisplayItem, SkiaGraphics g, bool preview = false)
         {
-            var elapsedMilliseconds = Stopwatch.ElapsedMilliseconds;
-
-            if (elapsedMilliseconds > RenderContext.TargetGraphUpdateRate)
+            lock (SampleGate)
             {
-                foreach (var key in GraphDataCache2.Keys)
-                {
-                    GraphDataCache2.TryGetValue(key, out Queue<double>? queue);
-                    if (queue != null)
-                    {
-                        if (SensorReader.ReadHwmonSensor(key) is Models.SensorReading hwmonReading)
-                        {
-                            lock (queue)
-                            {
-                                queue.Enqueue(hwmonReading.ValueNow);
-                                if (queue.Count > 4096) queue.Dequeue();
-                            }
-                        }
-                    }
-                }
+                var elapsedMilliseconds = Stopwatch.ElapsedMilliseconds;
 
-                foreach (var key in GraphDataCache3.Keys)
+                if (elapsedMilliseconds > RenderContext.TargetGraphUpdateRate)
                 {
-                    GraphDataCache3.TryGetValue(key, out Queue<double>? queue);
-                    if (queue != null)
+                    PruneHardwareHistory();
+                    foreach (var key in GraphDataCache2.Keys)
                     {
-                        if (SensorReader.ReadPluginSensor(key) is Models.SensorReading pluginReading)
+                        GraphDataCache2.TryGetValue(key, out Queue<double>? queue);
+                        if (queue != null)
                         {
-                            lock (queue)
+                            if (SensorReader.ReadHwmonSensor(key) is Models.SensorReading hwmonReading)
                             {
-                                queue.Enqueue(pluginReading.ValueNow);
-
-                                if (queue.Count > 4096)
+                                lock (queue)
                                 {
-                                    queue.Dequeue();
+                                    queue.Enqueue(hwmonReading.ValueNow);
+                                    if (queue.Count > 4096) queue.Dequeue();
                                 }
                             }
                         }
-
                     }
-                }
 
-                Stopwatch.Restart();
+                    foreach (var key in GraphDataCache3.Keys)
+                    {
+                        GraphDataCache3.TryGetValue(key, out Queue<double>? queue);
+                        if (queue != null)
+                        {
+                            if (SensorReader.ReadPluginSensor(key) is Models.SensorReading pluginReading)
+                            {
+                                lock (queue)
+                                {
+                                    queue.Enqueue(pluginReading.ValueNow);
+
+                                    if (queue.Count > 4096)
+                                    {
+                                        queue.Dequeue();
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+
+                    Stopwatch.Restart();
+                }
             }
 
             {
@@ -159,11 +175,12 @@ namespace InfoPanel.Drawing
 
                 var frameRect = new SKRect(0, 0, chartDisplayItem.Width, chartDisplayItem.Height);
 
-                Queue<double> queue;
+                Queue<double>? queue;
 
                 if (chartDisplayItem.SensorType == Enums.SensorType.Hwmon)
                 {
-                    queue = GetGraphDataQueue(chartDisplayItem.LibreSensorId);
+                    var key = GetHardwareHistoryKey(chartDisplayItem);
+                    queue = key == null ? null : GetGraphDataQueue(key);
                 }
                 else if (chartDisplayItem.SensorType == Enums.SensorType.Plugin)
                 {
@@ -171,20 +188,27 @@ namespace InfoPanel.Drawing
                 }
                 else
                 {
-                    queue = GetGraphDataQueue(chartDisplayItem.LibreSensorId);
+                    queue = null;
                 }
 
-                if (queue.Count == 0 && chartDisplayItem is not BarDisplayItem)
+                // Queue identity changes on rebind/removal/replug, but stays the same
+                // when a legacy reference is rewritten to its canonical key.
+                var history = (chartDisplayItem.SensorType, queue);
+                if (!ItemHistoryCache.TryGetValue(chartDisplayItem.Guid, out (Enums.SensorType, Queue<double>?) previous)
+                    || previous != history)
                 {
-                    return;
+                    AutoRangeCache.Remove(chartDisplayItem.Guid);
+                    GraphDataSmoothCache.Remove(chartDisplayItem.Guid);
                 }
+                ItemHistoryCache.Set(chartDisplayItem.Guid, history, AutoRangeTtl);
 
-                double[] tempValues;
-
-                lock (queue)
+                double[] tempValues = [];
+                if (queue != null)
                 {
-                    tempValues = [.. queue];
+                    lock (queue) tempValues = [.. queue];
                 }
+                if (chartDisplayItem.SensorType == Enums.SensorType.Plugin
+                    && tempValues.Length == 0 && chartDisplayItem is not BarDisplayItem) return;
 
                 double minValue = chartDisplayItem.MinValue;
                 double maxValue = chartDisplayItem.MaxValue;
@@ -352,15 +376,19 @@ namespace InfoPanel.Drawing
                                 value = sensorReading.Value.ValueNow;
                             }
 
-                            var scale = maxValue - minValue;
-                            value = scale <= 0 ? 0 : (value - minValue) / scale;
-                            value = Math.Clamp(value, 0, 1);
-                            value = value * Math.Max(frameRect.Width, frameRect.Height);
-                            value = Math.Round(value, 0, MidpointRounding.AwayFromZero);
+                            var hasValue = sensorReading.HasValue || chartDisplayItem.SensorType != Enums.SensorType.Hwmon;
+                            if (hasValue)
+                            {
+                                var scale = maxValue - minValue;
+                                value = scale <= 0 ? 0 : (value - minValue) / scale;
+                                value = Math.Clamp(value, 0, 1);
+                                value = value * Math.Max(frameRect.Width, frameRect.Height);
+                                value = Math.Round(value, 0, MidpointRounding.AwayFromZero);
 
-                            GraphDataSmoothCache.TryGetValue(chartDisplayItem.Guid, out double lastValue);
-                            value = preview ? value : InterpolateWithCycles(lastValue, value, RenderContext.TargetFrameRate * 3);
-                            GraphDataSmoothCache.Set(chartDisplayItem.Guid, value, TimeSpan.FromSeconds(5));
+                                GraphDataSmoothCache.TryGetValue(chartDisplayItem.Guid, out double lastValue);
+                                value = preview ? value : InterpolateWithCycles(lastValue, value, RenderContext.TargetFrameRate * 3);
+                                GraphDataSmoothCache.Set(chartDisplayItem.Guid, value, TimeSpan.FromSeconds(5));
+                            }
 
                             // Inset fill/background when the frame is drawn so the 1px AA stroke
                             // doesn't blend with the fill underneath (issue #81).
@@ -422,7 +450,7 @@ namespace InfoPanel.Drawing
                             }
 
                             // Draw the bar if it has size
-                            if (value > 0 && SKColor.TryParse(barDisplayItem.Color, out var barColor))
+                            if (hasValue && value > 0 && SKColor.TryParse(barDisplayItem.Color, out var barColor))
                             {
                                 if (barDisplayItem.Gradient && SKColor.TryParse(barDisplayItem.GradientColor, out var gradientColor))
                                 {
@@ -457,15 +485,21 @@ namespace InfoPanel.Drawing
                             (minValue, maxValue) = ResolveAutoRange(
                                 chartDisplayItem.Guid, tempValues, chartDisplayItem.MinValue, chartDisplayItem.MaxValue, chartDisplayItem.AutoValue);
 
-                            var value = tempValues.LastOrDefault(0.0);
-                            var scale = maxValue - minValue;
-                            value = scale <= 0 ? 0 : (value - minValue) / scale;
-                            value = Math.Clamp(value, 0, 1);
-                            value = value * 100;
+                            var value = 0.0; // Empty arc leaves only the configured background/frame.
+                            var hasValue = tempValues.Length > 0 && (chartDisplayItem.SensorType != Enums.SensorType.Hwmon
+                                || donutDisplayItem.GetValue().HasValue);
+                            if (hasValue)
+                            {
+                                value = tempValues[^1];
+                                var scale = maxValue - minValue;
+                                value = scale <= 0 ? 0 : (value - minValue) / scale;
+                                value = Math.Clamp(value, 0, 1);
+                                value = value * 100;
 
-                            GraphDataSmoothCache.TryGetValue(chartDisplayItem.Guid, out double lastValue);
-                            value = preview ? value : InterpolateWithCycles(lastValue, value, RenderContext.TargetFrameRate * 3);
-                            GraphDataSmoothCache.Set(chartDisplayItem.Guid, value, TimeSpan.FromSeconds(5));
+                                GraphDataSmoothCache.TryGetValue(chartDisplayItem.Guid, out double lastValue);
+                                value = preview ? value : InterpolateWithCycles(lastValue, value, RenderContext.TargetFrameRate * 3);
+                                GraphDataSmoothCache.Set(chartDisplayItem.Guid, value, TimeSpan.FromSeconds(5));
+                            }
 
                             var offset = 1;
                             g.FillDonut((int)frameRect.Left + offset, (int)frameRect.Top + offset, ((int)frameRect.Width / 2) - offset, donutDisplayItem.Thickness,
@@ -499,12 +533,12 @@ namespace InfoPanel.Drawing
         public static double InterpolateWithCycles(double A, double B, int cycles)
         {
             if (cycles <= 0) return B;
-            
+
             double tolerance = 0.001;
             double initialDifference = Math.Abs(B - A);
-            
+
             if (initialDifference <= tolerance) return B;
-            
+
             double decayFactor = Math.Pow(tolerance / initialDifference, 1.0 / cycles);
             double t = 1 - decayFactor;
 

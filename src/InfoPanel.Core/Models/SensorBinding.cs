@@ -1,4 +1,5 @@
 using InfoPanel.Enums;
+using InfoPanel.Sensors;
 
 namespace InfoPanel.Models;
 
@@ -6,6 +7,10 @@ namespace InfoPanel.Models;
 public sealed record SensorBinding(SensorType SensorType, string LibreSensorId, string PluginSensorId,
     string SensorName, HardwareSensorIdentity? HardwareSensorIdentity)
 {
+    public static SensorResolution? Resolve(DisplayItem item) =>
+        item is ISensorItem { SensorType: SensorType.Hwmon } sensor
+            ? SensorReader.ResolveHwmonSensor(sensor.GetSensorReference()) : null;
+
     public static SensorBinding? Capture(DisplayItem item) => item is IPluginSensorItem sensor
         ? new(sensor.SensorType, (item as ISensorItem)?.LibreSensorId ?? "", sensor.PluginSensorId,
             sensor.SensorName, (item as ISensorItem)?.HardwareSensorIdentity?.Copy())

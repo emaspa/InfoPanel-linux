@@ -10,6 +10,7 @@ namespace InfoPanel.App.Tests
     /// Covers the designer's editing model (selection, gestures, undo/redo, clipboard,
     /// z-order) - the logic the canvas drives from pointer/keyboard input.
     /// </summary>
+    [Collection("AppState")]
     public class DesignerSessionTests : IDisposable
     {
         private readonly string _tempDir;

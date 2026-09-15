@@ -19,9 +19,14 @@ namespace InfoPanel
                 await host.StartSensorsAsync();
                 await Task.Delay(2500);
 
-                foreach (var (id, reading) in Services.HwmonMonitor.SENSORHASH.OrderBy(kv => kv.Key))
+                var verbose = args.Contains("--verbose");
+                foreach (var sensor in Services.HwmonMonitor.GetOrderedList())
                 {
-                    Console.WriteLine($"{id,-40} {reading.ValueNow,12:0.###} {reading.Unit}");
+                    var value = Services.HwmonMonitor.SENSORHASH.TryGetValue(sensor.SensorId, out var reading)
+                        ? $"{reading.ValueNow:0.###} {reading.Unit}" : $"(no reading) {sensor.Unit}";
+                    var ambiguous = sensor.IsAmbiguous ? " (ambiguous)" : "";
+                    var diagnostics = verbose ? $" legacy={sensor.LegacyAlias ?? "-"} strength={sensor.IdentityStrength}" : "";
+                    Console.WriteLine($"{sensor.SensorId}  {value}  [{sensor.DeviceName} / {sensor.Label}]{ambiguous}{diagnostics}");
                 }
 
                 foreach (var (id, reading) in Monitors.PluginMonitor.SENSORHASH.OrderBy(kv => kv.Key))
@@ -37,6 +42,7 @@ namespace InfoPanel
 
                 Log.Information("{Count} hwmon sensors, {PluginCount} plugin sensors",
                     Services.HwmonMonitor.SENSORHASH.Count, Monitors.PluginMonitor.SENSORHASH.Count);
+                Services.HwmonMonitor.Instance.Stop();
                 Log.CloseAndFlush();
                 Environment.Exit(0);
             }
@@ -72,6 +78,7 @@ namespace InfoPanel
                     Log.Information("Rendered {Profile} ({W}x{H}) -> {File}", profile.Name, profile.Width, profile.Height, file);
                 }
 
+                Services.HwmonMonitor.Instance.Stop();
                 Log.CloseAndFlush();
                 Environment.Exit(0);
             }

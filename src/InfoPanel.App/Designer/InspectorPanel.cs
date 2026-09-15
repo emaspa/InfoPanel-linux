@@ -1,3 +1,4 @@
+using InfoPanel.Sensors;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Layout;
@@ -160,8 +161,14 @@ namespace InfoPanel.Designer
 
                     case SensorImageDisplayItem sensorImage:
                         BuildImageSection(session, sensorImage);
-                        BuildSensorHeaderLine(sensorImage.SensorName);
+                        BuildSensorHeaderLine(sensorImage, sensorImage.SensorName);
                         BuildBindButton(sensorImage);
+                        break;
+
+                    case HttpImageDisplayItem httpImage:
+                        BuildImageSection(session, httpImage);
+                        BuildSensorHeaderLine(httpImage, httpImage.SensorName);
+                        BuildBindButton(httpImage);
                         break;
 
                     case ImageDisplayItem image:
@@ -327,9 +334,31 @@ namespace InfoPanel.Designer
 
         private void RefreshGeometry() => Rebuild();
 
-        private void BuildSensorHeaderLine(string sensorName)
+        private void BuildSensorHeaderLine(DisplayItem item, string sensorName)
         {
             _root.Children.Add(Label(string.IsNullOrEmpty(sensorName) ? "No sensor bound" : $"Sensor: {sensorName}"));
+            BuildSensorStatus(item);
+        }
+
+        private void BuildSensorStatus(DisplayItem item)
+        {
+            var status = GetSensorStatus(item);
+            if (status != null) _root.Children.Add(Label(status));
+        }
+
+        internal static string? GetSensorStatus(DisplayItem item)
+        {
+            var resolution = SensorBinding.Resolve(item);
+            var binding = SensorBinding.Capture(item);
+            return resolution?.Status switch
+            {
+                SensorResolutionStatus.NotReady => "Sensors not scanned yet",
+                SensorResolutionStatus.Unresolved or SensorResolutionStatus.Ambiguous =>
+                    $"Unresolved sensor: {binding?.LibreSensorId} — use Replace Sensor",
+                SensorResolutionStatus.Resolved when binding?.HardwareSensorIdentity?.OriginalId is { } original =>
+                    $"migrated from {original}",
+                _ => null
+            };
         }
 
         private void BuildBindButton(DisplayItem item)
@@ -341,7 +370,7 @@ namespace InfoPanel.Designer
 
         private void BuildSensorBindingHeader(DesignerSession session, ChartDisplayItem chart)
         {
-            BuildSensorHeaderLine(chart.SensorName);
+            BuildSensorHeaderLine(chart, chart.SensorName);
             BuildBindButton(chart);
         }
 
@@ -351,6 +380,7 @@ namespace InfoPanel.Designer
 
             var id = sensor.SensorType == Enums.SensorType.Plugin ? sensor.PluginSensorId : sensor.LibreSensorId;
             _root.Children.Add(Label(string.IsNullOrEmpty(id) ? "No sensor bound" : $"{sensor.SensorType}: {id}"));
+            BuildSensorStatus(sensor);
             BuildBindButton(sensor);
 
             _root.Children.Add(Field("Value type", EnumCombo(sensor.ValueType,
@@ -640,7 +670,7 @@ namespace InfoPanel.Designer
         private void BuildGaugeSection(DesignerSession session, GaugeDisplayItem gauge)
         {
             _root.Children.Add(Header("Gauge"));
-            BuildSensorHeaderLine(gauge.SensorName);
+            BuildSensorHeaderLine(gauge, gauge.SensorName);
             BuildBindButton(gauge);
 
             var grid = TwoColumns();

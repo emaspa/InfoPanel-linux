@@ -122,12 +122,17 @@
                         <TreeView x:Name="SensorTree" DoubleTapped="SensorTree_DoubleTapped"
                                   Tapped="SensorTree_Tapped"
                                   SelectionChanged="SensorTree_SelectionChanged">
+                            <TreeView.Styles>
+                                <Style Selector="TreeViewItem" x:DataType="vm:SensorTreeItem">
+                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                </Style>
+                            </TreeView.Styles>
                             <TreeView.ItemTemplate>
                                 <TreeDataTemplate x:DataType="vm:SensorTreeItem" ItemsSource="{Binding Children}">
-                                    <DockPanel>
+                                    <DockPanel Opacity="{Binding DisplayOpacity}">
                                         <TextBlock DockPanel.Dock="Right" Text="{Binding DisplayValue}"
                                                    FontSize="11" Opacity="0.7" VerticalAlignment="Center" Margin="8,0,0,0" />
-                                        <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
                                     </DockPanel>
                                 </TreeDataTemplate>
                             </TreeView.ItemTemplate>

@@ -3,6 +3,7 @@ using InfoPanel.Enums;
 using InfoPanel.Monitors;
 using InfoPanel.Plugins;
 using InfoPanel.Services;
+using InfoPanel.Sensors;
 using System.Collections.ObjectModel;
 
 namespace InfoPanel.ViewModels
@@ -22,7 +23,15 @@ namespace InfoPanel.ViewModels
         public SensorType SensorType { get; init; }
         public string? Unit { get; init; }
 
-        public bool IsSensor => SensorId != null;
+        public string ChipName { get; init; } = "";
+        public bool IsAmbiguous { get; init; }
+        internal string StateKey { get; init; } = "";
+
+        public bool IsSensor => SensorId != null && !IsAmbiguous;
+        public string DisplayName => IsAmbiguous ? $"{Name} (ambiguous)" : Name;
+        public double DisplayOpacity => IsAmbiguous ? 0.45 : 1;
+
+        partial void OnNameChanged(string value) => OnPropertyChanged(nameof(DisplayName));
 
         partial void OnValueChanged(string value) => OnPropertyChanged(nameof(DisplayValue));
 
@@ -44,24 +53,44 @@ namespace InfoPanel.ViewModels
 
         private readonly Dictionary<string, SensorTreeItem> _leavesById = [];
 
-        public void Rebuild()
+        public void Rebuild() => Rebuild(HwmonMonitor.GetOrderedList());
+
+        public void Rebuild(IEnumerable<HwmonSensorInfo> sensors)
         {
+            var expansion = Walk(Roots).Where(n => n.StateKey.Length > 0)
+                .ToDictionary(n => n.StateKey, n => n.IsExpanded, StringComparer.Ordinal);
+            var selectedId = SelectedItem?.SensorId;
+            var selectedType = SelectedItem?.SensorType;
             Roots.Clear();
             _leavesById.Clear();
 
             // ---- hwmon ----
-            var hardwareRoot = new SensorTreeItem { Name = "Hardware", IsExpanded = true };
-            foreach (var deviceGroup in HwmonMonitor.GetOrderedList().GroupBy(s => s.DeviceName))
+            var hardwareRoot = new SensorTreeItem { Name = "Hardware", StateKey = "hardware", IsExpanded = true };
+            var devices = sensors.GroupBy(s => string.IsNullOrEmpty(s.ChipKey) ? s.DeviceName : s.ChipKey, StringComparer.Ordinal).ToArray();
+            foreach (var deviceGroup in devices)
             {
-                var deviceNode = new SensorTreeItem { Name = deviceGroup.Key };
+                var first = deviceGroup.First();
+                var sameName = devices.Where(g => g.First().DeviceName == first.DeviceName).ToArray();
+                var title = first.DeviceName;
+                if (sameName.Length > 1)
+                {
+                    var anchor = Disambiguator(first);
+                    if (sameName.Count(g => Disambiguator(g.First()) == anchor) > 1
+                        && SensorId.TryParse(first.SensorId, out var parsed) && parsed!.Secondary is { } secondary)
+                        anchor += " / " + string.Join(" / ", secondary.Split('+').Skip(1).Select(SensorId.DecodeToken));
+                    title += $" ({anchor})";
+                }
+                var deviceNode = new SensorTreeItem { Name = title, StateKey = $"h:{deviceGroup.Key}" };
                 foreach (var categoryGroup in deviceGroup.GroupBy(s => s.Category))
                 {
-                    var categoryNode = new SensorTreeItem { Name = categoryGroup.Key };
+                    var categoryNode = new SensorTreeItem { Name = categoryGroup.Key, StateKey = $"{deviceNode.StateKey}/{categoryGroup.Key}" };
                     foreach (var sensor in categoryGroup)
                     {
                         var leaf = new SensorTreeItem
                         {
                             Name = sensor.Label,
+                            ChipName = sensor.DeviceName,
+                            IsAmbiguous = sensor.IsAmbiguous,
                             SensorId = sensor.SensorId,
                             SensorType = SensorType.Hwmon,
                             Unit = sensor.Unit
@@ -82,13 +111,13 @@ namespace InfoPanel.ViewModels
             }
 
             // ---- plugins ----
-            var pluginsRoot = new SensorTreeItem { Name = "Plugins", IsExpanded = true };
+            var pluginsRoot = new SensorTreeItem { Name = "Plugins", StateKey = "plugins", IsExpanded = true };
             foreach (var pluginGroup in PluginMonitor.SENSORHASH.Values.OrderBy(r => r.IndexOrder).GroupBy(r => r.PluginName))
             {
-                var pluginNode = new SensorTreeItem { Name = pluginGroup.Key ?? "Unknown" };
+                var pluginNode = new SensorTreeItem { Name = pluginGroup.Key ?? "Unknown", StateKey = $"p:{pluginGroup.Key}" };
                 foreach (var containerGroup in pluginGroup.GroupBy(r => r.ContainerName))
                 {
-                    var containerNode = new SensorTreeItem { Name = containerGroup.Key ?? "Default" };
+                    var containerNode = new SensorTreeItem { Name = containerGroup.Key ?? "Default", StateKey = $"{pluginNode.StateKey}/{containerGroup.Key}" };
                     foreach (var reading in containerGroup)
                     {
                         var leaf = new SensorTreeItem
@@ -113,7 +142,24 @@ namespace InfoPanel.ViewModels
                 Roots.Add(pluginsRoot);
             }
 
+            foreach (var node in Walk(Roots))
+                if (expansion.TryGetValue(node.StateKey, out var expanded)) node.IsExpanded = expanded;
+            SelectedItem = Walk(Roots).FirstOrDefault(n => n.SensorId != null
+                && n.SensorId == selectedId && n.SensorType == selectedType);
             RefreshValues();
+        }
+
+        private static string Disambiguator(HwmonSensorInfo sensor) =>
+            SensorId.TryParse(sensor.SensorId, out var id)
+                ? string.Join(" / ", id!.AnchorTokens) : sensor.ChipKey;
+
+        private static IEnumerable<SensorTreeItem> Walk(IEnumerable<SensorTreeItem> nodes)
+        {
+            foreach (var node in nodes)
+            {
+                yield return node;
+                foreach (var child in Walk(node.Children)) yield return child;
+            }
         }
 
         /// <summary>Updates leaf values in place (keeps expansion/selection state).</summary>
@@ -127,6 +173,7 @@ namespace InfoPanel.ViewModels
                     {
                         leaf.Value = $"{reading.ValueNow:0.#}";
                     }
+                    else leaf.Value = "";
                 }
                 else if (PluginMonitor.SENSORHASH.TryGetValue(leaf.SensorId!, out var pluginReading))
                 {
