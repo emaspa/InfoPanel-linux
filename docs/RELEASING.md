@@ -349,7 +349,8 @@ payload/build rather than filtered.
 diagnostics fatal (some namcap versions return zero after reporting errors).
 
 Offline packaging tests (`packaging/tests/`) cover version rejection, note
-preservation, asset reuse, draft lookup by listing, checksum updates and
+preservation, asset reuse, draft lookup by listing, id-based publishing of a
+new draft, checksum updates and
 downgrade/recipe-drift guards. Local package
 assembly, metadata inspection and lint checks are useful when Docker is
 unavailable, but do not replace the clean target-container builds and installs

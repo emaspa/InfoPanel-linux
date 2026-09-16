@@ -42,56 +42,83 @@ class ReleaseTests(unittest.TestCase):
             Path("artifacts", name).write_bytes(b"validated bytes")
         self.calls = []
         self.metadata = {
-            "draft": False, "body": "Human-written release notes",
+            "id": 42, "draft": False, "body": "Human-written release notes",
             "html_url": "https://example.invalid/release",
-            "assets": [{"name": name} for name in self.names],
+            "assets": [{"id": 100 + index, "name": name} for index, name in enumerate(self.names)],
         }
 
-    def fake_gh(self, *args):
-        self.calls.append(args)
-        if args[0] == "api":
-            return json.dumps({"private": False, "default_branch": "main"})
-        if args[:2] == ("release", "edit"):
-            self.metadata["draft"] = False
-        return ""
+    def run_publish(self, lookup, created=None, download_bytes=b"validated bytes", tag_exists=True):
+        state = {"draft": (lookup or created or {}).get("draft", False)}
 
-    def run_publish(self, metadata=None, download_bytes=b"validated bytes"):
-        def download(repo, tag, name, directory):
-            Path(directory, name).write_bytes(download_bytes)
+        def gh(*args):
+            return json.dumps({"private": False, "default_branch": "main"})
+
+        def download(repo, asset, directory):
+            self.calls.append(("download", asset["id"]))
+            target = Path(directory, asset["name"])
+            target.write_bytes(download_bytes)
+            return target
+
+        def create_draft(repo, tag):
+            self.calls.append(("create", tag))
+            return created
+
+        def upload(repo, release_id, path):
+            self.calls.append(("upload", release_id, path.name))
+
+        def publish_draft(repo, release_id):
+            self.calls.append(("publish", release_id))
+            state["draft"] = False
+
+        def get_release(repo, release_id):
+            self.calls.append(("get", release_id))
+            return {**self.metadata, "id": release_id, "draft": state["draft"]}
 
         with patch.dict(os.environ, {"GH_REPO": "owner/repo"}), \
                 patch.object(sys, "argv", ["release.py", "publish", "v1.2.3"]), \
                 patch.object(release, "project_version", return_value="1.2.3"), \
-                patch.object(release, "release", side_effect=metadata or [self.metadata, self.metadata]), \
-                patch.object(release, "gh", side_effect=self.fake_gh), \
+                patch.object(release, "release", return_value=lookup) as lookup_mock, \
+                patch.object(release, "gh", side_effect=gh), \
+                patch.object(release, "tag_exists", return_value=tag_exists), \
+                patch.object(release, "create_draft", side_effect=create_draft), \
+                patch.object(release, "upload", side_effect=upload), \
+                patch.object(release, "publish_draft", side_effect=publish_draft), \
+                patch.object(release, "get_release", side_effect=get_release), \
                 patch.object(release, "download", side_effect=download):
             release.main()
+        return lookup_mock
+
+    def writes(self):
+        return [call for call in self.calls if call[0] in {"create", "upload", "publish"}]
 
     def test_existing_release_is_noop(self):
-        self.run_publish()
-        self.assertEqual([call for call in self.calls if call[0] == "release"], [])
+        self.run_publish(self.metadata)
+        self.assertEqual(self.writes(), [])
         self.assertEqual(self.metadata["body"], "Human-written release notes")
 
     def test_existing_asset_changed_aborts(self):
         with self.assertRaisesRegex(ValueError, "refusing to overwrite"):
-            self.run_publish(download_bytes=b"different bytes")
-        self.assertFalse(any(call[0] == "release" for call in self.calls))
+            self.run_publish(self.metadata, download_bytes=b"different bytes")
+        self.assertEqual(self.writes(), [])
 
-    def test_draft_publishes_without_notes_edit(self):
-        self.metadata["draft"] = True
-        self.run_publish()
-        edits = [call for call in self.calls if call[:2] == ("release", "edit")]
-        self.assertEqual(edits, [("release", "edit", "v1.2.3", "--repo", "owner/repo", "--draft=false")])
+    def test_existing_draft_is_published_by_id_without_notes_edit(self):
+        draft = {**self.metadata, "draft": True, "assets": self.metadata["assets"][:1]}
+        self.run_publish(draft)
+        self.assertEqual(self.writes(), [("upload", 42, self.names[1]), ("upload", 42, self.names[2]), ("publish", 42)])
 
-    def test_new_release_is_draft_until_uploads_complete(self):
-        empty = {**self.metadata, "draft": True, "assets": []}
-        self.run_publish(metadata=[None, empty, self.metadata])
-        writes = [call for call in self.calls if call[0] == "release"]
-        self.assertEqual(writes[0][:2], ("release", "create"))
-        self.assertIn("--verify-tag", writes[0])
-        self.assertIn("--draft", writes[0])
-        self.assertEqual([call[1] for call in writes], ["create", "upload", "upload", "upload", "edit"])
-        self.assertFalse(any("--clobber" in call for call in writes))
+    def test_new_release_is_never_re_read_by_listing(self):
+        # Regression: the release list lags behind a just-created draft, so a
+        # re-read by tag returned None and publishing crashed (v0.3.1, v0.3.2).
+        created = {**self.metadata, "id": 77, "draft": True, "assets": []}
+        lookup = self.run_publish(None, created=created)
+        self.assertEqual(lookup.call_count, 1)
+        self.assertEqual(self.writes(), [("create", "v1.2.3"), *[("upload", 77, name) for name in self.names], ("publish", 77)])
+        self.assertEqual(self.calls[-1], ("get", 77))
+
+    def test_missing_tag_never_creates_a_release(self):
+        with self.assertRaisesRegex(ValueError, "does not exist"):
+            self.run_publish(None, created={"id": 1}, tag_exists=False)
+        self.assertEqual(self.writes(), [])
 
     def test_draft_release_is_found_by_listing_not_tag_endpoint(self):
         draft = {"tag_name": "v1.2.3", "draft": True, "assets": []}
