@@ -14,6 +14,13 @@ namespace InfoPanel.Extras
 
         private static string ResolveConfigPath()
         {
+            // An isolated run must not read or write the installation's INI,
+            // even when a developer's plugin directory happens to be writable.
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("INFOPANEL_DATA_DIR")))
+            {
+                return ResolveDataConfigPath();
+            }
+
             // Historical location: next to the plugin assembly. Works for the
             // tarball install in the user's home, but system packages put the
             // plugin in a read-only location (/opt, /usr/lib), where writing
@@ -34,12 +41,15 @@ namespace InfoPanel.Extras
             }
             catch
             {
-                var dataDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "InfoPanel", "plugins");
-                Directory.CreateDirectory(dataDir);
-                return Path.Combine(dataDir, Path.GetFileName(legacy));
+                return ResolveDataConfigPath();
             }
+        }
+
+        private static string ResolveDataConfigPath()
+        {
+            var dataDir = Path.Combine(Utils.DataDirectory.GetBaseFolder(), "plugins");
+            Directory.CreateDirectory(dataDir);
+            return Path.Combine(dataDir, $"{Path.GetFileName(Assembly.GetExecutingAssembly().Location)}.ini");
         }
 
         public readonly static string SECTION_WEATHER = "Weather"; 
@@ -89,6 +99,7 @@ namespace InfoPanel.Extras
             if (IsDirty)
             {
                 var parser = new FileIniDataParser();
+                Directory.CreateDirectory(Path.GetDirectoryName(_configFilePath)!);
                 parser.WriteFile(_configFilePath, IniData);
                 IsDirty = false;
             }

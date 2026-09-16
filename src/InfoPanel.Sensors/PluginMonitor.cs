@@ -53,10 +53,7 @@ namespace InfoPanel.Monitors
         public List<PluginDescriptor> Plugins { get; private set; } = [];
 
         private PluginMonitor() {
-            if(!Directory.Exists(FileUtil.GetExternalPluginFolder()))
-            {
-                Directory.CreateDirectory(FileUtil.GetExternalPluginFolder());
-            }
+            Directory.CreateDirectory(FileUtil.GetExternalPluginFolder());
         }
 
         public void SavePluginState()
@@ -64,7 +61,9 @@ namespace InfoPanel.Monitors
             try
             {
                 var deactivatedPlugins = Plugins.Where(p => p.PluginWrappers.All(w => !w.Value.IsRunning)).Select(p => p.FilePath).ToList();
-                File.WriteAllLines(FileUtil.GetPluginStateFile(), deactivatedPlugins);
+                var filePath = FileUtil.GetPluginStateFile();
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+                File.WriteAllLines(filePath, deactivatedPlugins);
             }
             catch { }
         }
@@ -339,7 +338,9 @@ namespace InfoPanel.Monitors
         {
             try
             {
-                File.WriteAllLines(FileUtil.GetPluginModuleStateFile(), DeactivatedModules);
+                var filePath = FileUtil.GetPluginModuleStateFile();
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+                File.WriteAllLines(filePath, DeactivatedModules);
             }
             catch { }
         }

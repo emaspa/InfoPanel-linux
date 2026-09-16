@@ -122,9 +122,7 @@ namespace InfoPanel.Models
                 {
                     if (FilePath != null)
                     {
-                        return Path.Combine(
-                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                            "InfoPanel", "assets", ProfileGuid.ToString(), FilePath);
+                        return Utils.FileUtil.GetRelativeAssetPath(ProfileGuid, FilePath);
                     }
                     else
                     {

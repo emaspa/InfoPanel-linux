@@ -110,7 +110,9 @@ namespace InfoPanel.ViewModels
             {
                 try
                 {
-                    File.Copy(localPath, Path.Combine(FileUtil.GetExternalPluginFolder(), Path.GetFileName(localPath)), true);
+                    var pluginFolder = FileUtil.GetExternalPluginFolder();
+                    Directory.CreateDirectory(pluginFolder);
+                    File.Copy(localPath, Path.Combine(pluginFolder, Path.GetFileName(localPath)), true);
                     ShowRestartBanner = true;
                 }
                 catch { }

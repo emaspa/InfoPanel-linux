@@ -33,16 +33,19 @@ namespace InfoPanel.Persistence
             typeof(GaugeDisplayItem), typeof(ShapeDisplayItem), typeof(GuideDisplayItem)
         ];
 
-        /// <summary>Overrides the data directory (tests, portable mode). Null = default XDG location.</summary>
-        public static string? BaseFolderOverride { get; set; }
+        private static string? _baseFolderOverride;
+
+        /// <summary>Overrides the data directory (tests, portable mode). Null = environment/XDG location.</summary>
+        public static string? BaseFolderOverride
+        {
+            get => Volatile.Read(ref _baseFolderOverride);
+            set => Volatile.Write(ref _baseFolderOverride, value);
+        }
 
         /// <summary>Optional owner-thread migration after deserialization and profile attachment. Must not save.</summary>
         public static Action<Profile, IList<DisplayItem>>? PostLoadHook { get; set; }
 
-        public static string BaseFolder =>
-            BaseFolderOverride ??
-            Environment.GetEnvironmentVariable("INFOPANEL_DATA_DIR") ??
-            Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel");
+        public static string BaseFolder => Utils.DataDirectory.GetBaseFolder(BaseFolderOverride);
 
         public static string ProfilesFolder => Path.Combine(BaseFolder, "profiles");
         public static string AssetsFolder => Path.Combine(BaseFolder, "assets");
@@ -55,9 +58,8 @@ namespace InfoPanel.Persistence
             await _settingsSaveSemaphore.WaitAsync();
             try
             {
-                Directory.CreateDirectory(BaseFolder);
-
                 var fileName = SettingsFile;
+                Directory.CreateDirectory(Path.GetDirectoryName(fileName)!);
                 var tempFileName = fileName + ".tmp";
                 var backupFileName = fileName + ".bak";
 
@@ -149,9 +151,8 @@ namespace InfoPanel.Persistence
         /// </summary>
         public static void SaveProfiles(IReadOnlyList<Profile> profiles, bool cleanupOrphans = true)
         {
-            Directory.CreateDirectory(BaseFolder);
-
             var fileName = Path.Combine(BaseFolder, "profiles.xml");
+            Directory.CreateDirectory(Path.GetDirectoryName(fileName)!);
             var xs = new XmlSerializer(typeof(List<Profile>));
             var settings = new XmlWriterSettings() { Encoding = Encoding.UTF8, Indent = true };
             using (var wr = XmlWriter.Create(fileName, settings))
@@ -217,8 +218,8 @@ namespace InfoPanel.Persistence
 
         public static void SaveDisplayItems(Profile profile, ICollection<DisplayItem> displayItems)
         {
-            Directory.CreateDirectory(ProfilesFolder);
             var fileName = Path.Combine(ProfilesFolder, profile.Guid + ".xml");
+            Directory.CreateDirectory(Path.GetDirectoryName(fileName)!);
 
             var xs = new XmlSerializer(typeof(List<DisplayItem>), DisplayItemExtraTypes);
             var settings = new XmlWriterSettings() { Encoding = Encoding.UTF8, Indent = true };
@@ -250,8 +251,9 @@ namespace InfoPanel.Persistence
                 return;
             }
 
-            Directory.CreateDirectory(AutosaveFolder);
-            File.Copy(source, Path.Combine(AutosaveFolder, profile.Guid + ".xml"), overwrite: true);
+            var destination = Path.Combine(AutosaveFolder, profile.Guid + ".xml");
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(source, destination, overwrite: true);
         }
 
         /// <summary>Local timestamp of the profile's backup, or null when none exists.</summary>

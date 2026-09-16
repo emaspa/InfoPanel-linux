@@ -17,22 +17,18 @@ namespace InfoPanel.Utils
 
         public static string GetExternalPluginFolder()
         {
-            if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
-            {
-                return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel", "plugins");
-            }
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "InfoPanel", "plugins");
+            return Path.Combine(Persistence.ConfigPersistence.BaseFolder, "plugins");
         }
 
         public static string GetPluginStateFile()
         {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel", "plugins.bin");
+            return Path.Combine(Persistence.ConfigPersistence.BaseFolder, "plugins.bin");
         }
 
         /// <summary>Deactivated module ids (one per line) - module-level toggles within a package.</summary>
         public static string GetPluginModuleStateFile()
         {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel", "plugin-modules.bin");
+            return Path.Combine(Persistence.ConfigPersistence.BaseFolder, "plugin-modules.bin");
         }
 
         public static string GetRelativeAssetPath(Profile profile, string fileName)
@@ -47,9 +43,7 @@ namespace InfoPanel.Utils
 
         public static string GetRelativeAssetPath(string profileGuid, string fileName)
         {
-            return Path.Combine(
-                           Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                           "InfoPanel", "assets", profileGuid, fileName);
+            return Path.Combine(GetAssetPath(profileGuid), fileName);
         }
 
         public static string GetAssetPath(Profile profile)
@@ -63,11 +57,11 @@ namespace InfoPanel.Utils
         }
         public static string GetAssetPath(string profileGuid)
         {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel", "assets", profileGuid);
+            return Path.Combine(GetAssetDirectory(), profileGuid);
         }
         public static string GetAssetDirectory()
         {
-            return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "InfoPanel", "assets");
+            return Persistence.ConfigPersistence.AssetsFolder;
         }
 
         public static async Task<bool> SaveAsset(Profile profile, string fileName, byte[] data)
