@@ -59,7 +59,15 @@
             </StackPanel>
         </Border>
 
-        <Grid ColumnDefinitions="270,4,*,4,300">
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <!-- Leave room for indentation and readings when the splitter is narrowed. -->
+                <ColumnDefinition Width="270" MinWidth="210" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="300" />
+            </Grid.ColumnDefinitions>
 
             <!-- Left: layers + sensors -->
             <TabControl Grid.Column="0">
@@ -79,22 +87,22 @@
                                 <Button Content="Bottom" FontSize="11" Margin="0,0,4,4" Click="LayerBottom_Click" ToolTip.Tip="Send to back" />
                             </StackPanel>
                         </StackPanel>
-                        <TreeView x:Name="LayersTree" SelectionChanged="LayersTree_SelectionChanged">
+                        <TreeView x:Name="LayersTree" SelectionChanged="LayersTree_SelectionChanged"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                             <TreeView.ItemTemplate>
                                 <TreeDataTemplate x:DataType="models:DisplayItem">
-                                    <DockPanel>
-                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="6">
+                                        <TextBlock Text="{Binding Kind}" FontSize="10" Opacity="0.55" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                                        <TextBlock Grid.Column="2" FontSize="10" Opacity="0.55" VerticalAlignment="Center">
+                                            <Run Text="(" /><Run Text="{Binding X}" /><Run Text="," /><Run Text="{Binding Y}" /><Run Text=")" />
+                                        </TextBlock>
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4">
                                             <TextBlock Text="H" FontSize="10" Opacity="0.6" IsVisible="{Binding Hidden}" VerticalAlignment="Center" />
                                             <TextBlock Text="L" FontSize="10" Opacity="0.6" IsVisible="{Binding IsLocked}" VerticalAlignment="Center" />
                                         </StackPanel>
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <TextBlock Text="{Binding Kind}" FontSize="10" Opacity="0.55" VerticalAlignment="Center" />
-                                            <TextBlock Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="130" />
-                                            <TextBlock FontSize="10" Opacity="0.55" VerticalAlignment="Center">
-                                                <Run Text="(" /><Run Text="{Binding X}" /><Run Text="," /><Run Text="{Binding Y}" /><Run Text=")" />
-                                            </TextBlock>
-                                        </StackPanel>
-                                    </DockPanel>
+                                    </Grid>
                                 </TreeDataTemplate>
                             </TreeView.ItemTemplate>
                         </TreeView>
@@ -121,6 +129,7 @@
                         </StackPanel>
                         <TreeView x:Name="SensorTree" DoubleTapped="SensorTree_DoubleTapped"
                                   Tapped="SensorTree_Tapped"
+                                  ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                                   SelectionChanged="SensorTree_SelectionChanged">
                             <TreeView.Styles>
                                 <Style Selector="TreeViewItem" x:DataType="vm:SensorTreeItem">
@@ -129,11 +138,12 @@
                             </TreeView.Styles>
                             <TreeView.ItemTemplate>
                                 <TreeDataTemplate x:DataType="vm:SensorTreeItem" ItemsSource="{Binding Children}">
-                                    <DockPanel Opacity="{Binding DisplayOpacity}">
-                                        <TextBlock DockPanel.Dock="Right" Text="{Binding DisplayValue}"
+                                    <Grid ColumnDefinitions="*,Auto" Opacity="{Binding DisplayOpacity}">
+                                        <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding DisplayName}" />
+                                        <TextBlock Grid.Column="1" Text="{Binding DisplayValue}"
                                                    FontSize="11" Opacity="0.7" VerticalAlignment="Center" Margin="8,0,0,0" />
-                                        <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
-                                    </DockPanel>
+                                    </Grid>
                                 </TreeDataTemplate>
                             </TreeView.ItemTemplate>
                         </TreeView>

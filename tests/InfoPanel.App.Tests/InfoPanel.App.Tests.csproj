@@ -3,6 +3,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
+    <!-- The offscreen layout fixture supplies Avalonia's platform services. -->
+    <AvaloniaAccessUnstablePrivateApis>true</AvaloniaAccessUnstablePrivateApis>
   </PropertyGroup>
 
   <ItemGroup>
@@ -13,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\InfoPanel.App\InfoPanel.App.csproj" />
+    <Compile Include="../InfoPanel.Sensors.Linux.Tests/FakeSysfs.cs" Link="FakeSysfs.cs" />
   </ItemGroup>
 
 </Project>

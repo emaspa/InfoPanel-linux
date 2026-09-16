@@ -10,7 +10,7 @@
         </StackPanel>
         <TextBox x:Name="SearchBox" DockPanel.Dock="Top" PlaceholderText="Search sensors…"
                  Margin="0,0,0,8" TextChanged="Search_TextChanged" />
-        <TreeView x:Name="Tree" Tapped="Tree_Tapped">
+        <TreeView x:Name="Tree" Tapped="Tree_Tapped" ScrollViewer.HorizontalScrollBarVisibility="Disabled">
             <TreeView.Styles>
                 <Style Selector="TreeViewItem" x:DataType="vm:SensorTreeItem">
                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
@@ -18,11 +18,12 @@
             </TreeView.Styles>
             <TreeView.ItemTemplate>
                 <TreeDataTemplate x:DataType="vm:SensorTreeItem" ItemsSource="{Binding Children}">
-                    <DockPanel Opacity="{Binding DisplayOpacity}">
-                        <TextBlock DockPanel.Dock="Right" Text="{Binding DisplayValue}"
+                    <Grid ColumnDefinitions="*,Auto" Opacity="{Binding DisplayOpacity}">
+                        <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding DisplayName}" />
+                        <TextBlock Grid.Column="1" Text="{Binding DisplayValue}"
                                    FontSize="12" Opacity="0.75" VerticalAlignment="Center" Margin="8,0,0,0" />
-                        <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
-                    </DockPanel>
+                    </Grid>
                 </TreeDataTemplate>
             </TreeView.ItemTemplate>
         </TreeView>
