@@ -67,6 +67,9 @@ KERNEL=="hidraw*", ATTRS{idVendor}=="264a", ATTRS{idProduct}=="2347", MODE="0666
 # ASRock Phantom Gaming 360 LCD (hidraw)
 SUBSYSTEM=="usb", ATTR{idVendor}=="26ce", ATTR{idProduct}=="0a10", MODE="0666"
 KERNEL=="hidraw*", ATTRS{idVendor}=="26ce", ATTRS{idProduct}=="0a10", MODE="0666"
+# ASRock Steel Legend 360 LCD (hidraw)
+SUBSYSTEM=="usb", ATTR{idVendor}=="26ce", ATTR{idProduct}=="0a11", MODE="0666"
+KERNEL=="hidraw*", ATTRS{idVendor}=="26ce", ATTRS{idProduct}=="0a11", MODE="0666"
 
 # Jungle Leopard / Hongtai cooler displays and Jonsbo DS916 (CDC serial - grants
 # access without dialout membership; both are Artinchip 33c3 SKUs)
