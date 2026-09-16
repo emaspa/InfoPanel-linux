@@ -9,7 +9,7 @@ public sealed record HwmonPollPlan(ImmutableArray<HwmonPollEntry> Entries);
 public sealed record HwmonScanResult(SensorCatalogSnapshot Snapshot, HwmonPollPlan PollPlan, bool IsIdentical);
 
 /// <summary>Builds immutable scan candidates without reading a single input value.</summary>
-public sealed class HwmonCatalogScanner(SysfsAccess sysfs)
+public sealed class HwmonCatalogScanner(SysfsAccess sysfs, Func<IEnumerable<SensorDescriptor>>? systemDescriptors = null)
 {
     private readonly HwmonIdentity _identity = new(sysfs);
     private static readonly Dictionary<string, (string Category, string Unit, double Divisor)> Channels = new(StringComparer.Ordinal)
@@ -71,9 +71,10 @@ public sealed class HwmonCatalogScanner(SysfsAccess sysfs)
                 });
             }
         }
+        if (systemDescriptors != null) descriptors.AddRange(systemDescriptors());
         var identical = previous?.HasSameDescriptors(descriptors) == true;
         var snapshot = identical ? previous! : new SensorCatalogSnapshot((previous?.Generation ?? 0) + 1, descriptors);
-        var plan = new HwmonPollPlan(snapshot.Descriptors.Where(d => !d.IsAmbiguous)
+        var plan = new HwmonPollPlan(snapshot.Descriptors.Where(d => !d.IsAmbiguous && d.Id.Source != "system")
             .Select(d => new HwmonPollEntry(d.StableId, d.ValuePath, d.RealPath, d.Unit, d.Divisor)).ToImmutableArray());
         return new(snapshot, plan, identical);
     }

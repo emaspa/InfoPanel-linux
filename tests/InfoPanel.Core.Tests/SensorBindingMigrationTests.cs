@@ -10,6 +10,45 @@ namespace InfoPanel.Core.Tests;
 [Collection("ConfigPersistence")]
 public sealed class SensorBindingMigrationTests(SensorStateFixture fixture) : SensorStateTest(fixture)
 {
+    [Theory]
+    [InlineData("system/disk/nvme0n1/read_speed", "system/disk/nvme-serial+233529800995/read_speed")]
+    [InlineData("system/block/sda/read_iops", "system/block/block-wwid+naa.123/read_iops")]
+    [InlineData("system/gpu/temperature", "system/gpu/gpu-uuid+GPU-123~pci+0000-01-00.0/temperature")]
+    [InlineData("system/gpu/1/temperature", "system/gpu/pci+0000-02-00.0/temperature")]
+    [InlineData("system/amdgpu/temperature", "system/amdgpu/pci+0000-03-00.0/temperature")]
+    [InlineData("system/amdgpu/1/clock_graphics", "system/amdgpu/pci+0000-04-00.0/clock_graphics")]
+    public void SystemLegacyMigrationPersistsCanonicalIdAndOriginalAlias(string alias, string stable)
+    {
+        var resolver = new SensorIdResolver();
+        resolver.Publish(new(1, [new SensorDescriptor(SensorId.Parse(stable)) { LegacyAliases = [alias], Label = "Product label" }]));
+        SensorReader.ConfigureResolver(resolver);
+        var item = new SensorDisplayItem { LibreSensorId = alias, SensorName = "Old item label" };
+        Assert.Single(SensorBindingMigration.Migrate([item]).Migrated);
+        Assert.Equal(stable, item.LibreSensorId);
+        Assert.Equal(alias, item.HardwareSensorIdentity!.OriginalId);
+        var xml = SensorBindingTests.Serialize(item);
+        Assert.Contains($"<LibreSensorId>{stable}</LibreSensorId>", xml);
+        Assert.Contains($"<OriginalId>{alias}</OriginalId>", xml);
+        Assert.False(SensorBindingMigration.Migrate([item]).HasChanges);
+        Assert.Equal(xml, SensorBindingTests.Serialize(item));
+    }
+
+    [Fact]
+    public void SystemCpuRemainsByteIdenticalWhileMissingDiskAliasRemainsUnresolved()
+    {
+        var resolver = SensorStateFixture.PublishWireView();
+        var cpu = new SensorDisplayItem { LibreSensorId = "system/cpu/total" };
+        var disk = new SensorDisplayItem { LibreSensorId = "system/disk/nvme0n1/read_speed" };
+        var before = SensorBindingTests.Serialize(cpu);
+        var diskBefore = SensorBindingTests.Serialize(disk);
+        var report = SensorBindingMigration.Migrate([cpu, disk]);
+        Assert.Single(report.Unresolved);
+        Assert.False(report.HasChanges);
+        Assert.Equal(before, SensorBindingTests.Serialize(cpu));
+        Assert.Equal(diskBefore, SensorBindingTests.Serialize(disk));
+        Assert.Null(cpu.HardwareSensorIdentity);
+    }
+
     [Fact]
     public void WarningGuardStaysBoundedAcrossImportedItemsAndBindingEdits()
     {

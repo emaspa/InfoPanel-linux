@@ -46,7 +46,7 @@ The Sensors page lists everything InfoPanel can read on your system: CPU, GPU, m
 
 Hardware bindings normally survive reboots even when Linux changes `hwmonN` or `thermal_zoneN` numbering. InfoPanel checks for hardware changes every 10 seconds, so a newly connected sensor may take that long to appear. Disconnected sensors show no current value and recover automatically when the same identifiable device returns. Devices with the same chip name appear separately using their hardware identity. Physical relocation or firmware changes can require rebinding for devices identified by location.
 
-Disk, network and GPU metrics under `system/...` keep their existing IDs and remain subject to provider-specific naming changes. Plugin sensor IDs are unchanged. Exported profiles and sensor dumps can contain device serial numbers used in stable IDs.
+Disk and block I/O metrics under `system/...` use drive serials or WWIDs, and NVIDIA/AMD GPU metrics use UUID/PCI identity, so ordinary kernel device renumbering no longer changes their IDs. Disks without a serial or WWID retain a weak kernel-name fallback. Older disk/GPU bindings migrate when their current-boot alias identifies one sensor; these matches are logged as low confidence. Network interface names remain as-is (predictable names are usually stable). Intel GPU keys stay unchanged and select the card with the lowest PCI address. Plugin sensor IDs are unchanged. Exported profiles and sensor dumps can contain device serial numbers used in stable IDs.
 
 ## Plugins
 
@@ -89,7 +89,7 @@ Enable the web server in Settings to view live profile renders from any browser 
 - **Panel stopped responding** after a crash: unplug and replug it, or reset it with `usbreset <vid:pid>`.
 - **Overlay not visible on Wayland**: overlays render through XWayland; make sure XWayland is available (it is on standard GNOME and KDE sessions).
 - **Weather shows no data**: set the API key and city in the weather plugin's configuration on the Plugins page.
-- **Sensor missing after a reboot or hardware change**: allow up to 10 seconds for discovery, then check the Sensors page and the selected item's binding status in the designer. InfoPanel will not choose arbitrarily between indistinguishable devices. Use **Replace Sensor** if needed. For diagnostics, run `infopanel --dump-sensors --verbose`: it prints canonical IDs, labels, availability, current legacy aliases and identity strength. Check the logs for the original ID and resolution result. IDs under `system/...` still have the naming limitations described above.
+- **Sensor missing after a reboot or hardware change**: allow up to 10 seconds for discovery, then check the Sensors page and the selected item's binding status in the designer. InfoPanel will not choose arbitrarily between indistinguishable devices. Use **Replace Sensor** if needed. For diagnostics, run `infopanel --dump-sensors --verbose`: it prints canonical IDs, labels, availability, current legacy aliases and identity strength. Check the logs for the original ID and resolution result. Network names and weak disk fallbacks retain the naming limitations described above; physical GPU relocation can change PCI-based IDs.
 - Logs live in `~/.local/share/InfoPanel/logs/`.
 
 ## Getting help

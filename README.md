@@ -84,8 +84,14 @@ Older profiles are upgraded when InfoPanel can identify one matching sensor;
 successful migrations are saved automatically. Missing or ambiguous bindings
 keep their original IDs and show an unresolved status with a **Replace Sensor**
 hint in the designer inspector. Identical devices with no distinguishing
-identity may require manual rebinding. Disk, network and GPU IDs under
-`system/...` are unchanged and still have provider-specific naming limitations.
+identity may require manual rebinding. Disk throughput and block I/O IDs under
+`system/...` now use drive serials or WWIDs; NVIDIA GPU IDs use UUIDs with PCI
+location, and AMD GPU IDs use PCI location. These IDs keep the same shape on
+single- and multi-GPU systems. Disks without serials/WWIDs fall back to a weak
+kernel-name identity. Older disk/GPU bindings migrate using a unique current-boot
+alias, logged as low confidence. Network interface names remain as-is (predictable
+names are usually stable); Intel GPU keys stay unchanged and select the lowest
+PCI address.
 
 ### Plugins
 

@@ -280,6 +280,43 @@ public sealed class SensorBindingTests : IDisposable
         Assert.Same(queue, GraphDraw.GetGraphDataQueue(GraphDraw.GetHardwareHistoryKey(legacy)!));
     }
 
+    [Theory]
+    [InlineData("system/disk/nvme-serial+drive/read_speed", "system/disk/nvme0n1/read_speed")]
+    [InlineData("system/gpu/gpu-uuid+GPU-A/temperature", "system/gpu/temperature")]
+    public void Graph_SystemAliasUsesCanonicalHistoryAndRemovalDropsQueue(string stable, string alias)
+    {
+        var descriptor = new SensorDescriptor(SensorId.Parse(stable)) { LegacyAliases = [alias] };
+        Publish(descriptor);
+        var chart = new GraphDisplayItem { SensorType = SensorType.Hwmon, LibreSensorId = alias };
+        Assert.Equal(stable, GraphDraw.GetHardwareHistoryKey(chart));
+        var queue = GraphDraw.GetGraphDataQueue(stable);
+        queue.Enqueue(42);
+        Publish();
+        RenderingServices.OnHardwareCatalogChanged(_resolver.Snapshot!);
+        Assert.Null(GraphDraw.GetHardwareHistoryKey(chart));
+        Assert.NotSame(queue, GraphDraw.GetGraphDataQueue(stable));
+        Publish(descriptor);
+        var replugged = GraphDraw.GetGraphDataQueue(stable);
+        replugged.Enqueue(12);
+        Publish();
+        GraphDraw.PruneHardwareHistory();
+        Assert.NotSame(replugged, GraphDraw.GetGraphDataQueue(stable));
+    }
+
+    [Fact]
+    public void Tree_AnchoredDisksShareSystemDeviceNode()
+    {
+        var tree = new SensorTreeViewModel();
+        var descriptors = new[] { "drive-a", "drive-b" }.Select(serial => new SensorDescriptor(
+            SensorId.System("disk", SensorId.Component("nvme-serial", serial), "read_speed"))
+        { ChipDisplayName = "System Disk I/O", Category = "Throughput", Label = serial + " Read" });
+        tree.Rebuild(descriptors.Select(d => new HwmonSensorInfo
+        { SensorId = d.StableId, ChipKey = d.ChipKey, DeviceName = d.ChipDisplayName, Category = d.Category, Label = d.Label }));
+        var device = Assert.Single(tree.Roots[0].Children);
+        Assert.Equal("System Disk I/O", device.Name);
+        Assert.Equal(2, Assert.Single(device.Children).Children.Count);
+    }
+
     [Fact]
     public void Graph_UnresolvedAndAmbiguousBindingsHaveNoKey()
     {

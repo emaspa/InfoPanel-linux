@@ -36,7 +36,8 @@ public static class SensorBindingMigration
             }
             if (item is not ISensorItem sensor || sensor.SensorType != SensorType.Hwmon
                 || string.IsNullOrEmpty(sensor.LibreSensorId)
-                || sensor.LibreSensorId.StartsWith("system/", StringComparison.Ordinal)) return;
+                || (sensor.LibreSensorId.StartsWith("system/", StringComparison.Ordinal)
+                    && !SensorId.IsMigratedSystemFamily(sensor.LibreSensorId))) return;
 
             var oldId = sensor.LibreSensorId;
             var result = SensorReader.ResolveHwmonSensor(sensor.GetSensorReference());

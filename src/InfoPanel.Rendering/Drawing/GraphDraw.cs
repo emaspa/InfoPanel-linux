@@ -119,7 +119,8 @@ namespace InfoPanel.Drawing
             lock (SampleGate)
             {
                 foreach (var key in GraphDataCache2.Keys)
-                    if (!key.StartsWith("system/", StringComparison.Ordinal) && !catalog.StableIdIndex.ContainsKey(key))
+                    if ((!key.StartsWith("system/", StringComparison.Ordinal) || SensorId.IsMigratedSystemFamily(key))
+                        && !catalog.StableIdIndex.ContainsKey(key))
                         GraphDataCache2.TryRemove(key, out _);
                 _catalogGeneration = catalog.Generation;
                 PruneUnusedHistory(Environment.TickCount64);
@@ -127,7 +128,7 @@ namespace InfoPanel.Drawing
         }
 
         // Catalog membership, not reading availability: a failed input read does not
-        // retire an otherwise present descriptor's history. system/... is outside the catalog.
+        // retire an otherwise present descriptor's history. Only unmigrated system families bypass the catalog.
         internal static void PruneHardwareHistory()
         {
             lock (SampleGate)
@@ -136,7 +137,7 @@ namespace InfoPanel.Drawing
                 if (_catalogGeneration == generation) return;
                 foreach (var key in GraphDataCache2.Keys)
                 {
-                    if (key.StartsWith("system/", StringComparison.Ordinal)) continue;
+                    if (key.StartsWith("system/", StringComparison.Ordinal) && !SensorId.IsMigratedSystemFamily(key)) continue;
                     var resolution = SensorReader.ResolveHwmonSensor(new SensorReference(key));
                     if (resolution.Status != SensorResolutionStatus.Resolved || resolution.CanonicalId != key)
                         GraphDataCache2.TryRemove(key, out _);

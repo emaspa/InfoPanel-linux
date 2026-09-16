@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using InfoPanel.Enums;
+using Serilog;
 
 namespace InfoPanel.Sensors;
 
@@ -21,7 +22,9 @@ public sealed class SensorIdResolver
     public SensorResolution Resolve(SensorReference reference)
     {
         var publication = Volatile.Read(ref _current);
-        if (reference.SourceType == SensorType.Hwmon && reference.Id?.StartsWith("system/", StringComparison.Ordinal) == true)
+        if (reference.SourceType == SensorType.Hwmon && reference.Id?.StartsWith("system/", StringComparison.Ordinal) == true
+            && !SensorId.IsMigratedSystemFamily(reference.Id)
+            && publication?.Snapshot.StableIdIndex.ContainsKey(reference.Id) != true)
             return new(SensorResolutionStatus.Resolved, reference.Id, null, publication?.Snapshot.Generation ?? 0, SensorMatchReason.Exact);
         if (publication == null) return new(SensorResolutionStatus.NotReady, null, null, 0);
         if (publication.Cache.TryGetValue(reference, out var cached)) return cached;
@@ -43,6 +46,15 @@ public sealed class SensorIdResolver
         if (reference.SourceType != SensorType.Hwmon || string.IsNullOrEmpty(reference.Id)) return Missing();
         if (catalog.StableIdIndex.TryGetValue(reference.Id, out var exact)) return Found(exact, SensorMatchReason.Exact);
         if (catalog.AmbiguityIndex.ContainsKey(reference.Id)) return Missing(SensorResolutionStatus.Ambiguous);
+
+        if (SensorId.IsLegacySystem(reference.Id))
+        {
+            var systemAliases = catalog.LegacyAliasIndex.GetValueOrDefault(reference.Id, []);
+            if (systemAliases.Length != 1 || systemAliases[0].IsAmbiguous) return Missing();
+            Log.Information("Low-confidence LegacyAlias system sensor binding: {OldId} → {NewId} (current-boot alias)",
+                reference.Id, systemAliases[0].StableId);
+            return Found(systemAliases[0], SensorMatchReason.LegacyAlias);
+        }
 
         var stable = SensorId.TryParse(reference.Id, out var parsed);
         var legacy = SensorId.IsLegacy(reference.Id);

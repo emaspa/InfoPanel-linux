@@ -33,8 +33,8 @@ decisions below OVERRIDE the corresponding parts of the original design that fol
    only when this boot's `hwmonN` chip, the channel, and (when present) the item's
    `SensorName` label agree on exactly one catalog descriptor; with no label hint,
    accept only if that channel name exists on exactly one chip in the catalog.
-9. **`system/...` keys** (disk, network, gpu, amdgpu, igpu): untouched; documented
-   as a follow-up.
+9. **`system/...` keys**: initially deferred. The approved [system provider follow-up](#follow-up-system-provider-ids)
+   below supersedes this decision for disk/block, NVIDIA/AMD GPU IDs and Intel card selection.
 10. **Tests**: new xunit project `tests/InfoPanel.Sensors.Linux.Tests` with the fake
     sysfs root fixture; Core resolver/migration tests in `tests/InfoPanel.Core.Tests`.
     Existing golden-file fixture and its `hwmon4/curr5` expectation stay unchanged.
@@ -756,3 +756,36 @@ Add under **Troubleshooting**:
 10. **Update documentation and validate on real hardware.**  
     Add the supplied paragraphs and compare canonical dumps before/after reboot; exercise hotplug where available.  
     **Acceptance:** this machine’s two NVMe bindings remain attached to their respective serials; WireView/coretemp/thermal bindings retain identity; unresolved cases are diagnosable; deferred `system/...` limitations are documented.
+
+## Follow-up: system provider ids
+
+Approved follow-up (2026-09-16), superseding scope decision 9 for disk/block,
+NVIDIA/AMD GPU identity and Intel card selection only:
+
+- `system/disk/<anchor>/read_speed|write_speed` and
+  `system/block/<anchor>/queue_depth|read_iops|write_iops|read_latency|write_latency`.
+  Anchors prefer the actual NVMe controller's `nvme-serial+<serial>`, then
+  `block-wwid+<wwid>`, `block-serial+<serial>`, finally weak `name+<kernel-name>`.
+  Multiple namespaces with the same complete serial identity remain ambiguous;
+  no enumeration-derived discriminator is invented.
+- NVIDIA: `system/gpu/gpu-uuid+<uuid>~pci+<dddd-bb-dd.f>/<metric>`;
+  UUID alone if PCI is unavailable, or `pci+<address>` if UUID is unavailable.
+  AMD: `system/amdgpu/pci+<dddd-bb-dd.f>/<metric>`. Both singleton and multiple
+  GPUs always use anchored keys. No identity means no bindable GPU entry.
+  Tokens use the existing `SensorId.Component` percent encoding.
+- System descriptors join the same catalog on every 10-second rescan, with
+  current legacy aliases, display labels, units and identity strength. Only
+  stable keys are published/demanded; departed readings are removed. Empty
+  `ChipKey` retains the existing system grouping by display device name.
+- **Low-confidence alias decision:** for legacy disk/block kernel-name and
+  single/indexed NVIDIA/AMD bindings, one current-boot alias match is sufficient
+  evidence regardless of the item's label. Resolve as `LegacyAlias`, log low
+  confidence, migrate in memory and persist on the next normal save. Ambiguous
+  or absent aliases remain unresolved. The hwmon/thermal evidence rules remain.
+- ROCm and DRM clock paths join by the full PCI address. The decoder follows
+  [ROCm's BDF layout](https://rocm.docs.amd.com/projects/rocm_smi_lib/en/docs-7.1.0/doxygen/html/group__PCIeQuer.html).
+  The NVML UUID binding uses a 96-byte buffer following the
+  [NVML UUID buffer constants](https://docs.nvidia.com/deploy/nvml-api/group__nvmlConstants.html).
+- Intel retains `system/igpu/...`, selecting the lowest PCI address. Network,
+  filesystem, power, RAPL and CPU keys remain untouched. PCI identities are
+  location-based; physical relocation/topology changes can require rebinding.

@@ -1,4 +1,5 @@
 using InfoPanel.Models;
+using InfoPanel.Sensors;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -16,6 +17,10 @@ public class NvmlMonitor
     private int _deviceCount;
     private IntPtr[] _deviceHandles = [];
     private string[] _deviceNames = [];
+    private SensorId?[] _deviceIds = [];
+    private uint[] _fanCounts = [];
+    private SensorCatalogSnapshot _catalog = new(0, []);
+    private readonly HashSet<string> _updated = new(StringComparer.Ordinal);
 
     // NvAPI (libnvidia-api.so.1) side channel for hotspot/VRAM temperature and
     // core voltage; absent on the open drivers and proprietary drivers < R525.
@@ -28,6 +33,7 @@ public class NvmlMonitor
 
     public void Initialize()
     {
+        if (_initialized) return;
         try
         {
             var ret = Nvml.nvmlInit_v2();
@@ -38,37 +44,6 @@ public class NvmlMonitor
             }
 
             _initialized = true;
-
-            ret = Nvml.nvmlDeviceGetCount_v2(out uint count);
-            if (ret != NvmlReturn.Success || count == 0)
-            {
-                Log.Debug("NVML: no devices found ({Result})", ret);
-                Nvml.nvmlShutdown();
-                _initialized = false;
-                return;
-            }
-
-            _deviceCount = (int)count;
-            _deviceHandles = new IntPtr[_deviceCount];
-            _deviceNames = new string[_deviceCount];
-
-            for (int i = 0; i < _deviceCount; i++)
-            {
-                ret = Nvml.nvmlDeviceGetHandleByIndex_v2((uint)i, out _deviceHandles[i]);
-                if (ret != NvmlReturn.Success)
-                {
-                    Log.Debug("NVML: failed to get handle for GPU {Index}: {Result}", i, ret);
-                    continue;
-                }
-
-                ret = Nvml.nvmlDeviceGetName(_deviceHandles[i], out var name);
-                _deviceNames[i] = ret == NvmlReturn.Success ? name : $"GPU {i}";
-            }
-
-            _available = true;
-            Log.Information("NVML initialized: {Count} GPU(s) found", _deviceCount);
-
-            InitializeNvApi();
         }
         catch (DllNotFoundException)
         {
@@ -78,6 +53,57 @@ public class NvmlMonitor
         {
             Log.Debug(ex, "NVML initialization error");
         }
+    }
+
+    private void RefreshDevices()
+    {
+        _available = false;
+        var ret = Nvml.nvmlDeviceGetCount_v2(out uint count);
+        if (ret != NvmlReturn.Success || count == 0)
+        {
+            Log.Debug("NVML: no devices found ({Result})", ret);
+            return;
+        }
+
+        _deviceCount = (int)count;
+        _deviceHandles = new IntPtr[_deviceCount];
+        _deviceNames = new string[_deviceCount];
+        _deviceIds = new SensorId?[_deviceCount];
+        _fanCounts = new uint[_deviceCount];
+
+        for (int i = 0; i < _deviceCount; i++)
+        {
+            ret = Nvml.nvmlDeviceGetHandleByIndex_v2((uint)i, out _deviceHandles[i]);
+            if (ret != NvmlReturn.Success)
+            {
+                Log.Debug("NVML: failed to get handle for GPU {Index}: {Result}", i, ret);
+                continue;
+            }
+
+            ret = Nvml.nvmlDeviceGetName(_deviceHandles[i], out var name);
+            _deviceNames[i] = ret == NvmlReturn.Success ? name : "NVIDIA GPU";
+            string? uuid = null, pciAddress = null;
+            try { if (Nvml.nvmlDeviceGetUUID(_deviceHandles[i], out var value) == NvmlReturn.Success) uuid = value; }
+            catch (EntryPointNotFoundException) { }
+            try
+            {
+                if (Nvml.nvmlDeviceGetPciInfo_v3(_deviceHandles[i], out var pci) == NvmlReturn.Success)
+                    pciAddress = System.Text.Encoding.ASCII.GetString(pci.busId).TrimEnd('\0');
+            }
+            catch (EntryPointNotFoundException) { }
+            _deviceIds[i] = SystemSensorIdentity.Nvidia(uuid, pciAddress, "temperature");
+            try { Nvml.nvmlDeviceGetNumFans(_deviceHandles[i], ref _fanCounts[i]); }
+            catch (EntryPointNotFoundException) { }
+            _fanCounts[i] = Math.Min(_fanCounts[i], 8);
+            if (_deviceIds[i] == null) Log.Warning("NVML GPU {Index} has no UUID or PCI identity; excluded", i);
+        }
+
+        _available = true;
+
+        _nvApi?.Dispose();
+        _nvApi = null;
+        _nvApiHandles = [];
+        InitializeNvApi();
     }
 
     /// <summary>
@@ -150,6 +176,8 @@ public class NvmlMonitor
 
     public void Shutdown()
     {
+        foreach (var descriptor in _catalog.Descriptors) HwmonMonitor.SENSORHASH.TryRemove(descriptor.StableId, out _);
+        _catalog = new(_catalog.Generation + 1, []);
         if (_initialized)
         {
             try { Nvml.nvmlShutdown(); } catch { }
@@ -164,13 +192,16 @@ public class NvmlMonitor
     public void Poll()
     {
         if (!_available) return;
+        _updated.Clear();
 
         for (int i = 0; i < _deviceCount; i++)
         {
             var handle = _deviceHandles[i];
             if (handle == IntPtr.Zero) continue;
 
-            var prefix = _deviceCount == 1 ? "system/gpu" : $"system/gpu/{i}";
+            if (_deviceIds[i] is not { } id || !_catalog.StableIdIndex.ContainsKey(id.Value)) continue;
+            var prefix = id.Value[..id.Value.LastIndexOf('/')];
+            if (!_catalog.Descriptors.Any(d => d.Id.Identity == id.Identity && SensorDemand.IsHwmonUsed(d.StableId))) continue;
 
             try
             {
@@ -303,80 +334,74 @@ public class NvmlMonitor
                 Log.Debug(ex, "NVML poll error for GPU {Index}", i);
             }
         }
+        foreach (var descriptor in _catalog.Descriptors)
+            if (!_updated.Contains(descriptor.StableId)) HwmonMonitor.SENSORHASH.TryRemove(descriptor.StableId, out _);
+
     }
 
-    public List<HwmonSensorInfo> GetSensorInfoList()
+    private static readonly (string Metric, string Label, string Category, string Unit)[] Metrics =
+    [
+        ("temperature", "Temperature", "Temperature", "°C"),
+        ("temperature_hotspot", "Hotspot Temperature", "Temperature", "°C"),
+        ("temperature_vram", "VRAM Temperature", "Temperature", "°C"),
+        ("power", "Power Draw", "Power", "W"),
+        ("power_limit", "Power Limit", "Power", "W"),
+        ("power_percent", "Power (% of limit)", "Power", "%"),
+        ("voltage", "Core Voltage", "Voltage", "V"),
+        ("utilization", "GPU Utilization", "Utilization", "%"),
+        ("memory_utilization", "Memory Controller", "Utilization", "%"),
+        ("clock_graphics", "Graphics Clock", "Clock", "MHz"),
+        ("clock_memory", "Memory Clock", "Clock", "MHz"),
+        ("clock_sm", "SM Clock", "Clock", "MHz"),
+        ("clock_video", "Video Clock", "Clock", "MHz"),
+        ("pstate", "Performance State", "Status", ""),
+        ("throttle_thermal", "Thermal Throttling", "Status", ""),
+        ("throttle_power", "Power Throttling", "Status", ""),
+        ("memory_used", "Memory Used", "Memory", "MB"),
+        ("memory_total", "Memory Total", "Memory", "MB"),
+        ("memory_percent", "Memory Usage", "Memory", "%"),
+        ("fan_speed", "Fan Speed", "Fan", "%"),
+    ];
+
+    public List<HwmonSensorInfo> GetSensorInfoList() => _catalog.Descriptors.Select(SystemSensorIdentity.Info).ToList();
+
+    public IEnumerable<SensorDescriptor> ScanDescriptors()
     {
-        var result = new List<HwmonSensorInfo>();
-        if (!_available) return result;
-
-        for (int i = 0; i < _deviceCount; i++)
+        var descriptors = new List<SensorDescriptor>();
+        if (!_initialized) Initialize();
+        try
         {
-            var prefix = _deviceCount == 1 ? "system/gpu" : $"system/gpu/{i}";
-            var deviceName = _deviceNames[i] ?? $"GPU {i}";
-
-            foreach (var (suffix, label, category, unit) in new[]
+            if (_initialized) RefreshDevices();
+            if (_available)
             {
-                ("temperature", "Temperature", "Temperature", "°C"),
-                ("temperature_hotspot", "Hotspot Temperature", "Temperature", "°C"),
-                ("temperature_vram", "VRAM Temperature", "Temperature", "°C"),
-                ("power", "Power Draw", "Power", "W"),
-                ("power_limit", "Power Limit", "Power", "W"),
-                ("power_percent", "Power (% of limit)", "Power", "%"),
-                ("voltage", "Core Voltage", "Voltage", "V"),
-                ("utilization", "GPU Utilization", "Utilization", "%"),
-                ("memory_utilization", "Memory Controller", "Utilization", "%"),
-                ("clock_graphics", "Graphics Clock", "Clock", "MHz"),
-                ("clock_memory", "Memory Clock", "Clock", "MHz"),
-                ("clock_sm", "SM Clock", "Clock", "MHz"),
-                ("clock_video", "Video Clock", "Clock", "MHz"),
-                ("pstate", "Performance State", "Status", ""),
-                ("throttle_thermal", "Thermal Throttling", "Status", ""),
-                ("throttle_power", "Power Throttling", "Status", ""),
-                ("memory_used", "Memory Used", "Memory", "MB"),
-                ("memory_total", "Memory Total", "Memory", "MB"),
-                ("memory_percent", "Memory Usage", "Memory", "%"),
-                ("fan_speed", "Fan Speed", "Fan", "%"),
-            })
-            {
-                var key = $"{prefix}/{suffix}";
-                if (HwmonMonitor.SENSORHASH.ContainsKey(key))
+                for (var i = 0; i < _deviceCount; i++)
                 {
-                    result.Add(new HwmonSensorInfo
-                    {
-                        SensorId = key,
-                        DeviceName = $"NVIDIA {deviceName}",
-                        Category = category,
-                        Label = label,
-                        Unit = unit
-                    });
-                }
-            }
-
-            for (int fan = 0; fan < 8; fan++)
-            {
-                var key = $"{prefix}/fan{fan}_rpm";
-                if (HwmonMonitor.SENSORHASH.ContainsKey(key))
-                {
-                    result.Add(new HwmonSensorInfo
-                    {
-                        SensorId = key,
-                        DeviceName = $"NVIDIA {deviceName}",
-                        Category = "Fan",
-                        Label = $"Fan {fan + 1} RPM",
-                        Unit = "RPM"
-                    });
+                    if (_deviceIds[i] is not { } id) continue;
+                    var prefix = id.Value[..id.Value.LastIndexOf('/')];
+                    var alias = _deviceCount == 1 ? "system/gpu" : $"system/gpu/{i}";
+                    foreach (var metric in Metrics)
+                        descriptors.Add(SystemSensorIdentity.Descriptor(SensorId.Parse($"{prefix}/{metric.Metric}"),
+                            $"{alias}/{metric.Metric}", "NVIDIA GPU", $"{_deviceNames[i]} {metric.Label}", metric.Category, metric.Unit));
+                    for (var fan = 0; fan < _fanCounts[i]; fan++)
+                        descriptors.Add(SystemSensorIdentity.Descriptor(SensorId.Parse($"{prefix}/fan{fan}_rpm"),
+                            $"{alias}/fan{fan}_rpm", "NVIDIA GPU", $"{_deviceNames[i]} Fan {fan + 1} RPM", "Fan", "RPM"));
                 }
             }
         }
-
-        return result;
+        catch (Exception ex) { _available = false; Log.Debug(ex, "GPU discovery failed"); }
+        var catalog = new SensorCatalogSnapshot(_catalog.Generation + 1, descriptors);
+        foreach (var old in _catalog.Descriptors)
+            if (!catalog.StableIdIndex.ContainsKey(old.StableId)) HwmonMonitor.SENSORHASH.TryRemove(old.StableId, out _);
+        _catalog = catalog;
+        return catalog.Descriptors;
     }
 
     private static bool _fanRpmSupported = true;
 
-    private static void UpdateSensor(string sensorId, double value, string unit)
+    private void UpdateSensor(string sensorId, double value, string unit)
     {
+        if (!_catalog.StableIdIndex.ContainsKey(sensorId) || !SensorDemand.IsHwmonUsed(sensorId)) return;
+        _updated.Add(sensorId);
         if (HwmonMonitor.SENSORHASH.TryGetValue(sensorId, out var existing))
         {
             var min = Math.Min(existing.ValueMin, value);
@@ -459,6 +484,17 @@ internal static class Nvml
         name = ret == NvmlReturn.Success
             ? System.Text.Encoding.UTF8.GetString(buffer).TrimEnd('\0')
             : "";
+        return ret;
+    }
+
+    [DllImport(LibName, EntryPoint = "nvmlDeviceGetUUID")]
+    private static extern NvmlReturn nvmlDeviceGetUUID_native(IntPtr device, byte[] uuid, uint length);
+
+    public static NvmlReturn nvmlDeviceGetUUID(IntPtr device, out string uuid)
+    {
+        var buffer = new byte[96];
+        var ret = nvmlDeviceGetUUID_native(device, buffer, (uint)buffer.Length);
+        uuid = ret == NvmlReturn.Success ? System.Text.Encoding.UTF8.GetString(buffer).TrimEnd('\0') : "";
         return ret;
     }
 

@@ -11,7 +11,7 @@ public sealed record SensorId
     private static readonly Regex ChannelPattern = new(@"\A(temp|fan|in|curr|power|freq|humidity)(0|[1-9][0-9]*)\z", RegexOptions.CultureInvariant);
     private static readonly Regex LegacyPattern = new(@"\A(?:hwmon[0-9]+/(?:temp|fan|in|curr|power|freq|humidity)[0-9]+|thermal/thermal_zone[0-9]+)\z", RegexOptions.CultureInvariant);
     private static readonly HashSet<string> AnchorKinds = new(StringComparer.Ordinal)
-        { "nvme-serial", "block-wwid", "block-serial", "usb-serial", "usb-port", "pci", "platform", "type", "i2c", "name" };
+        { "nvme-serial", "block-wwid", "block-serial", "gpu-uuid", "usb-serial", "usb-port", "pci", "platform", "type", "i2c", "name" };
     private static readonly HashSet<string> SecondaryKinds = new(StringComparer.Ordinal)
         { "pci", "acpi", "of", "port", "role", "adapter", "meta" };
 
@@ -19,18 +19,22 @@ public sealed record SensorId
     public string Value { get; }
     public string Source => Value.Split('/')[0];
     public string Channel => Value[(Value.LastIndexOf('/') + 1)..];
-    public string Chip => Source == "hwmon" ? DecodeToken(Value.Split('/')[2]) : AnchorTokens[0];
+    public string Chip => Source == "system" ? Value.Split('/')[1] : Source == "hwmon" ? DecodeToken(Value.Split('/')[2]) : AnchorTokens[0];
     public string Anchor => Identity.Split('~')[0];
     public string? Secondary => Identity.Contains('~') ? Identity.Split('~')[1] : null;
     public string AnchorKind => Anchor.Split('+')[0];
     public ImmutableArray<string> AnchorTokens => Anchor.Split('+').Skip(1).Select(DecodeToken).ToImmutableArray();
     public string Identity => Value.Split('/')[Source == "hwmon" ? 3 : 2];
-    public string ChipKey => Value[..Value.LastIndexOf('/')];
-    public bool HasStrongIdentity => AnchorKind is "nvme-serial" or "usb-serial" or "block-wwid" or "block-serial";
+    public string ChipKey => Source == "system" ? "" : Value[..Value.LastIndexOf('/')];
+    public bool HasStrongIdentity => AnchorKind is "nvme-serial" or "usb-serial" or "block-wwid" or "block-serial" or "gpu-uuid";
     public override string ToString() => Value;
 
     public static bool IsValidChannel(string? channel) => channel != null && ChannelPattern.IsMatch(channel);
     public static bool IsLegacy(string? value) => value != null && LegacyPattern.IsMatch(value);
+    public static bool IsMigratedSystemFamily(string? value) => value?.Split('/') is ["system", "disk" or "block" or "gpu" or "amdgpu", ..];
+    // Only current-boot aliases for the migrated providers, never arbitrary system paths.
+    public static bool IsLegacySystem(string? value) => value != null && Regex.IsMatch(value,
+        @"\Asystem/(?:(?:disk|block)/[A-Za-z0-9_-]+|(?:gpu|amdgpu)(?:/[0-9]+)?)/[a-z][a-z0-9_]*\z", RegexOptions.CultureInvariant);
     public static string NormalizeChipName(string name)
     {
         name = name.Trim();
@@ -66,8 +70,8 @@ public sealed record SensorId
             var c = token[i];
             if (c == '%')
             {
-                if (i + 2 >= token.Length || !byte.TryParse(token.AsSpan(i + 1, 2), System.Globalization.NumberStyles.HexNumber,
-                    System.Globalization.CultureInfo.InvariantCulture, out var b)) throw new FormatException("Invalid percent escape.");
+                if (i + 2 >= token.Length || !byte.TryParse(token.AsSpan(i + 1, 2), global::System.Globalization.NumberStyles.HexNumber,
+                    global::System.Globalization.CultureInfo.InvariantCulture, out var b)) throw new FormatException("Invalid percent escape.");
                 bytes.Add(b);
                 i += 2;
             }
@@ -83,6 +87,8 @@ public sealed record SensorId
         Parse($"hwmon/v1/{EncodeToken(NormalizeChipName(chip))}/{anchor}{(secondary == null ? "" : "~" + secondary)}/{channel}");
     public static SensorId Thermal(string anchor, string? secondary = null) =>
         Parse($"thermal/v1/{anchor}{(secondary == null ? "" : "~" + secondary)}/temp");
+    public static SensorId System(string family, string anchor, string metric, string? secondary = null) =>
+        Parse($"system/{family}/{anchor}{(secondary == null ? "" : "~" + secondary)}/{metric}");
     public static SensorId Parse(string value) => TryParse(value, out var id) ? id! : throw new FormatException($"Invalid stable sensor id: {value}");
 
     public static bool TryParse(string? value, out SensorId? id)
@@ -92,8 +98,10 @@ public sealed record SensorId
         var parts = value.Split('/');
         var hwmon = parts.Length == 5 && parts[0] == "hwmon";
         var thermal = parts.Length == 4 && parts[0] == "thermal";
-        if ((!hwmon && !thermal) || parts[1] != "v1") return false;
-        if (hwmon ? !IsValidChannel(parts[^1]) : parts[^1] != "temp") return false;
+        var system = parts.Length == 4 && IsMigratedSystemFamily(value);
+        if (!system && ((!hwmon && !thermal) || parts[1] != "v1")) return false;
+        if (system ? !Regex.IsMatch(parts[^1], @"\A[a-z][a-z0-9_]*\z", RegexOptions.CultureInvariant)
+            : hwmon ? !IsValidChannel(parts[^1]) : parts[^1] != "temp") return false;
         try
         {
             if (hwmon && !ValidToken(parts[2])) return false;

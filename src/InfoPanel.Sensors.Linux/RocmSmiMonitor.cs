@@ -1,4 +1,5 @@
 using InfoPanel.Models;
+using InfoPanel.Sensors;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -17,6 +18,10 @@ public class RocmSmiMonitor
     private bool _initialized;
     private int _deviceCount;
     private string[] _deviceNames = [];
+    private SensorId?[] _deviceIds = [];
+    private readonly SysfsAccess _sysfs = new();
+    private SensorCatalogSnapshot _catalog = new(0, []);
+    private readonly HashSet<string> _updated = new(StringComparer.Ordinal);
 
     // sysfs paths for clock reading (avoids rsmi_frequencies_t struct layout issues)
     private string?[] _sysfsClockPaths = [];
@@ -26,6 +31,7 @@ public class RocmSmiMonitor
 
     public void Initialize()
     {
+        if (_initialized) return;
         try
         {
             var ret = Rsmi.rsmi_init(0);
@@ -36,32 +42,6 @@ public class RocmSmiMonitor
             }
 
             _initialized = true;
-
-            ret = Rsmi.rsmi_num_monitor_devices(out uint count);
-            if (ret != RsmiStatus.Success || count == 0)
-            {
-                Log.Debug("ROCm SMI: no devices found ({Result})", ret);
-                Rsmi.rsmi_shut_down();
-                _initialized = false;
-                return;
-            }
-
-            _deviceCount = (int)count;
-            _deviceNames = new string[_deviceCount];
-            _sysfsClockPaths = new string?[_deviceCount];
-            _sysfsMemClockPaths = new string?[_deviceCount];
-
-            for (int i = 0; i < _deviceCount; i++)
-            {
-                ret = Rsmi.rsmi_dev_name_get((uint)i, out var name);
-                _deviceNames[i] = ret == RsmiStatus.Success && !string.IsNullOrEmpty(name) ? name : $"AMD GPU {i}";
-
-                // Find sysfs paths for clock reading
-                FindSysfsClockPaths(i);
-            }
-
-            _available = true;
-            Log.Information("ROCm SMI initialized: {Count} AMD GPU(s) found", _deviceCount);
         }
         catch (DllNotFoundException)
         {
@@ -73,46 +53,55 @@ public class RocmSmiMonitor
         }
     }
 
-    private void FindSysfsClockPaths(int deviceIndex)
+    private void RefreshDevices()
     {
-        // AMD GPUs expose clocks in /sys/class/drm/card*/device/pp_dpm_sclk and pp_dpm_mclk
-        try
+        _available = false;
+        var ret = Rsmi.rsmi_num_monitor_devices(out uint count);
+        if (ret != RsmiStatus.Success || count == 0)
         {
-            var drmPath = "/sys/class/drm";
-            if (!Directory.Exists(drmPath)) return;
+            Log.Debug("ROCm SMI: no devices found ({Result})", ret);
+            return;
+        }
 
-            foreach (var cardDir in Directory.GetDirectories(drmPath, "card*"))
+        _deviceCount = (int)count;
+        _deviceNames = new string[_deviceCount];
+        _deviceIds = new SensorId?[_deviceCount];
+        _sysfsClockPaths = new string?[_deviceCount];
+        _sysfsMemClockPaths = new string?[_deviceCount];
+
+        for (int i = 0; i < _deviceCount; i++)
+        {
+            ret = Rsmi.rsmi_dev_name_get((uint)i, out var name);
+            _deviceNames[i] = ret == RsmiStatus.Success && !string.IsNullOrEmpty(name) ? name : "AMD GPU";
+
+            if (Rsmi.rsmi_dev_pci_id_get((uint)i, out var bdf) != RsmiStatus.Success)
             {
-                var vendorFile = Path.Combine(cardDir, "device", "vendor");
-                var vendor = ReadFile(vendorFile);
-                // AMD vendor ID is 0x1002
-                if (vendor != "0x1002") continue;
-
-                // Match card index to device index (simple mapping)
-                var sclkPath = Path.Combine(cardDir, "device", "pp_dpm_sclk");
-                var mclkPath = Path.Combine(cardDir, "device", "pp_dpm_mclk");
-
-                if (File.Exists(sclkPath) && _sysfsClockPaths[deviceIndex] == null)
-                {
-                    _sysfsClockPaths[deviceIndex] = sclkPath;
-                }
-                if (File.Exists(mclkPath) && _sysfsMemClockPaths[deviceIndex] == null)
-                {
-                    _sysfsMemClockPaths[deviceIndex] = mclkPath;
-                }
-
-                if (_sysfsClockPaths[deviceIndex] != null)
-                    break;
+                Log.Warning("ROCm GPU {Index} has no PCI identity; excluded", i);
+                continue;
             }
+            var pci = SystemSensorIdentity.RocmPciAddress(bdf);
+            _deviceIds[i] = SystemSensorIdentity.Amd(pci, "temperature");
+            FindSysfsClockPaths(i, pci);
         }
-        catch (Exception ex)
-        {
-            Log.Debug(ex, "Failed to find sysfs clock paths for AMD GPU {Index}", deviceIndex);
-        }
+
+        _available = true;
+
+    }
+
+    private void FindSysfsClockPaths(int deviceIndex, string pci)
+    {
+        var card = DrmDevices.Find(_sysfs, "0x1002", pci);
+        if (card == null) return;
+        var sclk = Path.Combine(card, "device", "pp_dpm_sclk");
+        var mclk = Path.Combine(card, "device", "pp_dpm_mclk");
+        if (_sysfs.FileExists(sclk)) _sysfsClockPaths[deviceIndex] = sclk;
+        if (_sysfs.FileExists(mclk)) _sysfsMemClockPaths[deviceIndex] = mclk;
     }
 
     public void Shutdown()
     {
+        foreach (var descriptor in _catalog.Descriptors) HwmonMonitor.SENSORHASH.TryRemove(descriptor.StableId, out _);
+        _catalog = new(_catalog.Generation + 1, []);
         if (_initialized)
         {
             try { Rsmi.rsmi_shut_down(); } catch { }
@@ -124,10 +113,13 @@ public class RocmSmiMonitor
     public void Poll()
     {
         if (!_available) return;
+        _updated.Clear();
 
         for (uint i = 0; i < _deviceCount; i++)
         {
-            var prefix = _deviceCount == 1 ? "system/amdgpu" : $"system/amdgpu/{i}";
+            if (_deviceIds[i] is not { } id || !_catalog.StableIdIndex.ContainsKey(id.Value)) continue;
+            var prefix = id.Value[..id.Value.LastIndexOf('/')];
+            if (!_catalog.Descriptors.Any(d => d.Id.Identity == id.Identity && SensorDemand.IsHwmonUsed(d.StableId))) continue;
 
             try
             {
@@ -201,6 +193,9 @@ public class RocmSmiMonitor
                 Log.Debug(ex, "ROCm SMI poll error for GPU {Index}", i);
             }
         }
+        foreach (var descriptor in _catalog.Descriptors)
+            if (!_updated.Contains(descriptor.StableId)) HwmonMonitor.SENSORHASH.TryRemove(descriptor.StableId, out _);
+
     }
 
     private void PollSysfsClocks(int deviceIndex, string prefix)
@@ -259,53 +254,57 @@ public class RocmSmiMonitor
         return 0;
     }
 
-    public List<HwmonSensorInfo> GetSensorInfoList()
+    private static readonly (string Metric, string Label, string Category, string Unit)[] Metrics =
+    [
+        ("temperature", "Edge Temperature", "Temperature", "°C"),
+        ("temperature_junction", "Junction Temperature", "Temperature", "°C"),
+        ("temperature_memory", "Memory Temperature", "Temperature", "°C"),
+        ("power", "Power Draw", "Power", "W"),
+        ("utilization", "GPU Utilization", "Utilization", "%"),
+        ("memory_utilization", "Memory Controller", "Utilization", "%"),
+        ("clock_graphics", "Graphics Clock", "Clock", "MHz"),
+        ("clock_memory", "Memory Clock", "Clock", "MHz"),
+        ("memory_used", "VRAM Used", "Memory", "MB"),
+        ("memory_total", "VRAM Total", "Memory", "MB"),
+        ("memory_percent", "VRAM Usage", "Memory", "%"),
+        ("fan_speed", "Fan Speed", "Fan", "%"),
+        ("fan_rpm", "Fan RPM", "Fan", "RPM"),
+    ];
+
+    public List<HwmonSensorInfo> GetSensorInfoList() => _catalog.Descriptors.Select(SystemSensorIdentity.Info).ToList();
+
+    public IEnumerable<SensorDescriptor> ScanDescriptors()
     {
-        var result = new List<HwmonSensorInfo>();
-        if (!_available) return result;
-
-        for (int i = 0; i < _deviceCount; i++)
+        var descriptors = new List<SensorDescriptor>();
+        if (!_initialized) Initialize();
+        try
         {
-            var prefix = _deviceCount == 1 ? "system/amdgpu" : $"system/amdgpu/{i}";
-            var deviceName = _deviceNames[i] ?? $"AMD GPU {i}";
-
-            foreach (var (suffix, label, category, unit) in new[]
+            if (_initialized) RefreshDevices();
+            if (_available)
             {
-                ("temperature", "Edge Temperature", "Temperature", "°C"),
-                ("temperature_junction", "Junction Temperature", "Temperature", "°C"),
-                ("temperature_memory", "Memory Temperature", "Temperature", "°C"),
-                ("power", "Power Draw", "Power", "W"),
-                ("utilization", "GPU Utilization", "Utilization", "%"),
-                ("memory_utilization", "Memory Controller", "Utilization", "%"),
-                ("clock_graphics", "Graphics Clock", "Clock", "MHz"),
-                ("clock_memory", "Memory Clock", "Clock", "MHz"),
-                ("memory_used", "VRAM Used", "Memory", "MB"),
-                ("memory_total", "VRAM Total", "Memory", "MB"),
-                ("memory_percent", "VRAM Usage", "Memory", "%"),
-                ("fan_speed", "Fan Speed", "Fan", "%"),
-                ("fan_rpm", "Fan RPM", "Fan", "RPM"),
-            })
-            {
-                var key = $"{prefix}/{suffix}";
-                if (HwmonMonitor.SENSORHASH.ContainsKey(key))
+                for (var i = 0; i < _deviceCount; i++)
                 {
-                    result.Add(new HwmonSensorInfo
-                    {
-                        SensorId = key,
-                        DeviceName = $"AMD {deviceName}",
-                        Category = category,
-                        Label = label,
-                        Unit = unit
-                    });
+                    if (_deviceIds[i] is not { } id) continue;
+                    var prefix = id.Value[..id.Value.LastIndexOf('/')];
+                    var alias = _deviceCount == 1 ? "system/amdgpu" : $"system/amdgpu/{i}";
+                    foreach (var metric in Metrics)
+                        descriptors.Add(SystemSensorIdentity.Descriptor(SensorId.Parse($"{prefix}/{metric.Metric}"),
+                            $"{alias}/{metric.Metric}", "AMD GPU", $"{_deviceNames[i]} {metric.Label}", metric.Category, metric.Unit));
                 }
             }
         }
-
-        return result;
+        catch (Exception ex) { _available = false; Log.Debug(ex, "GPU discovery failed"); }
+        var catalog = new SensorCatalogSnapshot(_catalog.Generation + 1, descriptors);
+        foreach (var old in _catalog.Descriptors)
+            if (!catalog.StableIdIndex.ContainsKey(old.StableId)) HwmonMonitor.SENSORHASH.TryRemove(old.StableId, out _);
+        _catalog = catalog;
+        return catalog.Descriptors;
     }
 
-    private static void UpdateSensor(string sensorId, double value, string unit)
+    private void UpdateSensor(string sensorId, double value, string unit)
     {
+        if (!_catalog.StableIdIndex.ContainsKey(sensorId) || !SensorDemand.IsHwmonUsed(sensorId)) return;
+        _updated.Add(sensorId);
         if (HwmonMonitor.SENSORHASH.TryGetValue(sensorId, out var existing))
         {
             var min = Math.Min(existing.ValueMin, value);
@@ -402,6 +401,9 @@ internal static class Rsmi
 
     [DllImport(LibName)]
     public static extern RsmiStatus rsmi_shut_down();
+
+    [DllImport(LibName)]
+    public static extern RsmiStatus rsmi_dev_pci_id_get(uint dvInd, out ulong bdfId);
 
     [DllImport(LibName)]
     public static extern RsmiStatus rsmi_num_monitor_devices(out uint count);

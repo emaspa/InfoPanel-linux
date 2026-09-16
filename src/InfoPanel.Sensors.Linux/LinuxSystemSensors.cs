@@ -1,4 +1,6 @@
 using InfoPanel.Models;
+using InfoPanel.Sensors;
+using System.Collections.Immutable;
 using Serilog;
 using System;
 using System.Collections.Generic;
@@ -22,9 +24,11 @@ public class LinuxSystemSensors
     private Dictionary<string, long> _prevRaplEnergy = new();
     private long _prevTimestampMs;
 
-    // Track which sensors exist for GetSensorInfoList()
-    private readonly List<HwmonSensorInfo> _sensorInfos = new();
-    private readonly object _sensorInfoLock = new();
+    private readonly SysfsAccess _sysfs;
+    private readonly string _diskStatsPath;
+    private readonly bool _hostProviders;
+    private ImmutableArray<DiskDevice> _disks = [];
+    private SensorCatalogSnapshot _diskCatalog = new(0, []);
 
     // Block device I/O latency delta state
     private Dictionary<string, (long readTicks, long writeTicks, long readOps, long writeOps)> _prevBlockStats = new();
@@ -38,7 +42,6 @@ public class LinuxSystemSensors
         "nfsd", "fuse.portal", "fuse.gvfsd-fuse"
     };
 
-    private static readonly Regex DiskDeviceRegex = new(@"^(sd[a-z]+|nvme\d+n\d+|vd[a-z]+|mmcblk\d+)$", RegexOptions.Compiled);
 
     // P/Invoke for statvfs (filesystem statistics)
     [StructLayout(LayoutKind.Sequential)]
@@ -66,12 +69,46 @@ public class LinuxSystemSensors
     [DllImport("libc", EntryPoint = "statvfs", SetLastError = true)]
     private static extern int statvfs_native([MarshalAs(UnmanagedType.LPStr)] string path, out Statvfs buf);
 
-    private LinuxSystemSensors()
+    private LinuxSystemSensors() : this(new SysfsAccess(), "/proc/diskstats", true) { }
+
+    /// <summary>Injected instances poll disks only; tests never initialize host GPU libraries.</summary>
+    public LinuxSystemSensors(SysfsAccess sysfs, string diskStatsPath) : this(sysfs, diskStatsPath, false) { }
+
+    private LinuxSystemSensors(SysfsAccess sysfs, string diskStatsPath, bool hostProviders)
     {
+        _sysfs = sysfs;
+        _diskStatsPath = diskStatsPath;
+        _hostProviders = hostProviders;
         _prevTimestampMs = Stopwatch.GetTimestamp() / (Stopwatch.Frequency / 1000);
+        if (!_hostProviders) return;
         NvmlMonitor.Instance.Initialize();
         RocmSmiMonitor.Instance.Initialize();
         IntelGpuMonitor.Instance.Initialize();
+    }
+
+    public IEnumerable<SensorDescriptor> ScanDescriptors()
+    {
+        var disks = new DiskCatalogScanner(_sysfs).Scan();
+        var catalog = new SensorCatalogSnapshot(_diskCatalog.Generation + 1, disks.SelectMany(d => d.Descriptors));
+        foreach (var old in _disks)
+        {
+            if (disks.Any(d => d.Identity == old.Identity && d.Name == old.Name && d.RealPath == old.RealPath)) continue;
+            _prevDiskStats.Remove(old.Identity);
+            _prevBlockStats.Remove(old.Identity);
+        }
+        foreach (var old in _diskCatalog.Descriptors)
+            if (!catalog.StableIdIndex.ContainsKey(old.StableId)) HwmonMonitor.SENSORHASH.TryRemove(old.StableId, out _);
+        _disks = disks.Where(d => d.Descriptors.All(s => catalog.StableIdIndex.ContainsKey(s.StableId))).ToImmutableArray();
+        _diskCatalog = catalog;
+        var descriptors = catalog.Descriptors.AsEnumerable();
+        if (_hostProviders) descriptors = descriptors.Concat(NvmlMonitor.Instance.ScanDescriptors()).Concat(RocmSmiMonitor.Instance.ScanDescriptors());
+        return descriptors.ToArray();
+    }
+
+    internal void PollDisks(long deltaMs)
+    {
+        PollDiskIO(deltaMs);
+        PollBlockDeviceStats(deltaMs);
     }
 
     public void Poll()
@@ -80,6 +117,12 @@ public class LinuxSystemSensors
         var deltaMs = nowMs - _prevTimestampMs;
         if (deltaMs <= 0) deltaMs = 1;
 
+        if (!_hostProviders)
+        {
+            PollDisks(deltaMs);
+            _prevTimestampMs = nowMs;
+            return;
+        }
         try { PollCpu(deltaMs); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: CPU poll error"); }
         try { PollMemory(); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: Memory poll error"); }
         try { PollDiskIO(deltaMs); } catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors: Disk I/O poll error"); }
@@ -229,9 +272,8 @@ public class LinuxSystemSensors
 
     private void PollDiskIO(long deltaMs)
     {
-        if (!File.Exists("/proc/diskstats")) return;
-
-        var lines = File.ReadAllLines("/proc/diskstats");
+        var lines = File.Exists(_diskStatsPath) ? File.ReadAllLines(_diskStatsPath) : [];
+        var devices = _disks.ToDictionary(d => d.Name, StringComparer.Ordinal);
         var newDiskStats = new Dictionary<string, (long readSectors, long writeSectors)>();
 
         foreach (var line in lines)
@@ -240,14 +282,15 @@ public class LinuxSystemSensors
             if (parts.Length < 14) continue;
 
             var devName = parts[2];
-            if (!DiskDeviceRegex.IsMatch(devName)) continue;
+            if (!devices.TryGetValue(devName, out var disk)) continue;
+            if (!disk.Descriptors.Any(d => d.Id.Chip == "disk" && SensorDemand.IsHwmonUsed(d.StableId))) continue;
 
             if (!long.TryParse(parts[5], out var readSectors)) continue;  // field 3: sectors read
             if (!long.TryParse(parts[9], out var writeSectors)) continue; // field 7: sectors written
 
-            newDiskStats[devName] = (readSectors, writeSectors);
+            newDiskStats[disk.Identity] = (readSectors, writeSectors);
 
-            if (_prevDiskStats.TryGetValue(devName, out var prev))
+            if (_prevDiskStats.TryGetValue(disk.Identity, out var prev))
             {
                 var deltaRead = readSectors - prev.readSectors;
                 var deltaWrite = writeSectors - prev.writeSectors;
@@ -258,11 +301,14 @@ public class LinuxSystemSensors
                 var readSpeed = Math.Round(deltaRead * 512.0 / (1024 * 1024) / deltaSec, 2);
                 var writeSpeed = Math.Round(deltaWrite * 512.0 / (1024 * 1024) / deltaSec, 2);
 
-                UpdateSensor($"system/disk/{devName}/read_speed", Math.Max(readSpeed, 0), "MB/s");
-                UpdateSensor($"system/disk/{devName}/write_speed", Math.Max(writeSpeed, 0), "MB/s");
+                UpdateSensor($"system/disk/{disk.Identity}/read_speed", Math.Max(readSpeed, 0), "MB/s");
+                UpdateSensor($"system/disk/{disk.Identity}/write_speed", Math.Max(writeSpeed, 0), "MB/s");
             }
         }
 
+        foreach (var disk in _disks)
+            if (!newDiskStats.ContainsKey(disk.Identity))
+                foreach (var d in disk.Descriptors.Where(d => d.Id.Chip == "disk")) HwmonMonitor.SENSORHASH.TryRemove(d.StableId, out _);
         _prevDiskStats = newDiskStats;
     }
 
@@ -632,21 +678,12 @@ public class LinuxSystemSensors
 
     private void PollBlockDeviceStats(long deltaMs)
     {
-        // /sys/block/*/stat has: reads_completed reads_merged read_sectors read_ticks
-        //                        writes_completed writes_merged write_sectors write_ticks
-        //                        ios_in_progress io_ticks weighted_io_ticks ...
-        const string blockBase = "/sys/block";
-        if (!Directory.Exists(blockBase)) return;
-
         var newBlockStats = new Dictionary<string, (long readTicks, long writeTicks, long readOps, long writeOps)>();
 
-        foreach (var blockDir in Directory.GetDirectories(blockBase))
+        foreach (var disk in _disks)
         {
-            var devName = Path.GetFileName(blockDir);
-            if (!DiskDeviceRegex.IsMatch(devName)) continue;
-
-            var statFile = Path.Combine(blockDir, "stat");
-            var content = ReadFile(statFile);
+            if (!disk.Descriptors.Any(d => d.Id.Chip == "block" && SensorDemand.IsHwmonUsed(d.StableId))) continue;
+            var content = _sysfs.ReadValue(disk.StatPath);
             if (content == null) continue;
 
             var parts = content.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -658,12 +695,12 @@ public class LinuxSystemSensors
             if (!long.TryParse(parts[7], out var writeTicks)) continue;  // ms spent writing
             if (!long.TryParse(parts[8], out var iosInProgress)) continue;
 
-            newBlockStats[devName] = (readTicks, writeTicks, readOps, writeOps);
+            newBlockStats[disk.Identity] = (readTicks, writeTicks, readOps, writeOps);
 
             // Queue depth (instantaneous)
-            UpdateSensor($"system/block/{devName}/queue_depth", iosInProgress, "");
+            UpdateSensor($"system/block/{disk.Identity}/queue_depth", iosInProgress, "");
 
-            if (_prevBlockStats.TryGetValue(devName, out var prev))
+            if (_prevBlockStats.TryGetValue(disk.Identity, out var prev))
             {
                 var deltaSec = deltaMs / 1000.0;
                 if (deltaSec <= 0) deltaSec = 1;
@@ -674,22 +711,26 @@ public class LinuxSystemSensors
                 var deltaWriteTicks = writeTicks - prev.writeTicks;
 
                 // IOPS
-                UpdateSensor($"system/block/{devName}/read_iops", Math.Round(Math.Max(deltaReadOps / deltaSec, 0), 0), "IOPS");
-                UpdateSensor($"system/block/{devName}/write_iops", Math.Round(Math.Max(deltaWriteOps / deltaSec, 0), 0), "IOPS");
+                UpdateSensor($"system/block/{disk.Identity}/read_iops", Math.Round(Math.Max(deltaReadOps / deltaSec, 0), 0), "IOPS");
+                UpdateSensor($"system/block/{disk.Identity}/write_iops", Math.Round(Math.Max(deltaWriteOps / deltaSec, 0), 0), "IOPS");
 
                 // Average latency (ms per operation)
                 if (deltaReadOps > 0)
-                    UpdateSensor($"system/block/{devName}/read_latency", Math.Round((double)deltaReadTicks / deltaReadOps, 2), "ms");
+                    UpdateSensor($"system/block/{disk.Identity}/read_latency", Math.Round((double)deltaReadTicks / deltaReadOps, 2), "ms");
                 if (deltaWriteOps > 0)
-                    UpdateSensor($"system/block/{devName}/write_latency", Math.Round((double)deltaWriteTicks / deltaWriteOps, 2), "ms");
+                    UpdateSensor($"system/block/{disk.Identity}/write_latency", Math.Round((double)deltaWriteTicks / deltaWriteOps, 2), "ms");
             }
         }
 
+        foreach (var disk in _disks)
+            if (!newBlockStats.ContainsKey(disk.Identity))
+                foreach (var d in disk.Descriptors.Where(d => d.Id.Chip == "block")) HwmonMonitor.SENSORHASH.TryRemove(d.StableId, out _);
         _prevBlockStats = newBlockStats;
     }
 
     private void UpdateSensor(string sensorId, double value, string unit)
     {
+        if (SensorId.IsMigratedSystemFamily(sensorId) && !SensorDemand.IsHwmonUsed(sensorId)) return;
         if (HwmonMonitor.SENSORHASH.TryGetValue(sensorId, out var existing))
         {
             var min = Math.Min(existing.ValueMin, value);
@@ -790,29 +831,7 @@ public class LinuxSystemSensors
             }
         }
 
-        // Disk I/O
-        foreach (var (sensorId, reading) in HwmonMonitor.SENSORHASH)
-        {
-            if (sensorId.StartsWith("system/disk/"))
-            {
-                // system/disk/sda/read_speed -> devName=sda, type=read_speed
-                var remainder = sensorId.Substring("system/disk/".Length);
-                var slashIdx = remainder.IndexOf('/');
-                if (slashIdx < 0) continue;
-                var devName = remainder.Substring(0, slashIdx);
-                var sensorName = remainder.Substring(slashIdx + 1);
-
-                var label = sensorName == "read_speed" ? $"{devName} Read" : $"{devName} Write";
-                result.Add(new HwmonSensorInfo
-                {
-                    SensorId = sensorId,
-                    DeviceName = "System Disk I/O",
-                    Category = "Throughput",
-                    Label = label,
-                    Unit = "MB/s"
-                });
-            }
-        }
+        result.AddRange(_diskCatalog.Descriptors.Select(SystemSensorIdentity.Info));
 
         // Network
         foreach (var (sensorId, reading) in HwmonMonitor.SENSORHASH)
@@ -948,7 +967,7 @@ public class LinuxSystemSensors
         }
 
         // Intel GPU (PMU-based)
-        result.AddRange(IntelGpuMonitor.Instance.GetSensorInfoList());
+        if (_hostProviders) result.AddRange(IntelGpuMonitor.Instance.GetSensorInfoList());
 
         // Uptime
         foreach (var (suffix, label, unit) in new[]
@@ -1028,42 +1047,11 @@ public class LinuxSystemSensors
             }
         }
 
-        // Block device stats (IOPS, latency, queue depth)
-        foreach (var (sensorId, _) in HwmonMonitor.SENSORHASH)
-        {
-            if (!sensorId.StartsWith("system/block/")) continue;
-
-            var remainder = sensorId.Substring("system/block/".Length);
-            var slashIdx = remainder.IndexOf('/');
-            if (slashIdx < 0) continue;
-            var devName = remainder.Substring(0, slashIdx);
-            var sensorName = remainder.Substring(slashIdx + 1);
-
-            var (label, unit) = sensorName switch
-            {
-                "read_iops" => ($"{devName} Read IOPS", "IOPS"),
-                "write_iops" => ($"{devName} Write IOPS", "IOPS"),
-                "read_latency" => ($"{devName} Read Latency", "ms"),
-                "write_latency" => ($"{devName} Write Latency", "ms"),
-                "queue_depth" => ($"{devName} Queue Depth", ""),
-                _ => ($"{devName} {sensorName}", "")
-            };
-
-            result.Add(new HwmonSensorInfo
-            {
-                SensorId = sensorId,
-                DeviceName = "System Block I/O",
-                Category = "Performance",
-                Label = label,
-                Unit = unit
-            });
-        }
-
         // NVIDIA GPU
-        result.AddRange(NvmlMonitor.Instance.GetSensorInfoList());
+        if (_hostProviders) result.AddRange(NvmlMonitor.Instance.GetSensorInfoList());
 
         // AMD GPU
-        result.AddRange(RocmSmiMonitor.Instance.GetSensorInfoList());
+        if (_hostProviders) result.AddRange(RocmSmiMonitor.Instance.GetSensorInfoList());
 
         // RAPL
         foreach (var (sensorId, reading) in HwmonMonitor.SENSORHASH)

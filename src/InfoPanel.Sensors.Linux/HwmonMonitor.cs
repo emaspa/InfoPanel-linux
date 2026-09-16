@@ -35,14 +35,15 @@ public class HwmonMonitor
     public event EventHandler<SensorCatalogSnapshot>? CatalogChanged;
 
     private HwmonMonitor() : this(new SysfsAccess(), () => LinuxSystemSensors.Instance.GetSensorInfoList(),
-        () => LinuxSystemSensors.Instance.Poll()) { }
+        () => LinuxSystemSensors.Instance.Poll(), systemDescriptors: () => LinuxSystemSensors.Instance.ScanDescriptors()) { }
 
     /// <summary>Injected instances default to no system providers and never initialize host GPU/proc providers.</summary>
     public HwmonMonitor(SysfsAccess sysfs, Func<IEnumerable<HwmonSensorInfo>>? systemSensorInfo = null,
-        Action? pollSystemSensors = null, SensorIdResolver? resolver = null, Func<long>? clock = null)
+        Action? pollSystemSensors = null, SensorIdResolver? resolver = null, Func<long>? clock = null,
+        Func<IEnumerable<SensorDescriptor>>? systemDescriptors = null)
     {
         _sysfs = sysfs;
-        _scanner = new(sysfs);
+        _scanner = new(sysfs, systemDescriptors);
         _systemInfo = systemSensorInfo ?? (() => []);
         _systemPoll = pollSystemSensors ?? (() => { });
         _clock = clock ?? (() => Environment.TickCount64);
@@ -133,7 +134,7 @@ public class HwmonMonitor
                     var scan = _scanner.Scan(Catalog);
                     if (!scan.IsIdentical)
                     {
-                        foreach (var old in _plan.Entries)
+                        foreach (var old in Catalog?.Descriptors ?? [])
                         {
                             if (!scan.Snapshot.StableIdIndex.TryGetValue(old.StableId, out var replacement)
                                 || old.RealPath != replacement.RealPath || old.ValuePath != replacement.ValuePath
@@ -204,7 +205,7 @@ public class HwmonMonitor
             Label = d.Label, Category = d.Category, Unit = d.Unit, IdentityStrength = d.IdentityStrength,
             IsAmbiguous = d.IsAmbiguous, LegacyAlias = d.LegacyAlias
         }).ToList();
-        result.AddRange(monitor._systemInfo());
+        result.AddRange(monitor._systemInfo().Where(s => !SensorId.IsMigratedSystemFamily(s.SensorId)));
         return result;
     }
 }

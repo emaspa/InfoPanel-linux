@@ -19,6 +19,68 @@ public class SensorIdResolverTests(SensorStateFixture fixture) : SensorStateTest
         return resolver;
     }
 
+    [Theory]
+    [InlineData("system/disk/nvme0n1/read_speed", "system/disk/nvme-serial+drive/read_speed")]
+    [InlineData("system/block/sda/queue_depth", "system/block/block-wwid+naa.123/queue_depth")]
+    [InlineData("system/gpu/temperature", "system/gpu/gpu-uuid+GPU-123~pci+0000-01-00.0/temperature")]
+    [InlineData("system/gpu/0/memory_used", "system/gpu/pci+0000-01-00.0/memory_used")]
+    [InlineData("system/amdgpu/temperature", "system/amdgpu/pci+0000-03-00.0/temperature")]
+    [InlineData("system/amdgpu/1/clock_graphics", "system/amdgpu/pci+0000-04-00.0/clock_graphics")]
+    public void SystemAliasesUseCurrentBootUniquenessWithoutLabelEvidence(string alias, string stable)
+    {
+        var descriptor = new SensorDescriptor(SensorId.Parse(stable)) { LegacyAliases = [alias], Label = "Product name" };
+        var other = descriptor with { Id = SensorId.System(descriptor.ChipName, "pci+0000-09-00.0", descriptor.Channel), LegacyAliases = [] };
+        var resolver = Resolver(descriptor, other);
+        var result = resolver.Resolve(new(alias, "Arbitrary saved label", "Old chip hint"));
+        Assert.Equal(stable, result.CanonicalId);
+        Assert.Equal(SensorMatchReason.LegacyAlias, result.MatchReason);
+        Assert.True(result.CanRewrite);
+        var exact = resolver.Resolve(new(stable));
+        Assert.Equal(SensorMatchReason.Exact, exact.MatchReason);
+        Assert.Same(descriptor, exact.Descriptor);
+        Assert.Equal(SensorResolutionStatus.NotReady, new SensorIdResolver().Resolve(new(alias)).Status);
+        resolver.Publish(new(2, [descriptor, other with { LegacyAliases = [alias] }]));
+        Assert.Equal(SensorResolutionStatus.Unresolved, resolver.Resolve(new(alias)).Status);
+        resolver.Publish(new(3, []));
+        Assert.Equal(SensorResolutionStatus.Unresolved, resolver.Resolve(new(alias)).Status);
+        Assert.Equal(SensorResolutionStatus.Unresolved, resolver.Resolve(new(stable)).Status);
+    }
+
+    [Theory]
+    [InlineData("system/cpu/total")]
+    [InlineData("system/memory/used")]
+    [InlineData("system/network/enp1s0/rx_speed")]
+    [InlineData("system/load/1min")]
+    [InlineData("system/power/BAT0/capacity")]
+    [InlineData("system/rapl/package-0/power")]
+    [InlineData("system/filesystem/root/used")]
+    [InlineData("system/uptime/seconds")]
+    [InlineData("system/processes/count")]
+    [InlineData("system/cpufreq/core0")]
+    [InlineData("system/igpu/utilization")]
+    public void OtherSystemKeysKeepExactPassthroughWithoutCatalog(string id)
+    {
+        var result = new SensorIdResolver().Resolve(new(id));
+        Assert.Equal(SensorResolutionStatus.Resolved, result.Status);
+        Assert.Equal(SensorMatchReason.Exact, result.MatchReason);
+        Assert.Equal(id, result.CanonicalId);
+        Assert.False(result.CanRewrite);
+        Assert.Null(result.Descriptor);
+    }
+
+    [Fact]
+    public void StrongSystemRelocationStaysWithinFamilyAndCannotCrossUuid()
+    {
+        var id = SensorId.System("gpu", "gpu-uuid+GPU-A", "temperature", "pci+0000-01-00.0");
+        var moved = new SensorDescriptor(SensorId.System("gpu", id.Anchor, id.Channel, "pci+0000-02-00.0"));
+        Assert.Equal(moved.StableId, Resolver(moved).Resolve(new(id.Value)).CanonicalId);
+        var wrong = moved with { Id = SensorId.System("gpu", "gpu-uuid+GPU-B", id.Channel) };
+        Assert.Equal(SensorResolutionStatus.Unresolved, Resolver(wrong).Resolve(new(id.Value)).Status);
+        var otherFamily = moved with { Id = SensorId.System("amdgpu", id.Anchor, id.Channel) };
+        Assert.Equal(SensorResolutionStatus.Unresolved, Resolver(otherFamily).Resolve(new(id.Value)).Status);
+        Assert.Equal(SensorResolutionStatus.Unresolved, Resolver(moved).Resolve(new("system/gpu/garbage/temperature")).Status);
+    }
+
     [Fact]
     public void MissingLocationAndWeakBindingsCannotMoveToAnotherMatchingDevice()
     {

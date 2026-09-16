@@ -82,7 +82,7 @@ public class IntelGpuMonitor
         const string drmPath = "/sys/class/drm";
         if (!Directory.Exists(drmPath)) return false;
 
-        foreach (var cardDir in Directory.GetDirectories(drmPath, "card*"))
+        foreach (var (cardDir, _) in DrmDevices.Scan(new SysfsAccess(), "0x8086"))
         {
             if (Path.GetFileName(cardDir).Contains('-')) continue; // skip connectors
 
