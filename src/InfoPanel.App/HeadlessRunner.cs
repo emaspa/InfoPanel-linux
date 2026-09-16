@@ -43,6 +43,7 @@ namespace InfoPanel
                 Log.Information("{Count} hwmon sensors, {PluginCount} plugin sensors",
                     Services.HwmonMonitor.SENSORHASH.Count, Monitors.PluginMonitor.SENSORHASH.Count);
                 Services.HwmonMonitor.Instance.Stop();
+                Services.NvmlMonitor.Instance.Shutdown();
                 Log.CloseAndFlush();
                 Environment.Exit(0);
             }
@@ -79,6 +80,7 @@ namespace InfoPanel
                 }
 
                 Services.HwmonMonitor.Instance.Stop();
+                Services.NvmlMonitor.Instance.Shutdown();
                 Log.CloseAndFlush();
                 Environment.Exit(0);
             }

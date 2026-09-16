@@ -12,7 +12,7 @@ namespace InfoPanel.Services;
 /// Query ids, struct layouts and register offsets follow LACT's implementation
 /// (github.com/ilya-zlobintsev/LACT, lact-daemon nvidia/nvapi.rs, GPL-3.0 like us).
 /// </summary>
-internal sealed class NvApi : IDisposable
+internal sealed class NvApi : INvApi
 {
     private const string LibraryName = "libnvidia-api.so.1";
 
@@ -51,6 +51,8 @@ internal sealed class NvApi : IDisposable
     private delegate int RegisterOpDelegate(IntPtr handle, ref NvGpuRegisterOpData data);
 
     private IntPtr _lib;
+    private bool _initialized;
+    private NoArgsDelegate? _unload;
     private QueryInterfaceDelegate _queryInterface = null!;
     private ThermalsDelegate? _thermals;
     private VoltageDelegate? _voltage;
@@ -79,12 +81,14 @@ internal sealed class NvApi : IDisposable
             api._queryInterface = Marshal.GetDelegateForFunctionPointer<QueryInterfaceDelegate>(qi);
 
             var init = api.GetDelegate<NoArgsDelegate>(QUERY_INITIALIZE);
-            if (init == null || init() != 0)
+            api._unload = api.GetDelegate<NoArgsDelegate>(QUERY_UNLOAD);
+            if (init == null || api._unload == null || init() != 0)
             {
                 Log.Debug("NvApi: initialize failed");
                 api.Dispose();
                 return null;
             }
+            api._initialized = true;
 
             var enumGpus = api.GetDelegate<EnumPhysicalGpusDelegate>(QUERY_ENUM_PHYSICAL_GPUS);
             if (enumGpus == null)
@@ -120,6 +124,7 @@ internal sealed class NvApi : IDisposable
 
     private T? GetDelegate<T>(uint queryId) where T : class
     {
+        if (_lib == IntPtr.Zero) return null;
         var ptr = _queryInterface(queryId);
         return ptr == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer<T>(ptr);
     }
@@ -133,7 +138,7 @@ internal sealed class NvApi : IDisposable
         foreach (var handle in _gpuHandles)
         {
             uint id = 0;
-            if (getBusId(handle, ref id) == 0 && id == busId)
+            if (CheckStatus(getBusId(handle, ref id)) == 0 && id == busId)
                 return handle;
         }
 
@@ -152,13 +157,13 @@ internal sealed class NvApi : IDisposable
         if (_thermals == null) return 0;
 
         var thermals = NvApiThermals.Create(1);
-        if (_thermals(handle, ref thermals) != 0)
+        if (CheckStatus(_thermals(handle, ref thermals)) != 0)
             return 0;
 
         for (int bit = 0; bit < 32; bit++)
         {
             thermals = NvApiThermals.Create(1 << bit);
-            if (_thermals(handle, ref thermals) != 0)
+            if (CheckStatus(_thermals(handle, ref thermals)) != 0)
                 return (1 << bit) - 1;
         }
 
@@ -178,7 +183,7 @@ internal sealed class NvApi : IDisposable
         if (_thermals != null && mask != 0)
         {
             var thermals = NvApiThermals.Create(mask);
-            if (_thermals(handle, ref thermals) == 0)
+            if (CheckStatus(_thermals(handle, ref thermals)) == 0)
             {
                 if (!isBlackwell)
                     hotspot = thermals.GetValue(THERMALS_SLOT_HOTSPOT);
@@ -206,7 +211,7 @@ internal sealed class NvApi : IDisposable
         if (_voltage == null) return null;
 
         var data = NvApiVoltage.Create();
-        if (_voltage(handle, ref data) != 0)
+        if (CheckStatus(_voltage(handle, ref data)) != 0)
             return null;
 
         var mv = (int)(data.currentVoltageUv / 1000);
@@ -222,10 +227,19 @@ internal sealed class NvApi : IDisposable
         data.ops[0].offset = offset;
         data.opCount = 1;
 
-        if (_registerOp(handle, ref data) != 0)
+        if (CheckStatus(_registerOp(handle, ref data)) != 0)
             return null;
 
         return data.ops[0].value;
+    }
+
+    // Missing sensors/permissions are normal (especially Blackwell's register
+    // read). Invalidated handles and driver loss require a fresh session.
+    internal static int CheckStatus(int status)
+    {
+        if (status is -4 or -6 or -8 or -10 or -220 or -221)
+            throw new NvApiUnavailableException(status);
+        return status;
     }
 
     public void Dispose()
@@ -234,12 +248,17 @@ internal sealed class NvApi : IDisposable
         {
             try
             {
-                var unload = GetDelegate<NoArgsDelegate>(QUERY_UNLOAD);
-                unload?.Invoke();
+                if (_initialized) _unload?.Invoke();
             }
             catch { }
             NativeLibrary.Free(_lib);
             _lib = IntPtr.Zero;
+            _initialized = false;
+            _unload = null;
+            _thermals = null;
+            _voltage = null;
+            _registerOp = null;
+            _gpuHandles = [];
         }
     }
 

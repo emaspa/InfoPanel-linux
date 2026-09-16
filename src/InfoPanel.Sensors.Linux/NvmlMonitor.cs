@@ -24,19 +24,33 @@ public class NvmlMonitor
 
     // NvAPI (libnvidia-api.so.1) side channel for hotspot/VRAM temperature and
     // core voltage; absent on the open drivers and proprietary drivers < R525.
-    private NvApi? _nvApi;
-    private IntPtr[] _nvApiHandles = [];
-    private int[] _nvApiThermalsMasks = [];
-    private bool[] _isBlackwell = [];
+    private INvApi? _nvApi;
+    private readonly INvmlApi _nvml;
+    private readonly Func<INvApi?> _createNvApi;
+    // The hwmon worker serializes scans/polls; shutdown runs after that worker stops.
+    private readonly Func<long> _clock;
+    private const int RetryIntervalMs = 60_000;
+    private long _nextNvmlAttempt, _nextNvApiAttempt;
+    private sealed record NvApiGpu(IntPtr Handle, int ThermalsMask, bool IsBlackwell);
+    private readonly Dictionary<(SensorId? Id, IntPtr Handle), NvApiGpu> _nvApiGpus = [];
+    private HashSet<(SensorId? Id, IntPtr Handle)> _devices = [];
 
-    private NvmlMonitor() { }
+    private NvmlMonitor() : this(new NativeNvmlApi(), NvApi.TryCreate) { }
+
+    internal NvmlMonitor(INvmlApi nvml, Func<INvApi?> createNvApi, Func<long>? clock = null)
+    {
+        _nvml = nvml;
+        _createNvApi = createNvApi;
+        _clock = clock ?? (() => Environment.TickCount64);
+    }
 
     public void Initialize()
     {
-        if (_initialized) return;
+        if (_initialized || _clock() < _nextNvmlAttempt) return;
+        _nextNvmlAttempt = _clock() + RetryIntervalMs;
         try
         {
-            var ret = Nvml.nvmlInit_v2();
+            var ret = _nvml.nvmlInit_v2();
             if (ret != NvmlReturn.Success)
             {
                 Log.Debug("NVML init failed: {Result}", ret);
@@ -44,6 +58,7 @@ public class NvmlMonitor
             }
 
             _initialized = true;
+            _fanRpmSupported = true;
         }
         catch (DllNotFoundException)
         {
@@ -58,12 +73,9 @@ public class NvmlMonitor
     private void RefreshDevices()
     {
         _available = false;
-        var ret = Nvml.nvmlDeviceGetCount_v2(out uint count);
-        if (ret != NvmlReturn.Success || count == 0)
-        {
-            Log.Debug("NVML: no devices found ({Result})", ret);
-            return;
-        }
+        var ret = CheckNvml(_nvml.nvmlDeviceGetCount_v2(out uint count));
+        if (ret != NvmlReturn.Success)
+            throw new NvmlUnavailableException(ret);
 
         _deviceCount = (int)count;
         _deviceHandles = new IntPtr[_deviceCount];
@@ -73,37 +85,49 @@ public class NvmlMonitor
 
         for (int i = 0; i < _deviceCount; i++)
         {
-            ret = Nvml.nvmlDeviceGetHandleByIndex_v2((uint)i, out _deviceHandles[i]);
+            ret = CheckNvml(_nvml.nvmlDeviceGetHandleByIndex_v2((uint)i, out _deviceHandles[i]));
             if (ret != NvmlReturn.Success)
             {
+                // A query/permission failure excludes only this index. CheckNvml
+                // escalates only errors that make the native session unusable.
+                _deviceHandles[i] = IntPtr.Zero;
                 Log.Debug("NVML: failed to get handle for GPU {Index}: {Result}", i, ret);
                 continue;
             }
 
-            ret = Nvml.nvmlDeviceGetName(_deviceHandles[i], out var name);
+            ret = CheckNvml(_nvml.nvmlDeviceGetName(_deviceHandles[i], out var name));
             _deviceNames[i] = ret == NvmlReturn.Success ? name : "NVIDIA GPU";
             string? uuid = null, pciAddress = null;
-            try { if (Nvml.nvmlDeviceGetUUID(_deviceHandles[i], out var value) == NvmlReturn.Success) uuid = value; }
+            try { if (CheckNvml(_nvml.nvmlDeviceGetUUID(_deviceHandles[i], out var value)) == NvmlReturn.Success) uuid = value; }
             catch (EntryPointNotFoundException) { }
             try
             {
-                if (Nvml.nvmlDeviceGetPciInfo_v3(_deviceHandles[i], out var pci) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetPciInfo_v3(_deviceHandles[i], out var pci)) == NvmlReturn.Success)
                     pciAddress = System.Text.Encoding.ASCII.GetString(pci.busId).TrimEnd('\0');
             }
             catch (EntryPointNotFoundException) { }
             _deviceIds[i] = SystemSensorIdentity.Nvidia(uuid, pciAddress, "temperature");
-            try { Nvml.nvmlDeviceGetNumFans(_deviceHandles[i], ref _fanCounts[i]); }
+            try
+            {
+                if (CheckNvml(_nvml.nvmlDeviceGetNumFans(_deviceHandles[i], ref _fanCounts[i])) != NvmlReturn.Success)
+                    _fanCounts[i] = 0;
+            }
             catch (EntryPointNotFoundException) { }
             _fanCounts[i] = Math.Min(_fanCounts[i], 8);
             if (_deviceIds[i] == null) Log.Warning("NVML GPU {Index} has no UUID or PCI identity; excluded", i);
         }
 
-        _available = true;
-
-        _nvApi?.Dispose();
-        _nvApi = null;
-        _nvApiHandles = [];
-        InitializeNvApi();
+        var devices = Enumerable.Range(0, _deviceCount).Where(i => _deviceHandles[i] != IntPtr.Zero)
+            .Select(i => (_deviceIds[i], _deviceHandles[i])).ToHashSet();
+        if (!_devices.SetEquals(devices))
+        {
+            // Re-enumerated NVML handles and identities detect replacement as well as
+            // removal. Index reordering alone preserves the cached NvAPI bindings.
+            ResetNvApi();
+            _devices = devices;
+        }
+        _available = devices.Count != 0;
+        if (_available && _nvApi == null && _clock() >= _nextNvApiAttempt) InitializeNvApi();
     }
 
     /// <summary>
@@ -112,21 +136,18 @@ public class NvmlMonitor
     /// </summary>
     private void InitializeNvApi()
     {
+        _nextNvApiAttempt = _clock() + RetryIntervalMs;
         try
         {
-            _nvApi = NvApi.TryCreate();
+            _nvApi = _createNvApi();
             if (_nvApi == null) return;
-
-            _nvApiHandles = new IntPtr[_deviceCount];
-            _nvApiThermalsMasks = new int[_deviceCount];
-            _isBlackwell = new bool[_deviceCount];
 
             for (int i = 0; i < _deviceCount; i++)
             {
                 if (_deviceHandles[i] == IntPtr.Zero) continue;
 
                 var apiHandle = IntPtr.Zero;
-                if (Nvml.nvmlDeviceGetPciInfo_v3(_deviceHandles[i], out NvmlPciInfo pci) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetPciInfo_v3(_deviceHandles[i], out NvmlPciInfo pci)) == NvmlReturn.Success)
                 {
                     apiHandle = _nvApi.FindGpuByBusId(pci.bus);
                 }
@@ -136,29 +157,30 @@ public class NvmlMonitor
                 }
                 if (apiHandle == IntPtr.Zero) continue;
 
-                _nvApiHandles[i] = apiHandle;
-                _nvApiThermalsMasks[i] = _nvApi.CalculateThermalsMask(apiHandle);
+                var mask = _nvApi.CalculateThermalsMask(apiHandle);
+                var isBlackwell = false;
 
                 // Blackwell (arch id 10+) moved the hotspot out of the thermals query
                 // and uses GDDR7; nvmlDeviceGetArchitecture needs driver R450+.
                 try
                 {
-                    if (Nvml.nvmlDeviceGetArchitecture(_deviceHandles[i], out uint arch) == NvmlReturn.Success)
+                    if (CheckNvml(_nvml.nvmlDeviceGetArchitecture(_deviceHandles[i], out uint arch)) == NvmlReturn.Success)
                     {
-                        _isBlackwell[i] = arch != uint.MaxValue && arch >= 10;
+                        isBlackwell = arch != uint.MaxValue && arch >= 10;
                     }
                 }
                 catch (EntryPointNotFoundException) { }
 
+                _nvApiGpus[(_deviceIds[i], _deviceHandles[i])] = new(apiHandle, mask, isBlackwell);
                 Log.Information("NvApi: GPU {Index} matched (thermals mask 0x{Mask:X}, blackwell={Blackwell})",
-                    i, _nvApiThermalsMasks[i], _isBlackwell[i]);
+                    i, mask, isBlackwell);
 
                 // Blackwell reports the hotspot only through a GPU register read, which the
                 // driver restricts to root (thermals slot 9 still answers, but with the edge
                 // temperature - verified on real hardware - so it must not be used instead).
-                if (_isBlackwell[i])
+                if (isBlackwell)
                 {
-                    var (hotspot, _) = _nvApi.ReadTemperatures(apiHandle, _nvApiThermalsMasks[i], isBlackwell: true);
+                    var (hotspot, _) = _nvApi.ReadTemperatures(apiHandle, mask, isBlackwell: true);
                     if (!hotspot.HasValue)
                     {
                         Log.Information("NvApi: GPU {Index}: hotspot temperature unavailable (Blackwell exposes it via a register read that requires root)", i);
@@ -166,28 +188,74 @@ public class NvmlMonitor
                 }
             }
         }
+        catch (NvmlUnavailableException) { throw; }
         catch (Exception ex)
         {
             Log.Debug(ex, "NvApi setup failed");
-            _nvApi?.Dispose();
-            _nvApi = null;
+            ResetNvApi(backOff: true);
+        }
+    }
+
+    private void ResetNvApi(bool backOff = false)
+    {
+        var api = _nvApi;
+        _nvApi = null;
+        _nvApiGpus.Clear();
+        RemoveNvApiReadings();
+        // A topology change may retry immediately after a working session. It
+        // must not bypass the cooldown of a missing/failing optional library.
+        if (backOff) _nextNvApiAttempt = _clock() + RetryIntervalMs;
+        else if (api != null) _nextNvApiAttempt = 0;
+        api?.Dispose();
+    }
+
+    private void ResetNativeSession()
+    {
+        _available = false;
+        _deviceCount = 0;
+        _deviceHandles = [];
+        _deviceNames = [];
+        _deviceIds = [];
+        _fanCounts = [];
+        _devices.Clear();
+        foreach (var descriptor in _catalog.Descriptors) HwmonMonitor.SENSORHASH.TryRemove(descriptor.StableId, out _);
+        try { ResetNvApi(); }
+        finally
+        {
+            if (_initialized)
+            {
+                _initialized = false;
+                try { _nvml.nvmlShutdown(); } catch { }
+            }
         }
     }
 
     public void Shutdown()
     {
-        foreach (var descriptor in _catalog.Descriptors) HwmonMonitor.SENSORHASH.TryRemove(descriptor.StableId, out _);
+        ResetNativeSession();
         _catalog = new(_catalog.Generation + 1, []);
-        if (_initialized)
-        {
-            try { Nvml.nvmlShutdown(); } catch { }
-            _initialized = false;
-            _available = false;
-        }
-
-        _nvApi?.Dispose();
-        _nvApi = null;
+        _nextNvmlAttempt = _nextNvApiAttempt = 0;
     }
+
+    private void RecoverNativeSession()
+    {
+        ResetNativeSession();
+        _nextNvmlAttempt = _clock() + RetryIntervalMs;
+    }
+
+    // Only explicit session/device loss stops polling before NvAPI reads. Query
+    // errors (including InvalidArgument, NotFound and Unknown) skip that metric.
+    // NVIDIA's nvmlReturn_t definitions:
+    // https://docs.nvidia.com/deploy/nvml-api/api/group__nvmlDeviceEnums.html
+    private static NvmlReturn CheckNvml(NvmlReturn result)
+    {
+        if (result is NvmlReturn.Uninitialized or NvmlReturn.DriverNotLoaded
+            or NvmlReturn.GpuIsLost or NvmlReturn.ResetRequired or NvmlReturn.LibraryRmVersionMismatch)
+            throw new NvmlUnavailableException(result);
+        return result;
+    }
+
+    private sealed class NvmlUnavailableException(NvmlReturn result) : Exception($"NVML session unavailable: {result}");
 
     public void Poll()
     {
@@ -206,26 +274,26 @@ public class NvmlMonitor
             try
             {
                 // Temperature
-                if (Nvml.nvmlDeviceGetTemperature(handle, NvmlTemperatureSensor.Gpu, out uint temp) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetTemperature(handle, NvmlTemperatureSensor.Gpu, out uint temp)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/temperature", temp, "°C");
                 }
 
                 // Power
-                if (Nvml.nvmlDeviceGetPowerUsage(handle, out uint powerMw) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetPowerUsage(handle, out uint powerMw)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/power", Math.Round(powerMw / 1000.0, 1), "W");
                 }
 
                 // Utilization
-                if (Nvml.nvmlDeviceGetUtilizationRates(handle, out NvmlUtilization util) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetUtilizationRates(handle, out NvmlUtilization util)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/utilization", util.gpu, "%");
                     UpdateSensor($"{prefix}/memory_utilization", util.memory, "%");
                 }
 
                 // Power limit and draw as a percentage of it
-                if (Nvml.nvmlDeviceGetPowerManagementLimit(handle, out uint limitMw) == NvmlReturn.Success && limitMw > 0)
+                if (CheckNvml(_nvml.nvmlDeviceGetPowerManagementLimit(handle, out uint limitMw)) == NvmlReturn.Success && limitMw > 0)
                 {
                     UpdateSensor($"{prefix}/power_limit", Math.Round(limitMw / 1000.0, 1), "W");
                     if (powerMw > 0)
@@ -235,38 +303,38 @@ public class NvmlMonitor
                 }
 
                 // Clock speeds
-                if (Nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Graphics, out uint graphicsClock) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Graphics, out uint graphicsClock)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/clock_graphics", graphicsClock, "MHz");
                 }
-                if (Nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Mem, out uint memClock) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Mem, out uint memClock)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/clock_memory", memClock, "MHz");
                 }
-                if (Nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Sm, out uint smClock) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Sm, out uint smClock)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/clock_sm", smClock, "MHz");
                 }
-                if (Nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Video, out uint videoClock) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetClockInfo(handle, NvmlClockType.Video, out uint videoClock)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/clock_video", videoClock, "MHz");
                 }
 
                 // Performance state: P0 (max performance) .. P15 (min), reported as the number
-                if (Nvml.nvmlDeviceGetPerformanceState(handle, out uint pstate) == NvmlReturn.Success && pstate <= 15)
+                if (CheckNvml(_nvml.nvmlDeviceGetPerformanceState(handle, out uint pstate)) == NvmlReturn.Success && pstate <= 15)
                 {
                     UpdateSensor($"{prefix}/pstate", pstate, "");
                 }
 
                 // Throttling: thermal (SW/HW thermal slowdown) and power (cap / power brake)
-                if (Nvml.nvmlDeviceGetCurrentClocksThrottleReasons(handle, out ulong throttle) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetCurrentClocksThrottleReasons(handle, out ulong throttle)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/throttle_thermal", (throttle & 0x60UL) != 0 ? 1 : 0, "");
                     UpdateSensor($"{prefix}/throttle_power", (throttle & 0x84UL) != 0 ? 1 : 0, "");
                 }
 
                 // Memory usage
-                if (Nvml.nvmlDeviceGetMemoryInfo(handle, out NvmlMemory memInfo) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetMemoryInfo(handle, out NvmlMemory memInfo)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/memory_used", Math.Round(memInfo.used / (1024.0 * 1024), 0), "MB");
                     UpdateSensor($"{prefix}/memory_total", Math.Round(memInfo.total / (1024.0 * 1024), 0), "MB");
@@ -275,7 +343,7 @@ public class NvmlMonitor
                 }
 
                 // Fan speed (duty cycle - the only fan metric classic NVML exposes)
-                if (Nvml.nvmlDeviceGetFanSpeed(handle, out uint fanSpeed) == NvmlReturn.Success)
+                if (CheckNvml(_nvml.nvmlDeviceGetFanSpeed(handle, out uint fanSpeed)) == NvmlReturn.Success)
                 {
                     UpdateSensor($"{prefix}/fan_speed", fanSpeed, "%");
                 }
@@ -286,8 +354,10 @@ public class NvmlMonitor
                 {
                     try
                     {
-                        uint numFans = 1;
-                        Nvml.nvmlDeviceGetNumFans(handle, ref numFans);
+                        uint numFans = 0;
+                        // An unsupported/failed count does not establish a fan 0.
+                        if (CheckNvml(_nvml.nvmlDeviceGetNumFans(handle, ref numFans)) != NvmlReturn.Success)
+                            numFans = 0;
                         numFans = Math.Min(numFans, 8);
                         for (uint fan = 0; fan < numFans; fan++)
                         {
@@ -296,7 +366,7 @@ public class NvmlMonitor
                                 version = NvmlFanSpeedInfo.Version1,
                                 fan = fan,
                             };
-                            if (Nvml.nvmlDeviceGetFanSpeedRPM(handle, ref info) == NvmlReturn.Success)
+                            if (CheckNvml(_nvml.nvmlDeviceGetFanSpeedRPM(handle, ref info)) == NvmlReturn.Success)
                             {
                                 UpdateSensor($"{prefix}/fan{fan}_rpm", info.speed, "RPM");
                             }
@@ -310,9 +380,9 @@ public class NvmlMonitor
                 }
 
                 // NvAPI extras: hotspot temperature, VRAM temperature, core voltage
-                if (_nvApi != null && i < _nvApiHandles.Length && _nvApiHandles[i] != IntPtr.Zero)
+                if (_nvApi != null && _nvApiGpus.TryGetValue((_deviceIds[i], handle), out var gpu))
                 {
-                    var (hotspot, vram) = _nvApi.ReadTemperatures(_nvApiHandles[i], _nvApiThermalsMasks[i], _isBlackwell[i]);
+                    var (hotspot, vram) = _nvApi.ReadTemperatures(gpu.Handle, gpu.ThermalsMask, gpu.IsBlackwell);
                     if (hotspot.HasValue)
                     {
                         UpdateSensor($"{prefix}/temperature_hotspot", hotspot.Value, "°C");
@@ -322,15 +392,28 @@ public class NvmlMonitor
                         UpdateSensor($"{prefix}/temperature_vram", vram.Value, "°C");
                     }
 
-                    var voltageMv = _nvApi.ReadVoltageMv(_nvApiHandles[i]);
+                    var voltageMv = _nvApi.ReadVoltageMv(gpu.Handle);
                     if (voltageMv.HasValue)
                     {
                         UpdateSensor($"{prefix}/voltage", Math.Round(voltageMv.Value / 1000.0, 3), "V");
                     }
                 }
             }
+            catch (NvmlUnavailableException ex)
+            {
+                Log.Debug(ex, "NVML session lost; retrying after cooldown");
+                RecoverNativeSession();
+                break;
+            }
+            catch (NvApiUnavailableException ex)
+            {
+                Log.Debug(ex, "NvAPI handles lost; retrying after cooldown");
+                ResetNvApi(backOff: true);
+            }
             catch (Exception ex)
             {
+                // Keep this GPU's completed readings and continue with the next
+                // GPU. An unexpected query exception does not prove session loss.
                 Log.Debug(ex, "NVML poll error for GPU {Index}", i);
             }
         }
@@ -388,7 +471,12 @@ public class NvmlMonitor
                 }
             }
         }
-        catch (Exception ex) { _available = false; Log.Debug(ex, "GPU discovery failed"); }
+        catch (Exception ex)
+        {
+            RecoverNativeSession();
+            descriptors.Clear();
+            Log.Debug(ex, "GPU discovery failed; retrying after cooldown");
+        }
         var catalog = new SensorCatalogSnapshot(_catalog.Generation + 1, descriptors);
         foreach (var old in _catalog.Descriptors)
             if (!catalog.StableIdIndex.ContainsKey(old.StableId)) HwmonMonitor.SENSORHASH.TryRemove(old.StableId, out _);
@@ -396,7 +484,14 @@ public class NvmlMonitor
         return catalog.Descriptors;
     }
 
-    private static bool _fanRpmSupported = true;
+    private bool _fanRpmSupported = true;
+
+    private void RemoveNvApiReadings()
+    {
+        foreach (var descriptor in _catalog.Descriptors)
+            if (descriptor.Id.Channel is "temperature_hotspot" or "temperature_vram" or "voltage")
+                HwmonMonitor.SENSORHASH.TryRemove(descriptor.StableId, out _);
+    }
 
     private void UpdateSensor(string sensorId, double value, string unit)
     {
@@ -426,7 +521,10 @@ internal enum NvmlReturn : uint
     NotFound = 6,
     InsufficientSize = 7,
     InsufficientPower = 8,
-    GpuIsLost = 9,
+    DriverNotLoaded = 9,
+    GpuIsLost = 15,
+    ResetRequired = 16,
+    LibraryRmVersionMismatch = 18,
     Unknown = 999,
 }
 

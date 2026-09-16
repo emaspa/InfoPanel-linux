@@ -352,6 +352,7 @@ namespace InfoPanel
 
             try { await Monitors.PluginMonitor.Instance.StopAsync().WaitAsync(TimeSpan.FromSeconds(3)); } catch { }
             try { HwmonMonitor.Instance.Stop(); } catch { }
+            try { NvmlMonitor.Instance.Shutdown(); } catch { }
             try { IntelGpuMonitor.Instance.Shutdown(); } catch { }
         }
     }
