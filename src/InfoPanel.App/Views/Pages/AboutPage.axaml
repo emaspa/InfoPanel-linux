@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.3.2 alpha: sensor values visible in the Designer picker" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.3.3 alpha: NVIDIA sensors stop re-initializing every 10 seconds" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Since 0.3.0 the NVIDIA hotspot, VRAM and voltage interface (NvAPI) was torn down and reopened on every 10-second sensor rescan, adding three log lines each time, about 26,000 a day. It now opens once and is only reopened when the GPU actually changes or the driver reports it lost. A card that rejects an individual query, such as a fan it does not have, now just skips that one reading instead of dropping every NVIDIA sensor, and a missing NVIDIA library is retried once a minute rather than every rescan. NVIDIA resources are also released properly when InfoPanel exits." />
+                        <TextBlock Text="v0.3.2 alpha: sensor values visible in the Designer picker" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="The Designer's sensor panel showed sensor names but no values. Long names, such as the detailed disk labels introduced with stable sensor ids, made the tree wider than the panel and pushed every value past its right edge. Names now shorten with an ellipsis and show in full as a tooltip, and values always stay in view at any panel width. The Sensors page and the Layers list get the same fix, and the Designer's left panel can no longer be dragged too narrow to show readings." />
                         <TextBlock Text="v0.3.1 alpha: deb and rpm packages, fresh-account data fix" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
