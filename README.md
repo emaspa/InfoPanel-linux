@@ -501,8 +501,9 @@ The argument must match `<Version>` in `src/InfoPanel.App/InfoPanel.App.csproj`;
 omit it to use that version. The publish remains self-contained `linux-x64`
 with separate files, including the bundled plugins and installer assets.
 
-GitHub Actions builds and validates the tarball, deb and rpm on packaging/source
-pull requests and manual runs. Pushing a matching `vX.Y.Z` tag publishes the
+GitHub Actions builds and validates the tarball, deb, rpm and a test Arch
+package on pull requests touching packaging or source files and on manual runs
+(not on direct pushes). Pushing a matching `vX.Y.Z` tag publishes the
 three release assets, then updates the existing `infopanel-bin` AUR package and
 commits the generated AUR metadata back to `main`. See
 [the maintainer release guide](docs/RELEASING.md) for the SSH secret setup,

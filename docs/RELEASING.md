@@ -74,8 +74,7 @@ its check accepts any `VERSION_ID`, including official image build dates.
 
 ## One-time maintainer setup
 
-1. Review this branch and run the container checks below before merging it to
-   `main`. Confirm the existing AUR package is still owned by AUR account
+1. Confirm the existing AUR package is still owned by AUR account
    `emaspa`: visit `https://aur.archlinux.org/packages/infopanel-bin` while logged
    in. Do not create a second package. Its push URL is
    `ssh://aur@aur.archlinux.org/infopanel-bin.git`.
@@ -100,6 +99,12 @@ its check accepts any `VERSION_ID`, including official image build dates.
      < ~/.ssh/infopanel-aur-actions
    ```
 
+   The secret currently holds the maintainer's existing AUR key
+   (`~/.ssh/aur`), which is registered account-wide, so a dedicated key is
+   optional. Whichever key is in the secret is the one to pass as
+   `AUR_SSH_PRIVATE_KEY` when running `publish-aur.sh` by hand (see
+   [Retries and partial failures](#retries-and-partial-failures)).
+
    There are no other custom secrets. `GITHUB_TOKEN` is supplied by GitHub;
    build jobs request `contents: read`, and only GitHub release/AUR sync jobs
    request `contents: write`. PR jobs receive neither this SSH key nor a write
@@ -113,7 +118,8 @@ its check accepts any `VERSION_ID`, including official image build dates.
    or required status checks can reject that push unless explicitly configured
    to allow it. This workflow does not bypass protections or use a PAT. Resolve
    that policy before releasing; otherwise the AUR job will fail before its AUR
-   push. Protect `v*` tag creation so only trusted maintainers can release.
+   push. (Optional, not currently configured.) Protect `v*` tag creation so
+   only trusted maintainers can release.
 5. Run **Actions → Packaging check → Run workflow** on `main` and review all
    three package jobs and lint output. If configuring required PR checks, note
    that this workflow has path filters; do not require a skipped workflow on
@@ -142,16 +148,23 @@ verify Arch's announcement and update the pin in `packaging/publish-aur.sh`.
 ## Release procedure
 
 1. Set `<Version>` in `src/InfoPanel.App/InfoPanel.App.csproj` to the next
-   `X.Y.Z`, with no prerelease suffix or leading zeroes. Review and merge the
-   change with successful packaging checks. Do not manually bump AUR `pkgver`
-   to an unpublished release: the publisher handles that after upload.
+   `X.Y.Z`, with no prerelease suffix or leading zeroes. Push (or merge) the
+   change, then run **Actions → Packaging check → Run workflow** on `main` and
+   wait for all three package jobs, unless the change arrived through a pull
+   request that already ran it: the check never runs on direct pushes. Do not
+   manually bump AUR `pkgver` to an unpublished release: the publisher handles
+   that after upload.
 2. From up-to-date `main`, run these commands, substituting the chosen version:
 
    ```bash
    python3 packaging/version.py v0.3.1
    git tag -a v0.3.1 -m 'InfoPanel 0.3.1'
-   git push origin v0.3.1
+   git push linux v0.3.1
    ```
+
+   Push the tag to the `emaspa/InfoPanel-linux` remote. In the maintainer's
+   clone that remote is named `linux`; `origin` there is the Windows fork, and a
+   tag pushed to it triggers nothing.
 
    These are maintainer instructions; the automation implementation does not
    create or push your tag. The tag must contain the release workflow.
@@ -189,9 +202,35 @@ rebuild. The publisher compares existing assets against the validated copies;
 a concurrent change fails instead of overwriting. Existing notes are never
 regenerated. Fixes to already released binaries require a new version/tag.
 
+A re-run always executes the workflow and the `packaging/` scripts **from the
+tagged commit**, so it only helps with transient failures. It cannot pick up a
+script fix made on `main` afterwards.
+
 `main` is pushed before AUR. If that push is blocked, AUR remains unchanged.
-If the later AUR push fails, `main` may be ahead temporarily; a rerun repairs
-the AUR without an empty commit on `main`. Neither repository is force-pushed.
+If the AUR push fails for a transient reason (network, AUR outage, a concurrent
+`main` commit), `main` may be ahead temporarily; re-running the `aur` job
+repairs the AUR without an empty commit on `main`.
+
+If the GitHub release is already public and the AUR job failed because of a
+bug in the scripts, do **not** delete or move the tag. Fix the script on
+`main`, then run the AUR step locally from an up-to-date `main` checkout with
+Docker available:
+
+```bash
+GH_REPO=emaspa/InfoPanel-linux GH_TOKEN="$(gh auth token)" \
+  AUR_SSH_PRIVATE_KEY="$(cat ~/.ssh/aur)" bash packaging/publish-aur.sh vX.Y.Z
+```
+
+It clones `main` fresh and downloads the public tarball, so it does not depend
+on the tagged checkout. It applies the same guards, commits `aur/PKGBUILD` and
+`aur/.SRCINFO` to `main`, and pushes the AUR. This is how `v0.3.1` reached the
+AUR, after a runner file-ownership bug in `packaging/ci/srcinfo.sh`.
+
+Only while the release is still an unpublished draft may the tag be deleted
+and re-pushed at a fixed commit. That was done for `v0.3.1` after the
+`release.py` draft-lookup fix, before anything had been published.
+
+Neither repository is force-pushed.
 Concurrent changes fail safely and require review/retry. An old tag cannot
 downgrade a newer `pkgver` or reset an existing same-version `pkgrel > 1`.
 Changes to the recipe/staging helper/install script on `main` after the tag
@@ -309,8 +348,9 @@ payload/build rather than filtered.
 `namcap` runs on the PKGBUILD with both command failures and emitted `E:`
 diagnostics fatal (some namcap versions return zero after reporting errors).
 
-Nine offline packaging tests cover version rejection, note preservation, asset
-reuse, checksum updates and downgrade/recipe-drift guards. Local package
+Offline packaging tests (`packaging/tests/`) cover version rejection, note
+preservation, asset reuse, draft lookup by listing, checksum updates and
+downgrade/recipe-drift guards. Local package
 assembly, metadata inspection and lint checks are useful when Docker is
 unavailable, but do not replace the clean target-container builds and installs
 above. Verify `.SRCINFO` with real `makepkg --printsrcinfo` after recipe changes.

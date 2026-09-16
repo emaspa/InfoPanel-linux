@@ -24,6 +24,9 @@ decisions below OVERRIDE the corresponding parts of the original design that fol
    Omitted when null. Deep-copied on clone.
 5. **Migration on load** as designed: migrate in memory, do not write; persisted
    on the next normal save. Unresolved ids are kept verbatim.
+   *Implementation note (shipped):* the host requests a debounced save for each
+   profile with migrated items right after reconciliation, so successful
+   migrations are persisted without waiting for a user edit.
 6. **Polling loop**: one serialized worker (poll + rescan every 10 s) replacing
    the overlapping `System.Timers.Timer` callbacks, as designed. Keep the
    existing first-poll "force poll all" behaviour.

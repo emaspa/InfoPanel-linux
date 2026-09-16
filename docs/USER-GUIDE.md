@@ -53,7 +53,7 @@ PipeWire server package `pipewire-pulseaudio`; Ubuntu and Arch use `pipewire-pul
 
 ### Tarball
 
-1. Download the latest `infopanel-<version>-linux-x64.tar.gz` from [GitHub Releases](https://github.com/emaspa/InfoPanel-linux/releases). It includes .NET; the host still needs glibc, the GCC/C++ runtime, zlib, ICU, fontconfig, libX11, libICE and libSM.
+1. Download the latest `infopanel-<version>-linux-x64.tar.gz` from [GitHub Releases](https://github.com/emaspa/InfoPanel-linux/releases). It includes .NET; the host still needs glibc, the GCC/C++ runtime, zlib, ICU, fontconfig and the X11 client libraries (libX11, libICE, libSM, libXcursor, libXext, libXi, libXrandr). The deb, rpm and AUR packages pull these in automatically.
 2. Extract it and run the installer:
    ```bash
    tar xf infopanel-<version>-linux-x64.tar.gz
@@ -116,7 +116,7 @@ When an older profile is opened, InfoPanel attempts to match its saved hardware 
 
 ## Sensors
 
-The Sensors page lists everything InfoPanel can read on your system: CPU, GPU, memory, drives, network and any plugin-provided values. Values come from Linux hwmon/sysfs, Intel and AMD GPU interfaces, and NVMe SMART data.
+The Sensors page lists everything InfoPanel can read on your system: CPU, GPU, memory, drives, network and any plugin-provided values. Values come from Linux hwmon/sysfs and thermal zones, the Intel, AMD (ROCm) and NVIDIA (NVML) GPU interfaces, the SMART dump produced by `infopanel-smart.timer`, and plugins.
 
 Hardware bindings normally survive reboots even when Linux changes `hwmonN` or `thermal_zoneN` numbering. InfoPanel checks for hardware changes every 10 seconds, so a newly connected sensor may take that long to appear. Disconnected sensors show no current value and recover automatically when the same identifiable device returns. Devices with the same chip name appear separately using their hardware identity. Physical relocation or firmware changes can require rebinding for devices identified by location.
 
@@ -128,7 +128,7 @@ The Plugins page manages bundled and third-party plugins. Plugins using the conf
 
 Bundled plugins include system info, drives, network, weather (OpenWeatherMap key required), MangoHud FPS, a stopwatch and Audio Spectrum, a real-time audio visualizer for the system output. Add its image from the Designer's sensor panel.
 
-Third-party .NET plugins built for InfoPanel for Windows load as-is: drop the plugin folder into the `plugins` directory next to the executable, or use the import option on the Plugins page.
+Third-party .NET plugins built for InfoPanel for Windows load as-is: use **Add plugin…** on the Plugins page to pick the plugin's `InfoPanel.*.zip`, or copy the plugin folder into `~/.local/share/InfoPanel/plugins/` (or `$INFOPANEL_DATA_DIR/plugins/` when that override is set). The `plugins` folder next to the executable holds only the bundled plugins and is read-only for package installs.
 
 To keep idle cost low, a plugin whose sensors are not shown on any streaming panel, overlay or web view stops updating, and after 5 minutes stops completely; it restarts automatically within a second when one of its sensors is used again. While stopped, its sensors remain listed with their last values. The Sensors page and the designer always show everything live while open.
 
