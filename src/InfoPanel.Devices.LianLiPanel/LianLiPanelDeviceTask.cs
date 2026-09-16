@@ -261,34 +261,49 @@ namespace InfoPanel.Services
                     var renderTask = Task.Run(async () =>
                     {
                         Thread.CurrentThread.Name ??= $"LianLiPanel-Render-{_device.DeviceId}";
-                        var stopwatch = new Stopwatch();
-
-                        while (!renderToken.IsCancellationRequested)
+                        try
                         {
-                            stopwatch.Restart();
-                            var frame = GenerateLcdBuffer();
+                            var stopwatch = new Stopwatch();
 
-                            if (frame != null)
+                            while (!renderToken.IsCancellationRequested)
                             {
-                                Interlocked.Exchange(ref latestFrame, frame);
-                                frameAvailable.Set();
-                            }
-                            else
-                            {
-                                // Content unchanged: skip encode/send, keep showing the pace.
-                                fpsCounter.Update(0);
-                                _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
-                            }
+                                stopwatch.Restart();
+                                var frame = GenerateLcdBuffer();
 
-                            var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
-                            var desiredFrameTime = Math.Max((int)fpsCounter.FrameTime, targetFrameTime);
-                            var elapsedMs = (int)stopwatch.ElapsedMilliseconds;
-                            var adaptiveFrameTime = desiredFrameTime - elapsedMs;
+                                if (frame != null)
+                                {
+                                    Interlocked.Exchange(ref latestFrame, frame);
+                                    frameAvailable.Set();
+                                }
+                                else
+                                {
+                                    // Content unchanged: skip encode/send, keep showing the pace.
+                                    fpsCounter.Update(0);
+                                    _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
+                                }
 
-                            if (adaptiveFrameTime > 0)
-                            {
-                                await Task.Delay(adaptiveFrameTime, renderToken);
+                                var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
+                                var desiredFrameTime = Math.Max((int)fpsCounter.FrameTime, targetFrameTime);
+                                var elapsedMs = (int)stopwatch.ElapsedMilliseconds;
+                                var adaptiveFrameTime = desiredFrameTime - elapsedMs;
+
+                                if (adaptiveFrameTime > 0)
+                                {
+                                    await Task.Delay(adaptiveFrameTime, renderToken);
+                                }
                             }
+                        }
+                        catch (OperationCanceledException) { }
+                        catch (Exception e)
+                        {
+                            Logger.Error(e, "LianLiPanelDevice {Device}: Error in render task", _device);
+                            _device.UpdateRuntimeProperties(errorMessage: e.Message);
+                        }
+                        finally
+                        {
+                            // Take the send task down too so DoWorkAsync returns and the
+                            // supervisor restarts the device instead of leaving a zombie.
+                            renderCts.Cancel();
                         }
                     }, renderToken);
 
@@ -299,7 +314,9 @@ namespace InfoPanel.Services
                         {
                             var stopwatch = new Stopwatch();
 
-                            while (!token.IsCancellationRequested)
+                            // renderToken: a dead render task must end this loop too,
+                            // or the device task never exits and is never restarted.
+                            while (!renderToken.IsCancellationRequested)
                             {
                                 if (brightness != _device.Brightness)
                                 {

@@ -20,7 +20,7 @@ mkdir -p "$ICON_DIR"
 cp infopanel.png "$ICON_DIR/infopanel.png" 2>/dev/null || true
 gtk-update-icon-cache -f "$HOME/.local/share/icons/hicolor" 2>/dev/null || true
 
-echo "Installing udev rules (sudo required, grants USB panel access to plugdev)"
+echo "Installing udev rules (sudo required, grants USB panel access)"
 sudo cp infopanel-udev.rules /etc/udev/rules.d/99-infopanel.rules
 sudo udevadm control --reload-rules
 sudo udevadm trigger
@@ -38,4 +38,4 @@ else
 fi
 
 echo
-echo "Done. Make sure your user is in the plugdev group, then run: infopanel"
+echo "Done. Replug your panels once (or reboot) so the udev rules apply, then run: infopanel"

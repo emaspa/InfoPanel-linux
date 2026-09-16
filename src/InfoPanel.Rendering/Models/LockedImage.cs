@@ -45,6 +45,12 @@ namespace InfoPanel.Models
         // Video decoded via the system ffmpeg binary (v1 used Windows-only FlyleafLib)
         private Video.FfmpegVideoDecoder? _videoDecoder;
 
+        // Cached per-frame video resizes, keyed by target size: the panel and the
+        // UI preview draw the same video at different sizes every frame, so a
+        // single-entry cache would miss on every draw (see the FFMPEG branch in
+        // AccessSKImage). Entries are refreshed per decoder frame version.
+        private readonly Dictionary<(int W, int H), (long Version, SKImage Image)> _frameResizeCache = [];
+
         public TimeSpan? CurrentTime => null;
         public TimeSpan? Duration => _videoDecoder?.Duration;
         public double? FrameRate => _videoDecoder?.FrameRate;
@@ -731,38 +737,106 @@ namespace InfoPanel.Models
                 if (Type == ImageType.PLUGIN)
                 {
                     var writer = PluginImageSource.Resolve(_pluginId!, _pluginImageId!);
-                    writer?.TryAccessFrame(frameBitmap =>
-                    {
-                        Width = writer.Width;
-                        Height = writer.Height;
+                    if (writer == null)
+                        return;
+                    Width = writer.Width;
+                    Height = writer.Height;
 
-                        using var resized = frameBitmap.Resize(
-                            new SKImageInfo(targetWidth, targetHeight),
-                            new SKSamplingOptions(SKCubicResampler.Mitchell));
-                        if (resized != null)
+                    // Same per-frame, per-size cache as the video branch: plugin
+                    // images invalidate at their own rate and were being resampled
+                    // with Mitchell cubic on every draw of every consumer, which
+                    // saturated the compositor's render thread. Same-size frames
+                    // skip the resample entirely (the copy is still required: the
+                    // writer reuses its buffers on the next swap).
+                    var pluginVersion = writer.FrameCounter;
+                    var pluginSizeKey = (targetWidth, targetHeight);
+                    if (!_frameResizeCache.TryGetValue(pluginSizeKey, out var pluginEntry)
+                        || pluginEntry.Version != pluginVersion)
+                    {
+                        SKImage? produced = null;
+                        writer.TryAccessFrame(frameBitmap =>
                         {
-                            using var image = SKImage.FromBitmap(resized);
-                            access(image);
+                            if (frameBitmap.Width == targetWidth && frameBitmap.Height == targetHeight)
+                            {
+                                produced = SKImage.FromBitmap(frameBitmap);
+                            }
+                            else
+                            {
+                                using var resized = frameBitmap.Resize(
+                                    new SKImageInfo(targetWidth, targetHeight),
+                                    new SKSamplingOptions(SKFilterMode.Linear));
+                                if (resized != null)
+                                {
+                                    produced = SKImage.FromBitmap(resized);
+                                }
+                            }
+                        });
+                        if (produced == null)
+                            return;
+
+                        pluginEntry.Image?.Dispose();
+                        pluginEntry = (pluginVersion, produced);
+                        _frameResizeCache[pluginSizeKey] = pluginEntry;
+
+                        if (_frameResizeCache.Count > 4)
+                        {
+                            foreach (var stale in _frameResizeCache.Where(kv => kv.Value.Version < pluginVersion - 24).ToList())
+                            {
+                                stale.Value.Image.Dispose();
+                                _frameResizeCache.Remove(stale.Key);
+                            }
                         }
-                    });
+                    }
+
+                    access(pluginEntry.Image);
                     return;
                 }
 
                 if (Type == ImageType.FFMPEG)
                 {
-                    // Video frames change every access: resize the latest decoded frame
-                    // directly, bypassing the per-frame caches.
-                    _videoDecoder?.TryAccessFrame(frameBitmap =>
+                    // Resize once per decoded frame and cache the result keyed by
+                    // the decoder's frame version and target size: every consumer
+                    // (multiple panels, preview) then draws the same cached image
+                    // instead of each paying a full-resolution resample per draw.
+                    // Bilinear is plenty for moving video and is several times
+                    // cheaper than the Mitchell cubic used for static images.
+                    var decoder = _videoDecoder;
+                    if (decoder == null)
+                        return;
+
+                    var version = decoder.FrameVersion;
+                    var sizeKey = (targetWidth, targetHeight);
+                    if (!_frameResizeCache.TryGetValue(sizeKey, out var entry)
+                        || entry.Version != version)
                     {
-                        using var resized = frameBitmap.Resize(
-                            new SKImageInfo(targetWidth, targetHeight),
-                            new SKSamplingOptions(SKCubicResampler.Mitchell));
-                        if (resized != null)
+                        SKBitmap? resized = null;
+                        decoder.TryAccessFrame(frameBitmap =>
                         {
-                            using var image = SKImage.FromBitmap(resized);
-                            access(image);
+                            resized = frameBitmap.Resize(
+                                new SKImageInfo(targetWidth, targetHeight),
+                                new SKSamplingOptions(SKFilterMode.Linear));
+                        });
+                        if (resized == null)
+                            return;
+
+                        entry.Image?.Dispose();
+                        entry = (version, SKImage.FromBitmap(resized));
+                        resized.Dispose();
+                        _frameResizeCache[sizeKey] = entry;
+
+                        // Drop sizes no longer being drawn (e.g. after a preview
+                        // resize) so stale entries don't pin memory.
+                        if (_frameResizeCache.Count > 4)
+                        {
+                            foreach (var stale in _frameResizeCache.Where(kv => kv.Value.Version < version - 24).ToList())
+                            {
+                                stale.Value.Image.Dispose();
+                                _frameResizeCache.Remove(stale.Key);
+                            }
                         }
-                    });
+                    }
+
+                    access(entry.Image);
                     return;
                 }
 
@@ -892,6 +966,11 @@ namespace InfoPanel.Models
 
                     _videoDecoder?.Dispose();
                     _videoDecoder = null;
+                    foreach (var cached in _frameResizeCache.Values)
+                    {
+                        cached.Image.Dispose();
+                    }
+                    _frameResizeCache.Clear();
 
                     _codec?.Dispose();
                     _stream?.Dispose();

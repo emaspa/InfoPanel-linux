@@ -243,40 +243,55 @@ namespace InfoPanel.Services
                     var renderTask = Task.Run(async () =>
                     {
                         Thread.CurrentThread.Name ??= $"TuringPanel-Render-{_device.DeviceId}";
-                        var stopwatch1 = new Stopwatch();
-
-                        while (!renderToken.IsCancellationRequested)
+                        try
                         {
-                            stopwatch1.Restart();
-                            var frame = GenerateLcdBuffer();
+                            var stopwatch1 = new Stopwatch();
 
-                            if (frame != null)
+                            while (!renderToken.IsCancellationRequested)
                             {
-                                var oldFrame = Interlocked.Exchange(ref _latestFrame, frame);
-                                _frameAvailable.Set();
-                            }
-                            else
-                            {
-                                // Content unchanged: skip encode/send, keep showing the pace.
-                                fpsCounter.Update(0);
-                                _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
-                            }
+                                stopwatch1.Restart();
+                                var frame = GenerateLcdBuffer();
 
-                            var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
-                            var desiredFrameTime = Math.Max((int)(fpsCounter.FrameTime), targetFrameTime);
-                            var adaptiveFrameTime = 0;
+                                if (frame != null)
+                                {
+                                    var oldFrame = Interlocked.Exchange(ref _latestFrame, frame);
+                                    _frameAvailable.Set();
+                                }
+                                else
+                                {
+                                    // Content unchanged: skip encode/send, keep showing the pace.
+                                    fpsCounter.Update(0);
+                                    _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
+                                }
 
-                            var elapsedMs = (int)stopwatch1.ElapsedMilliseconds;
+                                var targetFrameTime = 1000 / Math.Max(1, _device.TargetFrameRate);
+                                var desiredFrameTime = Math.Max((int)(fpsCounter.FrameTime), targetFrameTime);
+                                var adaptiveFrameTime = 0;
 
-                            if (elapsedMs < desiredFrameTime)
-                            {
-                                adaptiveFrameTime = desiredFrameTime - elapsedMs;
+                                var elapsedMs = (int)stopwatch1.ElapsedMilliseconds;
+
+                                if (elapsedMs < desiredFrameTime)
+                                {
+                                    adaptiveFrameTime = desiredFrameTime - elapsedMs;
+                                }
+
+                                if (adaptiveFrameTime > 0)
+                                {
+                                    await Task.Delay(adaptiveFrameTime, renderToken);
+                                }
                             }
-
-                            if (adaptiveFrameTime > 0)
-                            {
-                                await Task.Delay(adaptiveFrameTime, renderToken);
-                            }
+                        }
+                        catch (OperationCanceledException) { }
+                        catch (Exception e)
+                        {
+                            Logger.Error(e, "TuringPanelDevice {Device}: Error in render task", _device);
+                            _device.UpdateRuntimeProperties(errorMessage: e.Message);
+                        }
+                        finally
+                        {
+                            // Take the send task down too so DoWorkAsync returns and the
+                            // supervisor restarts the device instead of leaving a zombie.
+                            renderCts.Cancel();
                         }
                     }, renderToken);
 
@@ -287,7 +302,9 @@ namespace InfoPanel.Services
                         {
                             var stopwatch2 = new Stopwatch();
 
-                            while (!token.IsCancellationRequested)
+                            // renderToken: a dead render task must end this loop too,
+                            // or the device task never exits and is never restarted.
+                            while (!renderToken.IsCancellationRequested)
                             {
                                 if (brightness != _device.Brightness)
                                 {

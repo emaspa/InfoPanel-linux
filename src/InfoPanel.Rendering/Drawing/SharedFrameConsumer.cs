@@ -17,6 +17,12 @@ namespace InfoPanel
         private long _lastProducedMs;
         private object? _lastResult;
 
+        /// <summary>True when the last Produce returned the cached payload (or null)
+        /// instead of freshly produced content. Lets callers pace differently:
+        /// a cached result means the shared frame was not stale yet, so polling
+        /// again shortly is cheap.</summary>
+        public bool LastWasCached { get; private set; }
+
         /// <summary>Interval after which an unchanged frame is produced anyway.</summary>
         public int HeartbeatMs { get; set; } = 1000;
 
@@ -30,9 +36,11 @@ namespace InfoPanel
         /// </summary>
         public bool ResendCachedOnSkip { get; set; }
 
-        public T? Produce<T>(Profile profile, int maxAgeMs, Func<SKBitmap, T> produce) where T : class
+        public T? Produce<T>(Profile profile, int maxAgeMs, Func<SKBitmap, T> produce,
+            int renderWidth = 0, int renderHeight = 0) where T : class
         {
             T? result = null;
+            var wasCached = true;
             SharedFrameCache.WithFrame(profile, maxAgeMs, (bitmap, version) =>
             {
                 if (version == _lastVersion && Environment.TickCount64 - _lastProducedMs < HeartbeatMs)
@@ -45,10 +53,54 @@ namespace InfoPanel
                 }
 
                 result = produce(bitmap);
+                wasCached = false;
                 _lastResult = ResendCachedOnSkip ? result : null;
                 _lastVersion = version;
                 _lastProducedMs = Environment.TickCount64;
-            });
+            }, renderWidth, renderHeight);
+            LastWasCached = wasCached;
+            return result;
+        }
+
+        /// <summary>
+        /// Two-stage produce: <paramref name="extract"/> runs under the shared-frame
+        /// read lock and must return an owned snapshot (typically the resize);
+        /// <paramref name="transform"/> runs after the lock is released, so expensive
+        /// work (e.g. JPEG encode) no longer blocks the profile renderer or other
+        /// consumers. Returns null when skipped (same semantics as Produce).
+        /// </summary>
+        public T? Produce<TMid, T>(Profile profile, int maxAgeMs, Func<SKBitmap, TMid?> extract, Func<TMid, T> transform,
+            int renderWidth = 0, int renderHeight = 0)
+            where TMid : class
+            where T : class
+        {
+            TMid? mid = null;
+            T? cached = null;
+            SharedFrameCache.WithFrame(profile, maxAgeMs, (bitmap, version) =>
+            {
+                if (version == _lastVersion && Environment.TickCount64 - _lastProducedMs < HeartbeatMs)
+                {
+                    if (ResendCachedOnSkip)
+                    {
+                        cached = _lastResult as T;
+                    }
+                    return;
+                }
+
+                mid = extract(bitmap);
+                _lastVersion = version;
+                _lastProducedMs = Environment.TickCount64;
+            }, renderWidth, renderHeight);
+
+            if (mid == null)
+            {
+                LastWasCached = true;
+                return cached;
+            }
+
+            var result = transform(mid);
+            LastWasCached = false;
+            _lastResult = ResendCachedOnSkip ? result : null;
             return result;
         }
 

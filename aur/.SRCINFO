@@ -1,0 +1,27 @@
+pkgbase = infopanel-bin
+	pkgdesc = Hardware monitoring dashboards for desktop overlays, USB LCD panels and web browsers
+	pkgver = 0.2.4
+	pkgrel = 1
+	url = https://github.com/emaspa/InfoPanel-linux
+	install = infopanel-bin.install
+	arch = x86_64
+	license = GPL-3.0-only
+	depends = glibc
+	depends = gcc-libs
+	depends = zlib
+	depends = icu
+	depends = fontconfig
+	depends = libx11
+	depends = libice
+	depends = libsm
+	optdepends = ffmpeg: video and RTSP display items
+	optdepends = smartmontools: SMART drive health sensors
+	optdepends = pipewire-pulse: audio spectrum plugin (or pulseaudio)
+	provides = infopanel
+	conflicts = infopanel
+	options = !strip
+	options = !debug
+	source = https://github.com/emaspa/InfoPanel-linux/releases/download/v0.2.4/infopanel-0.2.4-linux-x64.tar.gz
+	sha256sums = 295c431890c0fd454dcbbcb807a496c15544f3158ec0eadb1c8972100e58f687
+
+pkgname = infopanel-bin

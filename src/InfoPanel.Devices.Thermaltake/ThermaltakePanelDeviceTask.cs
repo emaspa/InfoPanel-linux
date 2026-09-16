@@ -153,7 +153,9 @@ namespace InfoPanel.Services
                 try
                 {
                     var stopwatch = new Stopwatch();
-                    while (!token.IsCancellationRequested)
+                    // renderToken: a dead render task must end this loop too,
+                    // or the device task never exits and is never restarted.
+                    while (!renderToken.IsCancellationRequested)
                     {
                         if (frameAvailable.WaitOne(100))
                         {

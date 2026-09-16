@@ -31,6 +31,12 @@ namespace InfoPanel.Video
         private SKBitmap? _back;
         private bool _frameReady;
         private bool _disposed;
+        private long _frameVersion;
+
+        /// <summary>Bumps every time a new decoded frame is published. Lets
+        /// consumers cache per-frame derived work (e.g. resizes) instead of
+        /// redoing it on every draw.</summary>
+        public long FrameVersion => Interlocked.Read(ref _frameVersion);
 
         public int Width { get; }
         public int Height { get; }
@@ -156,9 +162,13 @@ namespace InfoPanel.Video
             {
                 try
                 {
+                    // No -re for file sources: combined with -stream_loop it stalls at
+                    // every loop boundary (input timestamps reset, the -re wallclock
+                    // does not) and then bursts to catch up. Pacing happens in this
+                    // read loop instead; the pipe's backpressure throttles ffmpeg.
                     var input = _isLive
                         ? $"-rtsp_transport tcp -i \"{_source}\""
-                        : $"-stream_loop -1 -re -i \"{_source}\"";
+                        : $"-stream_loop -1 -i \"{_source}\"";
 
                     _process = Process.Start(new ProcessStartInfo("ffmpeg",
                         $"-hide_banner -loglevel error -nostdin {input} -an -sn -f rawvideo -pix_fmt bgra pipe:1")
@@ -175,6 +185,10 @@ namespace InfoPanel.Video
 
                     var stdout = _process.StandardOutput.BaseStream;
 
+                    var frameIntervalMs = FrameRate > 1 ? 1000.0 / FrameRate : 1000.0 / 30;
+                    var pace = System.Diagnostics.Stopwatch.StartNew();
+                    long framesRead = 0;
+
                     while (!token.IsCancellationRequested)
                     {
                         var read = 0;
@@ -187,6 +201,22 @@ namespace InfoPanel.Video
                             }
 
                             read += n;
+                        }
+
+                        // Pace to the source frame rate (replaces ffmpeg's -re).
+                        // Reset the reference on drift > 2 frames (slow reads,
+                        // suspend/resume) instead of bursting to catch up.
+                        framesRead++;
+                        var dueMs = framesRead * frameIntervalMs;
+                        var aheadMs = dueMs - pace.Elapsed.TotalMilliseconds;
+                        if (aheadMs > 2)
+                        {
+                            Thread.Sleep((int)aheadMs);
+                        }
+                        else if (aheadMs < -2 * frameIntervalMs)
+                        {
+                            pace.Restart();
+                            framesRead = 0;
                         }
 
                         PublishFrame(buffer);
@@ -227,6 +257,7 @@ namespace InfoPanel.Video
 
                 (_front, _back) = (_back, _front);
                 _frameReady = true;
+                Interlocked.Increment(ref _frameVersion);
             }
         }
 

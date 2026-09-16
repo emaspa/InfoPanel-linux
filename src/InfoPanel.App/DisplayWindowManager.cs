@@ -31,6 +31,19 @@ namespace InfoPanel
                         return;
                     }
 
+                    // Don't create the overlay at all when no monitor matches
+                    // (e.g. a profile imported from another machine targeting a
+                    // monitor that doesn't exist here): show-then-hide leaves a
+                    // ghost taskbar entry on some window managers.
+                    if (Avalonia.Application.Current?.ApplicationLifetime
+                            is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+                        && desktop.MainWindow is Avalonia.Controls.Window main
+                        && !DisplayWindow.HasTargetMonitor(profile, main))
+                    {
+                        Logger.Warning("No matching monitor for profile {Name}; overlay not shown", profile.Name);
+                        return;
+                    }
+
                     var window = new DisplayWindow(profile);
                     window.Closed += (_, _) => OnWindowClosed(profile.Guid);
                     _windows[profile.Guid] = window;

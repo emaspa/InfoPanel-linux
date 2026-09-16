@@ -83,11 +83,24 @@ namespace InfoPanel.Views.Pages
             }
         }
 
-        private void RefreshThumbnails()
+        private bool _thumbnailRefreshBusy;
+
+        private async void RefreshThumbnails()
         {
-            foreach (var card in _cards)
+            // Sequential and re-entrancy guarded: renders run off the UI thread
+            // one profile at a time, so a slow refresh never stacks or bursts.
+            if (_thumbnailRefreshBusy) return;
+            _thumbnailRefreshBusy = true;
+            try
             {
-                card.RefreshThumbnail();
+                foreach (var card in _cards.ToList())
+                {
+                    await card.RefreshThumbnailAsync();
+                }
+            }
+            finally
+            {
+                _thumbnailRefreshBusy = false;
             }
         }
 

@@ -108,7 +108,24 @@ namespace InfoPanel.Drawing
             }
             else
             {
-                lockedImage.AccessSK(width, height, image =>
+                // For per-frame sources (video, plugin) request the frame at device
+                // resolution: on a scaled canvas (profile rendered at panel size)
+                // this makes the expensive per-frame resample happen once at the
+                // real output size instead of at profile size only to be shrunk
+                // again by the canvas transform. Their caches are keyed per size,
+                // so consumers at different scales coexist. Static images keep
+                // profile-coordinate requests: their frame cache is single-size,
+                // and mixed-size requests from panel and preview would invalidate
+                // it on every draw.
+                var deviceW = width;
+                var deviceH = height;
+                if (lockedImage.Type is Models.LockedImage.ImageType.FFMPEG or Models.LockedImage.ImageType.PLUGIN)
+                {
+                    var totalMatrix = Canvas.TotalMatrix;
+                    deviceW = Math.Max(1, (int)MathF.Round(width * totalMatrix.ScaleX));
+                    deviceH = Math.Max(1, (int)MathF.Round(height * totalMatrix.ScaleY));
+                }
+                lockedImage.AccessSK(deviceW, deviceH, image =>
                 {
                     if (image != null)
                     {

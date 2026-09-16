@@ -9,69 +9,69 @@
 #     echo 'kernel.perf_event_paranoid=-1' | sudo tee /etc/sysctl.d/99-infopanel-perf.conf  # permanent
 
 # BeadaPanel (NXElec)
-SUBSYSTEM=="usb", ATTR{idVendor}=="4e58", ATTR{idProduct}=="1001", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="4e58", ATTR{idProduct}=="1001", MODE="0666"
 
 # Turing Smart Screen - serial (CH340)
-SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5722", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="5722", MODE="0666"
 # Turing Smart Screen - CT13INCH identifier
-SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="ca11", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="ca11", MODE="0666"
 # Turing/Turzx - CT21INCH identifier (Turzx 5" companion port)
-SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="ca21", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1a86", ATTR{idProduct}=="ca21", MODE="0666"
 # Turing Smart Screen - CDC ACM
-SUBSYSTEM=="usb", ATTR{idVendor}=="0525", ATTR{idProduct}=="a4a7", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0525", ATTR{idProduct}=="a4a7", MODE="0666"
 # Turing Smart Screen - revision models
-SUBSYSTEM=="usb", ATTR{idVendor}=="1d6b", ATTR{idProduct}=="0121", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1d6b", ATTR{idProduct}=="0106", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d6b", ATTR{idProduct}=="0121", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1d6b", ATTR{idProduct}=="0106", MODE="0666"
 # Turing Smart Screen - serial tty nodes (the app opens /dev/ttyACM* / /dev/ttyUSB*,
 # which the usb-node rules above do not cover; grants access without dialout membership)
-SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="5722", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="ca11", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="ca21", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="tty", ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a4a7", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="tty", ATTRS{idVendor}=="1d6b", ATTRS{idProduct}=="0121", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="tty", ATTRS{idVendor}=="1d6b", ATTRS{idProduct}=="0106", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="5722", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="ca11", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1a86", ATTRS{idProduct}=="ca21", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="0525", ATTRS{idProduct}=="a4a7", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1d6b", ATTRS{idProduct}=="0121", MODE="0666"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="1d6b", ATTRS{idProduct}=="0106", MODE="0666"
 # Turing Smart Screen - USB devices (Luminary Micro)
-SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0088", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0080", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0092", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0050", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0016", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0021", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0046", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="a088", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0088", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0080", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0092", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0050", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0016", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0021", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="0046", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="1cbe", ATTR{idProduct}=="a088", MODE="0666"
 
 # Thermalright / ChiZhu panels
-SUBSYSTEM=="usb", ATTR{idVendor}=="87ad", ATTR{idProduct}=="70db", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="87ad", ATTR{idProduct}=="70db", MODE="0666"
 # Trofeo Vision panels
-SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5302", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5302", MODE="0666"
 # Trofeo HID-protocol panels expose hidraw nodes (e.g. Trofeo Vision 6.86")
-KERNEL=="hidraw*", ATTRS{idVendor}=="0416", ATTRS{idProduct}=="5302", MODE="0666", GROUP="plugdev"
-KERNEL=="hidraw*", ATTRS{idVendor}=="0418", ATTRS{idProduct}=="5303", MODE="0666", GROUP="plugdev"
-KERNEL=="hidraw*", ATTRS{idVendor}=="0418", ATTRS{idProduct}=="5304", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5408", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5409", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5406", MODE="0666", GROUP="plugdev"
+KERNEL=="hidraw*", ATTRS{idVendor}=="0416", ATTRS{idProduct}=="5302", MODE="0666"
+KERNEL=="hidraw*", ATTRS{idVendor}=="0418", ATTRS{idProduct}=="5303", MODE="0666"
+KERNEL=="hidraw*", ATTRS{idVendor}=="0418", ATTRS{idProduct}=="5304", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5408", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5409", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0416", ATTR{idProduct}=="5406", MODE="0666"
 # Trofeo alternate vendor
-SUBSYSTEM=="usb", ATTR{idVendor}=="0418", ATTR{idProduct}=="5303", MODE="0666", GROUP="plugdev"
-SUBSYSTEM=="usb", ATTR{idVendor}=="0418", ATTR{idProduct}=="5304", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0418", ATTR{idProduct}=="5303", MODE="0666"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0418", ATTR{idProduct}=="5304", MODE="0666"
 # SCSI pass-through panels (Elite Vision 360)
-SUBSYSTEM=="usb", ATTR{idVendor}=="0402", ATTR{idProduct}=="3922", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="0402", ATTR{idProduct}=="3922", MODE="0666"
 
 # Thermalright SCSI pass-through panels (Frozen Horizon/Magic Pro, Core/Elite/Wonder Vision, AIO pump heads)
-SUBSYSTEM=="usb", ATTR{idVendor}=="87cd", ATTR{idProduct}=="70db", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="87cd", ATTR{idProduct}=="70db", MODE="0666"
 # 0416:5406 already covered above (shared with ALi Vision)
 
 # Thermaltake 6" LCD (hidraw)
-SUBSYSTEM=="usb", ATTR{idVendor}=="264a", ATTR{idProduct}=="2347", MODE="0666", GROUP="plugdev"
-KERNEL=="hidraw*", ATTRS{idVendor}=="264a", ATTRS{idProduct}=="2347", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="264a", ATTR{idProduct}=="2347", MODE="0666"
+KERNEL=="hidraw*", ATTRS{idVendor}=="264a", ATTRS{idProduct}=="2347", MODE="0666"
 # ASRock Phantom Gaming 360 LCD (hidraw)
-SUBSYSTEM=="usb", ATTR{idVendor}=="26ce", ATTR{idProduct}=="0a10", MODE="0666", GROUP="plugdev"
-KERNEL=="hidraw*", ATTRS{idVendor}=="26ce", ATTRS{idProduct}=="0a10", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="26ce", ATTR{idProduct}=="0a10", MODE="0666"
+KERNEL=="hidraw*", ATTRS{idVendor}=="26ce", ATTRS{idProduct}=="0a10", MODE="0666"
 
 # Jungle Leopard / Hongtai cooler displays and Jonsbo DS916 (CDC serial - grants
 # access without dialout membership; both are Artinchip 33c3 SKUs)
-SUBSYSTEM=="tty", ATTRS{idVendor}=="33c3", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="tty", ATTRS{idVendor}=="33c3", MODE="0666"
 
 # VMAX / AuyiHomu 4.6" LCD (HY-001, HY-002) and Jonsbo DS339 (both MacroSilicon MS9132)
-SUBSYSTEM=="usb", ATTR{idVendor}=="345f", ATTR{idProduct}=="9132", MODE="0666", GROUP="plugdev"
-KERNEL=="hidraw*", ATTRS{idVendor}=="345f", ATTRS{idProduct}=="9132", MODE="0666", GROUP="plugdev"
+SUBSYSTEM=="usb", ATTR{idVendor}=="345f", ATTR{idProduct}=="9132", MODE="0666"
+KERNEL=="hidraw*", ATTRS{idVendor}=="345f", ATTRS{idProduct}=="9132", MODE="0666"

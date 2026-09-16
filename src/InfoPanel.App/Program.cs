@@ -42,14 +42,33 @@ namespace InfoPanel
         }
 
         public static AppBuilder BuildAvaloniaApp()
-            => AppBuilder.Configure<App>()
+        {
+            var x11 = new X11PlatformOptions
+            {
+                // WM_CLASS must match infopanel.desktop for correct dock/taskbar icon
+                WmClass = "infopanel"
+            };
+
+            // Rendering backend override for diagnosing presentation jank
+            // (GLX vsync under XWayland on some drivers). Values: software, egl, glx.
+            switch (Environment.GetEnvironmentVariable("INFOPANEL_RENDER_MODE"))
+            {
+                case "software":
+                    x11.RenderingMode = [X11RenderingMode.Software];
+                    break;
+                case "egl":
+                    x11.RenderingMode = [X11RenderingMode.Egl, X11RenderingMode.Glx, X11RenderingMode.Software];
+                    break;
+                case "glx":
+                    x11.RenderingMode = [X11RenderingMode.Glx, X11RenderingMode.Software];
+                    break;
+            }
+
+            return AppBuilder.Configure<App>()
                 .UsePlatformDetect()
-                .With(new X11PlatformOptions
-                {
-                    // WM_CLASS must match infopanel.desktop for correct dock/taskbar icon
-                    WmClass = "infopanel"
-                })
+                .With(x11)
                 .WithInterFont()
                 .LogToTrace();
+        }
     }
 }

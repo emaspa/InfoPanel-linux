@@ -8,7 +8,8 @@ using System.Threading;
 namespace InfoPanel
 {
     /// <summary>
-    /// One rendered frame per profile, shared by every panel consumer (issue #9).
+    /// One rendered frame per profile and render resolution, shared by every panel
+    /// consumer (issue #9).
     ///
     /// Instead of each device task rendering the profile independently every frame,
     /// consumers call <see cref="WithFrame"/>: the profile is rendered at most once
@@ -17,6 +18,12 @@ namespace InfoPanel
     /// Consumers that see an unchanged version can skip their resize/encode/send
     /// work entirely, which is the common case: profile content typically changes
     /// at sensor rate (~1 Hz), far below panel frame rates.
+    ///
+    /// Consumers whose output resolution is an exact aspect match of the profile
+    /// can pass renderWidth/renderHeight to get a dedicated entry rendered at that
+    /// size via a canvas scale. For a panel smaller than the profile this replaces
+    /// "render large, then downscale every frame" with rendering the small frame
+    /// directly, which also shrinks the per-frame video resample inside the draw.
     ///
     /// The consumer callback runs under a read lock (multiple consumers in
     /// parallel); rendering takes the write lock. The bitmap passed to the callback
@@ -33,45 +40,64 @@ namespace InfoPanel
             public long RenderedAtMs = long.MinValue;
         }
 
-        private static readonly ConcurrentDictionary<Guid, Entry> _entries = new();
+        private static readonly ConcurrentDictionary<(Guid Guid, int W, int H), Entry> _entries = new();
 
         /// <summary>
         /// Runs <paramref name="consume"/> with the current shared frame and its
         /// content version, rendering first if the cached frame is older than
-        /// <paramref name="maxAgeMs"/>.
+        /// <paramref name="maxAgeMs"/>. Pass <paramref name="renderWidth"/> and
+        /// <paramref name="renderHeight"/> (same aspect ratio as the profile) to
+        /// consume a frame rendered directly at that resolution; 0 renders at the
+        /// profile's native size.
         /// </summary>
-        public static void WithFrame(Profile profile, int maxAgeMs, Action<SKBitmap, long> consume)
+        public static void WithFrame(Profile profile, int maxAgeMs, Action<SKBitmap, long> consume,
+            int renderWidth = 0, int renderHeight = 0)
         {
-            var entry = _entries.GetOrAdd(profile.Guid, static _ => new Entry());
+            var w = renderWidth > 0 ? renderWidth : profile.Width;
+            var h = renderHeight > 0 ? renderHeight : profile.Height;
+            var entry = _entries.GetOrAdd((profile.Guid, w, h), static _ => new Entry());
 
-            while (true)
+            // Fast path: fresh frame, plain read lock (concurrent consumers).
+            entry.Lock.EnterReadLock();
+            try
             {
-                entry.Lock.EnterReadLock();
-                try
+                if (IsFresh(entry, w, h, maxAgeMs))
                 {
-                    if (IsFresh(entry, profile, maxAgeMs))
-                    {
-                        consume(entry.Bitmap!, entry.Version);
-                        return;
-                    }
+                    consume(entry.Bitmap!, entry.Version);
+                    return;
                 }
-                finally
-                {
-                    entry.Lock.ExitReadLock();
-                }
+            }
+            finally
+            {
+                entry.Lock.ExitReadLock();
+            }
 
-                entry.Lock.EnterWriteLock();
-                try
+            // Stale: upgradeable read holds our place so no other writer can
+            // interleave between our render and our consume (freshness is stamped
+            // at render START, so a render slower than maxAgeMs is already stale
+            // on completion; re-checking would render forever without delivering,
+            // and releasing between render and consume lets another consumer's
+            // render steal the lock and stall this one).
+            entry.Lock.EnterUpgradeableReadLock();
+            try
+            {
+                if (!IsFresh(entry, w, h, maxAgeMs))
                 {
-                    if (!IsFresh(entry, profile, maxAgeMs))
+                    entry.Lock.EnterWriteLock();
+                    try
                     {
-                        Render(entry, profile);
+                        Render(entry, profile, w, h);
+                    }
+                    finally
+                    {
+                        entry.Lock.ExitWriteLock();
                     }
                 }
-                finally
-                {
-                    entry.Lock.ExitWriteLock();
-                }
+                consume(entry.Bitmap!, entry.Version);
+            }
+            finally
+            {
+                entry.Lock.ExitUpgradeableReadLock();
             }
         }
 
@@ -86,39 +112,47 @@ namespace InfoPanel
             var result = new List<Guid>();
             foreach (var kvp in _entries)
             {
-                if (kvp.Value.RenderedAtMs >= cutoff)
+                if (kvp.Value.RenderedAtMs >= cutoff && !result.Contains(kvp.Key.Guid))
                 {
-                    result.Add(kvp.Key);
+                    result.Add(kvp.Key.Guid);
                 }
             }
             return result;
         }
 
-        private static bool IsFresh(Entry entry, Profile profile, int maxAgeMs)
+        private static bool IsFresh(Entry entry, int w, int h, int maxAgeMs)
         {
             return entry.Bitmap != null
-                && entry.Bitmap.Width == profile.Width
-                && entry.Bitmap.Height == profile.Height
+                && entry.Bitmap.Width == w
+                && entry.Bitmap.Height == h
                 && Environment.TickCount64 - entry.RenderedAtMs < maxAgeMs;
         }
 
-        private static void Render(Entry entry, Profile profile)
+        private static void Render(Entry entry, Profile profile, int w, int h)
         {
             if (entry.Bitmap == null
-                || entry.Bitmap.Width != profile.Width
-                || entry.Bitmap.Height != profile.Height)
+                || entry.Bitmap.Width != w
+                || entry.Bitmap.Height != h)
             {
                 entry.Bitmap?.Dispose();
-                entry.Bitmap = new SKBitmap(profile.Width, profile.Height, SKColorType.Rgba8888, SKAlphaType.Opaque);
+                entry.Bitmap = new SKBitmap(w, h, SKColorType.Rgba8888, SKAlphaType.Opaque);
                 entry.PreviousPixels = null;
             }
 
+            // Stamp freshness at render START, not completion: consumers gate their
+            // next render on this timestamp, and stamping at completion made the
+            // frame interval = maxAge + render time instead of max(maxAge, render
+            // time), silently halving achievable panel frame rates.
+            entry.RenderedAtMs = Environment.TickCount64;
+
             using (var g = SkiaGraphics.FromBitmap(entry.Bitmap, profile.FontScale))
             {
-                PanelDraw.Run(profile, g, preview: false, cacheHint: $"DISPLAY-{profile.Guid}");
+                if (w != profile.Width || h != profile.Height)
+                {
+                    g.Canvas.Scale((float)w / profile.Width, (float)h / profile.Height);
+                }
+                PanelDraw.Run(profile, g, preview: false, cacheHint: $"DISPLAY-{profile.Guid}-{w}x{h}");
             }
-
-            entry.RenderedAtMs = Environment.TickCount64;
 
             var pixels = entry.Bitmap.GetPixelSpan();
             if (entry.PreviousPixels == null || entry.PreviousPixels.Length != pixels.Length)

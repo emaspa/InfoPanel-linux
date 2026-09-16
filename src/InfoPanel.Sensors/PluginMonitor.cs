@@ -366,6 +366,12 @@ namespace InfoPanel.Monitors
 
         private async Task InitializeWrapperAsync(PluginWrapper wrapper)
         {
+            // Apply stored config BEFORE Initialize: plugins build structural state
+            // (band counts, image buffer sizes) from their config during Initialize,
+            // and applying afterwards left them running on defaults with only the
+            // live-updatable settings (colors, styles) taking effect.
+            PluginConfigStore.LoadAndApply(wrapper);
+
             await wrapper.Initialize();
             Log.Information("Plugin {PluginName} loaded successfully", wrapper.Name);
 
@@ -373,7 +379,6 @@ namespace InfoPanel.Monitors
             // sensors, tables or images are used by a consumed profile.
             wrapper.UpdateGate = () => IsPluginDemanded(wrapper.Id);
 
-            PluginConfigStore.LoadAndApply(wrapper);
             SetupImageProvider(wrapper);
 
             int indexOrder = 0;
@@ -510,11 +515,13 @@ namespace InfoPanel.Monitors
 
             try
             {
+                // Same ordering as InitializeWrapperAsync: config before Initialize
+                PluginConfigStore.LoadAndApply(wrapper);
+
                 await wrapper.Initialize();
                 Log.Information("Plugin {PluginName} reloaded successfully", wrapper.Name);
 
                 wrapper.UpdateGate = () => IsPluginDemanded(wrapper.Id);
-                PluginConfigStore.LoadAndApply(wrapper);
                 SetupImageProvider(wrapper);
 
                 int indexOrder = 0;

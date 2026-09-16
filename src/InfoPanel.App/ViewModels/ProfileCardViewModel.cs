@@ -37,6 +37,50 @@ namespace InfoPanel.ViewModels
             }
         }
 
+        private const string NoDisplay = "Not assigned";
+
+        private static List<Utils.MonitorInfo> Monitors() =>
+            Avalonia.Application.Current?.ApplicationLifetime
+                is Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop
+            && desktop.MainWindow is { } main
+                ? Utils.ScreenHelper.GetAllMonitors(main)
+                : [];
+
+        /// <summary>Overlay display choices for the card's settings expander.</summary>
+        public IReadOnlyList<string> DisplayChoices =>
+            [NoDisplay, .. Monitors().Select(m => m.Label)];
+
+        /// <summary>Guards against ComboBox writing null when its popup/state churns.</summary>
+        public string? DisplaySelection
+        {
+            get
+            {
+                var monitors = Monitors();
+                var assigned = Profile.TargetWindow is { } target
+                    ? Utils.ScreenHelper.MatchTargetWindow(target, monitors, strict: false)
+                    : null;
+                return assigned?.Label ?? NoDisplay;
+            }
+            set
+            {
+                if (string.IsNullOrEmpty(value) || value == DisplaySelection) return;
+
+                if (value == NoDisplay)
+                {
+                    Profile.TargetWindow = null;
+                }
+                else
+                {
+                    var monitor = Monitors().FirstOrDefault(m => m.Label == value);
+                    if (monitor == null) return;
+                    Utils.ScreenHelper.AssignTargetWindow(Profile, monitor);
+                }
+
+                host.SaveProfiles();
+                OnPropertyChanged();
+            }
+        }
+
         public string Subtitle
         {
             get
@@ -100,16 +144,34 @@ namespace InfoPanel.ViewModels
             }
         }
 
-        /// <summary>Renders a fresh thumbnail (~quarter scale) off the live profile state.</summary>
-        public void RefreshThumbnail()
+        /// <summary>
+        /// Renders a fresh thumbnail (~quarter scale) off the live profile state.
+        /// The render runs on a worker thread and the pixels are copied straight
+        /// into an Avalonia bitmap: the previous PNG encode/decode round-trip on
+        /// the UI thread stalled the whole UI for hundreds of milliseconds per
+        /// dashboard refresh with many profiles.
+        /// </summary>
+        public async Task RefreshThumbnailAsync()
         {
             try
             {
-                using var bitmap = PanelRenderer.RenderSK(Profile, preview: true);
-                using var image = SKImage.FromBitmap(bitmap);
-                using var data = image.Encode(SKEncodedImageFormat.Png, 90);
-                using var stream = new MemoryStream(data.ToArray());
-                Thumbnail = new Bitmap(stream);
+                var rendered = await Task.Run(() =>
+                {
+                    using var bitmap = PanelRenderer.RenderSK(Profile, preview: true);
+                    var writeable = new Avalonia.Media.Imaging.WriteableBitmap(
+                        new Avalonia.PixelSize(bitmap.Width, bitmap.Height),
+                        new Avalonia.Vector(96, 96),
+                        Avalonia.Platform.PixelFormat.Bgra8888,
+                        Avalonia.Platform.AlphaFormat.Premul);
+                    using (var fb = writeable.Lock())
+                    using (var pixmap = bitmap.PeekPixels())
+                    {
+                        var info = new SKImageInfo(bitmap.Width, bitmap.Height, SKColorType.Bgra8888, SKAlphaType.Premul);
+                        pixmap.ReadPixels(info, fb.Address, fb.RowBytes);
+                    }
+                    return writeable;
+                });
+                Thumbnail = rendered;
             }
             catch
             {

@@ -224,6 +224,10 @@
                                                 </StackPanel>
                                             </Grid>
                                             <StackPanel Spacing="2">
+                                                <TextBlock Text="Display" FontSize="10" Opacity="0.7" />
+                                                <ComboBox ItemsSource="{Binding DisplayChoices}" SelectedItem="{Binding DisplaySelection, Mode=TwoWay}" MaxDropDownHeight="360" HorizontalAlignment="Stretch" />
+                                            </StackPanel>
+                                            <StackPanel Spacing="2">
                                                 <TextBlock Text="Font" FontSize="10" Opacity="0.7" />
                                                 <ComboBox ItemsSource="{Binding FontChoices}" SelectedItem="{Binding FontSelection, Mode=TwoWay}" MaxDropDownHeight="360" HorizontalAlignment="Stretch" />
                                             </StackPanel>

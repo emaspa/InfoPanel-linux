@@ -49,8 +49,11 @@ bad editing session is never fatal.
 
 - **Desktop overlays**: transparent, repositionable windows rendered
   through X11/XWayland, one per active profile. Each profile can be
-  assigned to a specific monitor from the designer, or simply dragged
-  where it should live.
+  assigned to a specific monitor from the designer or from its dashboard
+  tile, or simply dragged where it should live. Monitors are identified
+  by output name and native resolution, so assignments survive
+  Wayland/XWayland scale changes. Overlay frames are rendered off the UI
+  and compositor threads and only blitted on screen.
 - **USB LCD panels**: eight device families with per-device profile
   assignment, rotation, brightness, and live frame rate and latency
   readouts. Devices are supervised: they self-heal their USB binding after
@@ -101,8 +104,9 @@ module individually with enable/disable toggles and per-plugin reload.
 
 - **Configuration framework**: `IPluginConfigurable` plugins get an
   auto-generated settings UI (text, numeric, toggle and choice editors)
-  with host-managed persistence in `plugins/<id>.config.json`. Changes
-  apply live.
+  with host-managed persistence in `plugins/<id>.config.json`. Stored
+  values are applied before plugin initialization (so structural settings
+  like buffer sizes take effect) and changes from the UI apply live.
 - **Plugin-rendered images**: the `InfoPanel.Plugins.Graphics` contract
   lets plugins draw into shared image buffers. Each image appears in the
   sensor tree as a `plugin-image://` entry and can be placed on any
@@ -167,12 +171,15 @@ InfoPanel.Plugins (net8.0 SDK) + Plugins.Loader + Plugins.Graphics
 Key design points:
 
 - **Render pipeline**: each profile renders once per tick into a shared,
-  reused buffer that every consumer (panels, web viewer) reads from, with
-  a content-version check so unchanged frames skip the resize, encode and
-  USB transfer entirely (panels still receive full-cadence frames from the
-  cached payload). Text layouts and font lookups are cached while
-  unchanged, which is what sustains full frame rate on 1920-wide panels
-  at a few percent of CPU.
+  reused buffer that every consumer (panels, overlays, web viewer) reads
+  from, with entries per output resolution so a panel smaller than the
+  profile renders directly at panel size instead of downscaling every
+  frame. A content-version check lets unchanged frames skip the resize,
+  encode and USB transfer (throttled keepalives protect panel firmware
+  that treats a stopped stream as disconnect). JPEG encoding runs outside
+  the shared-frame lock, video and plugin-image resamples are cached per
+  frame and output size, and text layouts and font lookups are cached
+  while unchanged.
 - **Demand-driven sensing**: only sensors referenced by a profile that is
   actually being consumed are polled each second, and a plugin whose
   sensors are unused for a few minutes stops completely (audio capture,
@@ -395,6 +402,22 @@ directions:
 
 ## Installing
 
+### Arch Linux (AUR)
+
+```bash
+yay -S infopanel-bin
+```
+
+Installs [infopanel-bin from the AUR](https://aur.archlinux.org/packages/infopanel-bin)
+system-wide: the app in `/opt/infopanel` with a `/usr/bin/infopanel`
+launcher, a desktop entry, the udev rules, and the SMART sensor systemd
+units (enable with `systemctl enable --now infopanel-smart.timer` if you
+have `smartmontools`). Replug your panels once after installing so the
+udev rules apply. Updates arrive through `yay` like any other package.
+The PKGBUILD lives in [`aur/`](aur/).
+
+### Tarball (any distribution)
+
 Download the latest `infopanel-<version>-linux-x64.tar.gz` from
 [Releases](https://github.com/emaspa/InfoPanel-linux/releases). The
 tarball is self-contained, so no .NET runtime is needed.
@@ -418,8 +441,10 @@ the About page shows what changed and links the download.
 
 Requirements and optional dependencies:
 
-- **USB panels**: the bundled udev rules plus membership in the `plugdev`
-  group.
+- **USB panels**: the bundled udev rules (world-accessible device nodes; no
+  group membership needed. udev 261+ silently rejects rules that assign
+  device nodes to non-system groups like the old `plugdev`, which is why the
+  rules no longer use it).
 - **Intel GPU engine utilization**: `sysctl kernel.perf_event_paranoid=-1`
   (see comments in `packaging/infopanel-udev.rules`).
 - **Video/RTSP display items**: a system `ffmpeg` binary.
@@ -438,7 +463,7 @@ dotnet run --project src/InfoPanel.App
 To produce the same self-contained tarball as the published releases:
 
 ```bash
-packaging/publish.sh 0.2.0     # builds artifacts/infopanel-0.2.0-linux-x64.tar.gz
+packaging/publish.sh 0.2.4     # builds artifacts/infopanel-0.2.4-linux-x64.tar.gz
 ```
 
 ## Data and paths
@@ -465,6 +490,10 @@ A single instance is enforced via a lock file in the data directory.
 | `--render-once <dir>` | render every profile to PNG in `<dir>` and exit |
 | `--dump-sensors` | print canonical sensor IDs, labels and availability, then exit; add `--verbose` for legacy aliases and identity strength |
 | `--verbose` | debug-level logging |
+
+Environment variables: `INFOPANEL_DATA_DIR` relocates the data directory;
+`INFOPANEL_RENDER_MODE` (`software`, `egl`, `glx`) overrides the UI
+rendering backend for diagnosing platform issues.
 
 ## Credits
 

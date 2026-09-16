@@ -10,9 +10,13 @@ OUT="artifacts/infopanel-${VERSION}-linux-x64"
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
+# AllowMissingPrunePackageData: distro-packaged SDKs (e.g. Arch dotnet-sdk)
+# ship without the prune package data and fail with NETSDK1226 otherwise;
+# harmless on official SDKs.
 dotnet publish src/InfoPanel.App/InfoPanel.App.csproj \
     -c Release -r linux-x64 --self-contained \
     -p:PublishSingleFile=false \
+    -p:AllowMissingPrunePackageData=true \
     -o "$OUT/infopanel"
 
 # GPLv3 section 4 requires a copy of the license with every distribution;
