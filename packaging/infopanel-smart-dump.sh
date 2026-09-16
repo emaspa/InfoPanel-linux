@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # Dumps SMART data for all drives to /run/infopanel/smart.json (world-readable)
 # so InfoPanel's SMART plugin can expose drive health without root.
 set -u

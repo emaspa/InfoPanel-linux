@@ -1,0 +1,10 @@
+#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == configure ]]; then
+    if [[ -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
+        systemctl daemon-reload || :
+    fi
+    if [[ -S /run/udev/control ]] && command -v udevadm >/dev/null 2>&1; then
+        udevadm control --reload-rules || :
+    fi
+fi

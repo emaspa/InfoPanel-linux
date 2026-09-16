@@ -4,7 +4,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-VERSION="${1:-0.0.1}"
+VERSION="$(python3 packaging/version.py "${1:-$(python3 packaging/version.py)}")"
 OUT="artifacts/infopanel-${VERSION}-linux-x64"
 
 rm -rf "$OUT"
@@ -13,7 +13,14 @@ mkdir -p "$OUT"
 # AllowMissingPrunePackageData: distro-packaged SDKs (e.g. Arch dotnet-sdk)
 # ship without the prune package data and fail with NETSDK1226 otherwise;
 # harmless on official SDKs.
+# App builds these plugins through MSBuild tasks, not ProjectReferences, so
+# publish's implicit restore never visits them. Restore in separate evaluations
+# before publishing; a solution restore would also require the omitted tests/.
+for plugin in InfoPanel.Extras InfoPanel.AudioSpectrum InfoPanel.StopWatch; do
+    dotnet restore "src/$plugin/$plugin.csproj" -p:AllowMissingPrunePackageData=true
+done
 dotnet publish src/InfoPanel.App/InfoPanel.App.csproj \
+    -m:1 \
     -c Release -r linux-x64 --self-contained \
     -p:PublishSingleFile=false \
     -p:AllowMissingPrunePackageData=true \
@@ -25,7 +32,7 @@ cp LICENSE LICENSES.md "$OUT/"
 cp packaging/infopanel-udev.rules "$OUT/"
 cp packaging/infopanel.desktop "$OUT/"
 cp packaging/infopanel-smart-dump.sh packaging/infopanel-smart.service packaging/infopanel-smart.timer "$OUT/"
-cp src/InfoPanel.App/Assets/logo.png "$OUT/infopanel.png"
+cp packaging/infopanel.png "$OUT/infopanel.png"
 cp packaging/install.sh "$OUT/"
 chmod +x "$OUT/install.sh" "$OUT/infopanel/infopanel"
 

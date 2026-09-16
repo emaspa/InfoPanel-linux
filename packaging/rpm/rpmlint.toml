@@ -1,0 +1,13 @@
+# Only exceptions inherent to redistributing the upstream self-contained runtime.
+# These filters match individual diagnostic names and private payload paths.
+Filters = [
+  '^infopanel\.x86_64: [EW]: unstripped-binary-or-object /opt/infopanel/',
+  '^infopanel\.x86_64: [EW]: binary-or-shlib-defines-rpath /opt/infopanel/',
+  # The private /opt layout is shared with infopanel-bin and the deb package.
+  '^infopanel\.x86_64: E: dir-or-file-in-opt /opt/infopanel(?:/|$)',
+  # AutoReqProv: no keeps the self-contained runtime's private libraries out of
+  # system dependency discovery; its host libraries must be required explicitly.
+  '^infopanel\.x86_64: E: explicit-lib-dependency (?:libICE|libSM|libX11|libgcc|libicu|libstdc\+\+|libXcursor|libXext|libXi|libXrandr)$',
+  # Independently loaded plugins legitimately carry copies of shared DLLs.
+  '^infopanel\.x86_64: E: files-duplicated-waste [0-9]+$',
+]

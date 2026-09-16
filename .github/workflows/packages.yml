@@ -1,0 +1,154 @@
+name: Build and validate packages
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        type: string
+        default: ''
+    outputs:
+      version:
+        value: ${{ jobs.ubuntu.outputs.version }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  ubuntu:
+    name: Ubuntu 26.04 / deb and tarball
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Check tag against csproj version
+        id: version
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$RELEASE_TAG" ]]; then
+            [[ "$RELEASE_TAG" == v* ]]
+            version="$(python3 packaging/version.py "$RELEASE_TAG")"
+          else
+            version="$(python3 packaging/version.py)"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Check release guards and retry behavior offline
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s packaging/tests -v
+      - name: Reuse existing release assets on retries
+        if: inputs.release_tag != ''
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 packaging/release.py fetch-existing "$RELEASE_TAG"
+      - name: Build and lint inside Ubuntu 26.04
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REUSE_RELEASE_ASSETS: ${{ inputs.release_tag != '' && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/repo:ro" -v "$PWD/artifacts:/out" \
+            -e VERSION -e SOURCE_DATE_EPOCH -e REUSE_RELEASE_ASSETS \
+            ubuntu:26.04 bash /repo/packaging/ci/build.sh deb
+      - name: Install and run in a fresh Ubuntu 26.04 container
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/repo:ro" -v "$PWD/artifacts:/out:ro" -e VERSION \
+            ubuntu:26.04 bash /repo/packaging/ci/install.sh deb
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ubuntu-packages
+          path: |
+            artifacts/infopanel-${{ steps.version.outputs.version }}-linux-x64.tar.gz
+            artifacts/infopanel_${{ steps.version.outputs.version }}_amd64.deb
+          if-no-files-found: error
+          overwrite: true
+          compression-level: 0
+
+  other-packages:
+    name: ${{ matrix.label }}
+    needs: ubuntu
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: rpm
+            image: fedora:44
+            label: Fedora 44 / rpm
+            artifact: fedora-package
+            pattern: artifacts/*.rpm
+          - target: arch
+            image: archlinux:base
+            label: Arch / AUR package
+            artifact: arch-package
+            pattern: artifacts/*.pkg.tar.zst
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ubuntu-packages
+          path: artifacts
+      - name: Reuse existing release assets on retries
+        if: inputs.release_tag != '' && matrix.target == 'rpm'
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 packaging/release.py fetch-existing "$RELEASE_TAG"
+      - name: Build and lint inside target container
+        env:
+          VERSION: ${{ needs.ubuntu.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          IMAGE: ${{ matrix.image }}
+          REUSE_RELEASE_ASSETS: ${{ inputs.release_tag != '' && '1' || '0' }}
+        run: |
+          set -euo pipefail
+          SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
+          export SOURCE_DATE_EPOCH
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/repo:ro" -v "$PWD/artifacts:/out" \
+            -e VERSION -e SOURCE_DATE_EPOCH -e REUSE_RELEASE_ASSETS \
+            "$IMAGE" bash /repo/packaging/ci/build.sh "$TARGET"
+      - name: Install and run in a fresh target container
+        env:
+          VERSION: ${{ needs.ubuntu.outputs.version }}
+          TARGET: ${{ matrix.target }}
+          IMAGE: ${{ matrix.image }}
+        run: |
+          set -euo pipefail
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD:/repo:ro" -v "$PWD/artifacts:/out:ro" -e VERSION \
+            "$IMAGE" bash /repo/packaging/ci/install.sh "$TARGET"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.pattern }}
+          if-no-files-found: error
+          overwrite: true
+          compression-level: 0

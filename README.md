@@ -402,6 +402,36 @@ directions:
 
 ## Installing
 
+### Ubuntu 26.04 (.deb) and Fedora 44 (.rpm)
+
+Download the package for your distribution from
+[Releases](https://github.com/emaspa/InfoPanel-linux/releases), then install it
+with the package manager (replace `<version>` with the release number):
+
+```bash
+# Ubuntu 26.04, amd64
+sudo apt install ./infopanel_<version>_amd64.deb
+
+# Fedora 44, x86_64
+sudo dnf install ./infopanel-<version>-1.x86_64.rpm
+```
+
+These packages include .NET and install the app in `/opt/infopanel`, with the
+`/usr/bin/infopanel` launcher, desktop entry, icon, udev rules and SMART units.
+The package manager installs the required native libraries. Optional features
+need `ffmpeg` (`ffmpeg-free` on Fedora), `smartmontools`, or a PulseAudio-compatible
+audio server plus `pulseaudio-utils`. With `smartmontools` installed, enable
+SMART collection using `sudo systemctl enable --now infopanel-smart.timer`.
+Replug USB panels after installation. The packages leave the timer disabled
+until you enable it.
+
+To upgrade, quit InfoPanel and install the new package with the same command.
+There is no apt/dnf repository or automatic package download; the app's update
+notification links to the release. Profiles in `~/.local/share/InfoPanel/` are
+preserved. Remove a previous per-user tarball installation's launcher and desktop
+entry before switching, so they do not shadow the system package; see the
+[User Guide](docs/USER-GUIDE.md#installation).
+
 ### Arch Linux (AUR)
 
 ```bash
@@ -460,15 +490,29 @@ dotnet build InfoPanel.slnx -c Release
 dotnet run --project src/InfoPanel.App
 ```
 
-To produce the same self-contained tarball as the published releases:
+To produce the same self-contained tarball as the published releases (also
+requires Python 3 for the version guard):
 
 ```bash
 packaging/publish.sh 0.3.0     # builds artifacts/infopanel-0.3.0-linux-x64.tar.gz
 ```
 
+The argument must match `<Version>` in `src/InfoPanel.App/InfoPanel.App.csproj`;
+omit it to use that version. The publish remains self-contained `linux-x64`
+with separate files, including the bundled plugins and installer assets.
+
+GitHub Actions builds and validates the tarball, deb and rpm on packaging/source
+pull requests and manual runs. Pushing a matching `vX.Y.Z` tag publishes the
+three release assets, then updates the existing `infopanel-bin` AUR package and
+commits the generated AUR metadata back to `main`. See
+[the maintainer release guide](docs/RELEASING.md) for the SSH secret setup,
+branch permissions, retry behavior and exact local container validation commands.
+
 ## Data and paths
 
-Configuration lives in `~/.local/share/InfoPanel/`:
+Configuration lives in `$XDG_DATA_HOME/InfoPanel/` when `XDG_DATA_HOME` is
+absolute, otherwise in `~/.local/share/InfoPanel/`. Missing directories are
+created automatically, including for a fresh user account:
 
 | Path | Contents |
 |---|---|
@@ -479,7 +523,14 @@ Configuration lives in `~/.local/share/InfoPanel/`:
 | `plugins/{id}.config.json` | plugin configuration sidecars |
 | `logs/` | rolling Serilog output |
 
-Set `INFOPANEL_DATA_DIR` to relocate everything (portable or test setups).
+Set `INFOPANEL_DATA_DIR` to relocate settings, profiles, assets, external
+plugins, plugin state and logs (portable or test setups). It also redirects
+Extras' INI instead of using a copy next to the installed plugin. Bundled
+plugins still load from the application directory. Relative overrides resolve
+against the working directory; use an absolute path for a stable location.
+If you previously used an override, copy any wanted plugins, state and assets
+from the default folder into it; older versions ignored the override for those
+paths. No files are moved automatically.
 A single instance is enforced via a lock file in the data directory.
 
 ## Command line

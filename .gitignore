@@ -5,6 +5,7 @@ obj/
 .idea/
 publish/
 *.binlog
+__pycache__/
 artifacts/
 aur/src/
 aur/pkg/

@@ -1,0 +1,6 @@
+#!/bin/bash
+set -euo pipefail
+if [[ "${1:-}" == remove && -d /run/systemd/system ]] && command -v systemctl >/dev/null 2>&1; then
+    systemctl disable --now infopanel-smart.timer || :
+    systemctl stop infopanel-smart.service || :
+fi

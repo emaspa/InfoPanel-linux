@@ -4,7 +4,56 @@ InfoPanel turns hardware monitoring data into designable dashboards shown on des
 
 ## Installation
 
-1. Download the latest `infopanel-<version>-linux-x64.tar.gz` from [GitHub Releases](https://github.com/emaspa/InfoPanel-linux/releases). It is self-contained: no .NET runtime or other packages are needed.
+All packages are for x86_64 (amd64) and include the .NET runtime. Native system
+libraries are still required; deb, rpm and AUR install these as dependencies.
+
+### Ubuntu 26.04
+
+Download `infopanel_<version>_amd64.deb` from
+[GitHub Releases](https://github.com/emaspa/InfoPanel-linux/releases), then run:
+
+```bash
+sudo apt install ./infopanel_<version>_amd64.deb
+```
+
+### Fedora 44
+
+Download `infopanel-<version>-1.x86_64.rpm` from the same release, then run:
+
+```bash
+sudo dnf install ./infopanel-<version>-1.x86_64.rpm
+```
+
+### Arch Linux (AUR)
+
+Install the existing [infopanel-bin](https://aur.archlinux.org/packages/infopanel-bin)
+package with an AUR helper:
+
+```bash
+yay -S infopanel-bin
+```
+
+Alternatively, clone `https://aur.archlinux.org/infopanel-bin.git`, review its
+`PKGBUILD`, then run `makepkg -si` inside that directory as your normal user.
+
+All three packages install in `/opt/infopanel`, with a launcher at
+`/usr/bin/infopanel`, a desktop entry, icon and USB rules. Replug your panels
+after installing. No group membership is required. For optional SMART sensors,
+install `smartmontools` and run:
+
+```bash
+sudo systemctl enable --now infopanel-smart.timer
+```
+
+The timer is not enabled automatically by these packages. Video and RTSP items
+need `ffmpeg` (`ffmpeg-free` on Fedora; supported codecs depend on that build).
+Audio Spectrum needs PipeWire's PulseAudio server or PulseAudio and its
+`parec`/`pactl` tools: `pulseaudio-utils` on Ubuntu/Fedora. Fedora calls the
+PipeWire server package `pipewire-pulseaudio`; Ubuntu and Arch use `pipewire-pulse`.
+
+### Tarball
+
+1. Download the latest `infopanel-<version>-linux-x64.tar.gz` from [GitHub Releases](https://github.com/emaspa/InfoPanel-linux/releases). It includes .NET; the host still needs glibc, the GCC/C++ runtime, zlib, ICU, fontconfig, libX11, libICE and libSM.
 2. Extract it and run the installer:
    ```bash
    tar xf infopanel-<version>-linux-x64.tar.gz
@@ -16,9 +65,32 @@ InfoPanel turns hardware monitoring data into designable dashboards shown on des
 
 Optional: enable "Start at login" in Settings to install an XDG autostart entry.
 
+### Switching from the tarball to a system package
+
+Quit InfoPanel and disable "Start at login" first, if enabled. Remove the old
+tarball launcher (`~/.local/bin/infopanel`), desktop entry
+(`~/.local/share/applications/infopanel.desktop`) and app directory
+(`~/.local/opt/infopanel`) after confirming they belong to this installation.
+If the tarball installed SMART units, stop its timer and remove its copies of
+`/etc/systemd/system/infopanel-smart.service` and `infopanel-smart.timer`, then
+run `sudo systemctl daemon-reload` and enable the packaged timer again. Also
+remove the tarball's `/etc/udev/rules.d/99-infopanel.rules` after confirming the
+package installed `/usr/lib/udev/rules.d/99-infopanel.rules`. Files in `/etc`
+override package defaults in `/usr/lib`.
+
+Keep `~/.local/share/InfoPanel/`; it contains your profiles and settings. Start
+the packaged app, then enable "Start at login" again if wanted.
+
 ## Updates
 
-InfoPanel checks GitHub Releases once at startup (a single anonymous request, no accounts or telemetry) and sends a desktop notification when a newer version is available. The About page then shows the release notes and a download link; it also has a "Check for updates" button for manual checks. Disable the startup check in Settings with "Check for updates at startup". Updating is the same as installing: extract the new tarball and run `./install.sh` again; your profiles and settings are untouched.
+InfoPanel checks GitHub Releases once at startup (a single anonymous request, no accounts or telemetry) and sends a desktop notification when a newer version is available. The About page then shows the release notes and a download link; it also has a "Check for updates" button for manual checks. Disable the startup check in Settings with "Check for updates at startup".
+
+Quit InfoPanel before updating. On Ubuntu/Fedora, download the new deb/rpm and
+repeat the installation command above; no apt/dnf repository is configured.
+On Arch, update through your AUR helper (for example `yay -Syu`). For tarball
+installations, extract the new tarball and run `./install.sh` again. Profiles and
+settings are retained with each method. Use your existing installation method
+when following an update notification.
 
 ## Dashboard
 

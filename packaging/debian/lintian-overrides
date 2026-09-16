@@ -1,0 +1,9 @@
+# Upstream binary distribution: /opt layout intentionally matches infopanel-bin.
+infopanel: dir-or-file-in-opt [opt/infopanel/*]
+# Preserve Microsoft's and NuGet's native binaries and debugging information.
+infopanel: unstripped-binary-or-object [opt/infopanel/*]
+# Private runtime libraries are not system libraries; their ABI belongs to .NET.
+infopanel: embedded-library freetype [opt/infopanel/libSkiaSharp.so]
+infopanel: embedded-library libjpeg [opt/infopanel/libSkiaSharp.so]
+infopanel: embedded-library libpng [opt/infopanel/libSkiaSharp.so]
+infopanel: embedded-library zlib [opt/infopanel/libSystem.IO.Compression.Native.so]

@@ -1,0 +1,32 @@
+name: Packaging check
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'packaging/**'
+      - 'aur/**'
+      - '.github/workflows/**'
+      - 'src/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'Directory.Packages.props'
+      - 'global.json'
+      - 'NuGet.Config'
+      - 'nuget.config'
+      - 'InfoPanel.slnx'
+      - 'LICENSE'
+      - 'LICENSES.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packaging-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  packages:
+    uses: ./.github/workflows/packages.yml
+    permissions:
+      contents: read

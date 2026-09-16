@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+# Serialize different release tags as well as retries: both update the same AUR
+# repository and main branch. Do not cancel a partially published release.
+concurrency:
+  group: infopanel-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  packages:
+    uses: ./.github/workflows/packages.yml
+    permissions:
+      contents: read
+    with:
+      release_tag: ${{ github.ref_name }}
+
+  github-release:
+    if: github.repository == 'emaspa/InfoPanel-linux'
+    needs: packages
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: ubuntu-packages
+          path: artifacts
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: fedora-package
+          path: artifacts
+      - name: Attach assets and publish without replacing release notes
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          python3 packaging/release.py publish "$RELEASE_TAG"
+
+  aur:
+    if: github.repository == 'emaspa/InfoPanel-linux'
+    needs: github-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Update existing AUR package and synchronize main
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ github.token }}
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          bash packaging/publish-aur.sh "$RELEASE_TAG"
