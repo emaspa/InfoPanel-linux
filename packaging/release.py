@@ -16,15 +16,20 @@ def gh(*args):
 
 
 def release(repo, tag):
+    # releases/tags/{tag} never returns draft releases, so a draft created by an
+    # earlier attempt would look absent and a retry would create a duplicate.
+    # List all releases (drafts included for a token with push access) instead.
     result = subprocess.run(
-        ["gh", "api", f"repos/{repo}/releases/tags/{tag}"],
+        ["gh", "api", "--paginate", f"repos/{repo}/releases",
+         "--jq", f'.[] | select(.tag_name == "{tag}") | @json'],
         text=True, capture_output=True,
     )
     if result.returncode:
-        if "(HTTP 404)" in result.stderr:
-            return None
         raise RuntimeError(result.stderr)
-    return json.loads(result.stdout)
+    matches = [json.loads(line) for line in result.stdout.splitlines() if line.strip()]
+    if len(matches) > 1:
+        raise RuntimeError(f"{len(matches)} releases use tag {tag}; delete the duplicates and retry")
+    return matches[0] if matches else None
 
 
 def asset_names(value):

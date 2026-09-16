@@ -93,6 +93,28 @@ class ReleaseTests(unittest.TestCase):
         self.assertEqual([call[1] for call in writes], ["create", "upload", "upload", "upload", "edit"])
         self.assertFalse(any("--clobber" in call for call in writes))
 
+    def test_draft_release_is_found_by_listing_not_tag_endpoint(self):
+        draft = {"tag_name": "v1.2.3", "draft": True, "assets": []}
+        other = {"tag_name": "v1.2.2", "draft": False, "assets": []}
+        listing = "\n".join(json.dumps(item) for item in (draft,)) + "\n"
+        ok = subprocess.CompletedProcess([], 0, listing, "")
+        with patch.object(subprocess, "run", return_value=ok) as run:
+            self.assertEqual(release.release("owner/repo", "v1.2.3"), draft)
+        command = run.call_args.args[0]
+        self.assertIn("repos/owner/repo/releases", command)
+        self.assertNotIn("releases/tags", " ".join(command))
+        self.assertIn("--paginate", command)
+        self.assertNotEqual(other["tag_name"], draft["tag_name"])
+
+    def test_missing_release_is_none_and_duplicates_abort(self):
+        empty = subprocess.CompletedProcess([], 0, "", "")
+        with patch.object(subprocess, "run", return_value=empty):
+            self.assertIsNone(release.release("owner/repo", "v1.2.3"))
+        item = json.dumps({"tag_name": "v1.2.3", "draft": True, "assets": []})
+        twice = subprocess.CompletedProcess([], 0, f"{item}\n{item}\n", "")
+        with patch.object(subprocess, "run", return_value=twice), self.assertRaisesRegex(RuntimeError, "duplicates"):
+            release.release("owner/repo", "v1.2.3")
+
     def test_api_auth_failure_is_not_treated_as_absent_release(self):
         failure = subprocess.CompletedProcess([], 1, "", "gh: Forbidden (HTTP 403)")
         with patch.object(subprocess, "run", return_value=failure), self.assertRaises(RuntimeError):
