@@ -65,11 +65,7 @@ namespace InfoPanel.ThermaltakePanel
                     stream.ReadTimeout = 2000;
 
                     Logger.Information("ThermaltakeHidDevice: Opened {Path}", device.DevicePath);
-                    return new ThermaltakeHidDevice
-                    { 
-                        _stream = stream,
-                        _productId = productId
-                    };
+                    return new ThermaltakeHidDevice { _stream = stream, _productId = productId };
                 }
                 catch (Exception ex)
                 {
@@ -82,36 +78,31 @@ namespace InfoPanel.ThermaltakePanel
         }
 
         /// <summary>
-        /// Performs the full handshake: conn, realtimeDisplay enable.
+        /// Performs the full handshake: conn, realtimeDisplay enable
+        /// (Steel Legend 360: power resume, realtimeDisplay enable).
         /// Returns true if all commands received 200 OK responses.
         /// </summary>
         public bool Handshake()
         {
             Logger.Information("ThermaltakeHidDevice: Starting handshake");
 
-            if (_productId == ThermaltakePanelModelDatabase.ASROCK_PRODUCT_ID_STEEL_LEGEND_360)
+            if (IsSteelLegend360)
             {
+                // Required after a full power cycle, or the LCD stays dark.
                 if (!SetPowerState("resume"))
                     return false;
 
                 // ASRock software waits ~78 ms after the resume response before beginning image transmission.
                 System.Threading.Thread.Sleep(100);
 
-                var steelLegendEnablePacket = BuildCommandPacket(
-                    "POST realtimeDisplay 1",
-                    body: "{\"enable\":true}",
-                    contentType: "json");
-
-                if (!SendPacketAndCheckResponse(
-                    steelLegendEnablePacket,
-                    "realtimeDisplay"))
+                var steelLegendEnablePacket = BuildCommandPacket("POST realtimeDisplay 1",
+                    body: "{\"enable\":true}", contentType: "json");
+                if (!SendPacketAndCheckResponse(steelLegendEnablePacket, "realtimeDisplay"))
                     return false;
 
                 System.Threading.Thread.Sleep(100);
 
-                Logger.Information(
-                    "ThermaltakeHidDevice: Steel Legend handshake complete");
-
+                Logger.Information("ThermaltakeHidDevice: Steel Legend handshake complete");
                 return true;
             }
 
@@ -140,37 +131,30 @@ namespace InfoPanel.ThermaltakePanel
             return SendPacketAndCheckResponse(packet, "brightness");
         }
 
-        // Ensures the LCD turns on
+        private bool IsSteelLegend360 => _productId == ThermaltakePanelModelDatabase.ASROCK_PRODUCT_ID_STEEL_LEGEND_360;
+
+        /// <summary>
+        /// Sends a power event ("resume" or "suspend"). Steel Legend 360 only.
+        /// </summary>
         private bool SetPowerState(string state)
         {
-            var packet = BuildCommandPacket(
-                "POST power 1",
-                body: $"{{\"event\":\"{state}\"}}",
-                contentType: "json");
-
+            var packet = BuildCommandPacket("POST power 1",
+                body: $"{{\"event\":\"{state}\"}}", contentType: "json");
             return SendPacketAndCheckResponse(packet, $"power {state}");
         }
 
         /// <summary>
         /// Sends a JPEG image frame as chunked image data.
         /// </summary>
-        /// 
-        
-        
         public void SendJpegFrame(byte[] jpegData)
         {
-
-
             if (_stream == null) throw new InvalidOperationException("Device not open");
-
-                Logger.Information(
-                    "ThermaltakeHidDevice: Sending JPEG frame, {Bytes} bytes",
-                    jpegData.Length);
 
             int totalChunks = (jpegData.Length + IMAGE_PAYLOAD_PER_CHUNK - 1) / IMAGE_PAYLOAD_PER_CHUNK;
 
-            bool isSteelLegend360 = _productId == ThermaltakePanelModelDatabase.ASROCK_PRODUCT_ID_STEEL_LEGEND_360;
-
+            bool isSteelLegend360 = IsSteelLegend360;
+            // Sampled once so every chunk of a frame carries the same byte 3.
+            byte frameTag = (byte)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() & 0xFF);
 
             for (int chunk = 0; chunk < totalChunks; chunk++)
             {
@@ -179,16 +163,14 @@ namespace InfoPanel.ThermaltakePanel
 
                 var wireData = new byte[WIRE_PACKET_SIZE];
                 wireData[0] = 0x5C;  // Image magic
-                
+
                 if (isSteelLegend360)
                 {
-
-                    // Steel Legend 360 LCD (26CE:0A11):
+                    // Steel Legend 360 LCD (26CE:0A11): BE16 packet length, then a frame tag
                     int packetLength = payloadSize + 21;
-
                     wireData[1] = (byte)((packetLength >> 8) & 0xFF);
                     wireData[2] = (byte)(packetLength & 0xFF);
-                    wireData[3] = (byte)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() & 0xFF);
+                    wireData[3] = frameTag;
                 }
                 else
                 {
@@ -216,26 +198,12 @@ namespace InfoPanel.ThermaltakePanel
         {
             try
             {
-
-                if (_productId ==
-                    ThermaltakePanelModelDatabase.ASROCK_PRODUCT_ID_STEEL_LEGEND_360)
-                {
-                     var steelLegendDisablePacket = BuildCommandPacket(
-                        "POST realtimeDisplay 1",
-                        body: "{\"enable\":false}",
-                        contentType: "json");
-
-                    SendPacketAndCheckResponse(
-                        steelLegendDisablePacket,
-                        "realtimeDisplay disable");
-
-                    SetPowerState("suspend");
-                    return;
-                }
-
                 var disablePacket = BuildCommandPacket("POST realtimeDisplay 1",
                     body: "{\"enable\":false}", contentType: "json");
                 SendPacketAndCheckResponse(disablePacket, "realtimeDisplay disable");
+
+                if (IsSteelLegend360)
+                    SetPowerState("suspend");
             }
             catch (Exception ex)
             {

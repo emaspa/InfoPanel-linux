@@ -263,6 +263,7 @@ BY-OEM HID protocol (JPEG over 1024-byte reports):
 |---|---|---|
 | Thermaltake 6" LCD (ToughLiquid Ultra) ✓ | 1480×720 | `264A:2347` |
 | ASRock Phantom Gaming 360 LCD | 480×480 | `26CE:0A10` |
+| ASRock Steel Legend 360 LCD | 480×480 | `26CE:0A11` |
 
 ### Jungle Leopard / Hongtai
 
