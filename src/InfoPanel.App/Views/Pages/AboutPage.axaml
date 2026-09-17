@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.3.3 alpha: NVIDIA sensors stop re-initializing every 10 seconds" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.3.4 alpha: ASRock Steel Legend 360 LCD support" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="The ASRock Steel Legend 360 LCD (USB 26CE:0A11) is now detected and driven as a 480x480 panel, with udev rules for access without root. It wakes the panel after a full power cycle, and puts it back to sleep when InfoPanel stops. Contributed by Ulfy." />
+                        <TextBlock Text="v0.3.3 alpha: NVIDIA sensors stop re-initializing every 10 seconds" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Since 0.3.0 the NVIDIA hotspot, VRAM and voltage interface (NvAPI) was torn down and reopened on every 10-second sensor rescan, adding three log lines each time, about 26,000 a day. It now opens once and is only reopened when the GPU actually changes or the driver reports it lost. A card that rejects an individual query, such as a fan it does not have, now just skips that one reading instead of dropping every NVIDIA sensor, and a missing NVIDIA library is retried once a minute rather than every rescan. NVIDIA resources are also released properly when InfoPanel exits." />
                         <TextBlock Text="v0.3.2 alpha: sensor values visible in the Designer picker" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
