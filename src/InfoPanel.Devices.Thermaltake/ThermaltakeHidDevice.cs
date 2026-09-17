@@ -27,6 +27,7 @@ namespace InfoPanel.ThermaltakePanel
         private const int FRAME_OVERHEAD = 5; // 5A 00 [len] ... [checksum] 5A 00
 
         private HidStream? _stream;
+        private int _productId;
         private bool _disposed;
         private int _seqNumber = 100;
 
@@ -64,7 +65,7 @@ namespace InfoPanel.ThermaltakePanel
                     stream.ReadTimeout = 2000;
 
                     Logger.Information("ThermaltakeHidDevice: Opened {Path}", device.DevicePath);
-                    return new ThermaltakeHidDevice { _stream = stream };
+                    return new ThermaltakeHidDevice { _stream = stream, _productId = productId };
                 }
                 catch (Exception ex)
                 {
@@ -77,12 +78,33 @@ namespace InfoPanel.ThermaltakePanel
         }
 
         /// <summary>
-        /// Performs the full handshake: conn, realtimeDisplay enable.
+        /// Performs the full handshake: conn, realtimeDisplay enable
+        /// (Steel Legend 360: power resume, realtimeDisplay enable).
         /// Returns true if all commands received 200 OK responses.
         /// </summary>
         public bool Handshake()
         {
             Logger.Information("ThermaltakeHidDevice: Starting handshake");
+
+            if (IsSteelLegend360)
+            {
+                // Required after a full power cycle, or the LCD stays dark.
+                if (!SetPowerState("resume"))
+                    return false;
+
+                // ASRock software waits ~78 ms after the resume response before beginning image transmission.
+                System.Threading.Thread.Sleep(100);
+
+                var steelLegendEnablePacket = BuildCommandPacket("POST realtimeDisplay 1",
+                    body: "{\"enable\":true}", contentType: "json");
+                if (!SendPacketAndCheckResponse(steelLegendEnablePacket, "realtimeDisplay"))
+                    return false;
+
+                System.Threading.Thread.Sleep(100);
+
+                Logger.Information("ThermaltakeHidDevice: Steel Legend handshake complete");
+                return true;
+            }
 
             // POST conn
             var connPacket = BuildCommandPacket("POST conn 1", hasBody: false);
@@ -109,6 +131,18 @@ namespace InfoPanel.ThermaltakePanel
             return SendPacketAndCheckResponse(packet, "brightness");
         }
 
+        private bool IsSteelLegend360 => _productId == ThermaltakePanelModelDatabase.ASROCK_PRODUCT_ID_STEEL_LEGEND_360;
+
+        /// <summary>
+        /// Sends a power event ("resume" or "suspend"). Steel Legend 360 only.
+        /// </summary>
+        private bool SetPowerState(string state)
+        {
+            var packet = BuildCommandPacket("POST power 1",
+                body: $"{{\"event\":\"{state}\"}}", contentType: "json");
+            return SendPacketAndCheckResponse(packet, $"power {state}");
+        }
+
         /// <summary>
         /// Sends a JPEG image frame as chunked image data.
         /// </summary>
@@ -118,6 +152,10 @@ namespace InfoPanel.ThermaltakePanel
 
             int totalChunks = (jpegData.Length + IMAGE_PAYLOAD_PER_CHUNK - 1) / IMAGE_PAYLOAD_PER_CHUNK;
 
+            bool isSteelLegend360 = IsSteelLegend360;
+            // Sampled once so every chunk of a frame carries the same byte 3.
+            byte frameTag = (byte)(DateTimeOffset.UtcNow.ToUnixTimeSeconds() & 0xFF);
+
             for (int chunk = 0; chunk < totalChunks; chunk++)
             {
                 int offset = chunk * IMAGE_PAYLOAD_PER_CHUNK;
@@ -125,9 +163,22 @@ namespace InfoPanel.ThermaltakePanel
 
                 var wireData = new byte[WIRE_PACKET_SIZE];
                 wireData[0] = 0x5C;  // Image magic
-                wireData[1] = 0x03;
-                wireData[2] = 0xFD;  // CMD: image data
-                wireData[3] = 0x00;  // area index
+
+                if (isSteelLegend360)
+                {
+                    // Steel Legend 360 LCD (26CE:0A11): BE16 packet length, then a frame tag
+                    int packetLength = payloadSize + 21;
+                    wireData[1] = (byte)((packetLength >> 8) & 0xFF);
+                    wireData[2] = (byte)(packetLength & 0xFF);
+                    wireData[3] = frameTag;
+                }
+                else
+                {
+                    wireData[1] = 0x03;
+                    wireData[2] = 0xFD;  // CMD: image data
+                    wireData[3] = 0x00;  // area index
+                }
+
                 wireData[4] = (byte)((totalChunks >> 8) & 0xFF); // total chunks BE16
                 wireData[5] = (byte)(totalChunks & 0xFF);
                 wireData[6] = (byte)((chunk >> 8) & 0xFF);       // chunk index BE16
@@ -150,6 +201,9 @@ namespace InfoPanel.ThermaltakePanel
                 var disablePacket = BuildCommandPacket("POST realtimeDisplay 1",
                     body: "{\"enable\":false}", contentType: "json");
                 SendPacketAndCheckResponse(disablePacket, "realtimeDisplay disable");
+
+                if (IsSteelLegend360)
+                    SetPowerState("suspend");
             }
             catch (Exception ex)
             {
