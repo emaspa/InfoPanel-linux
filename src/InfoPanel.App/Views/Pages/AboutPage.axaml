@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.3.5 alpha: RTX 50 series hotspot no longer floods dmesg" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.3.6 alpha: panels sleep and wake with the system" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Before the system suspends, InfoPanel now stops every panel (sending each one its sleep or close command), and restarts them after resume, as the Windows app does. It listens to systemd-logind and holds a sleep delay lock so there is time to do this. Until now a frozen stream could leave a panel dark after a longer suspend: the ASRock Steel Legend 360 goes dark after about a minute without frames and then ignores everything until a full power cycle. Reported by Ulfy." />
+                        <TextBlock Text="v0.3.5 alpha: RTX 50 series hotspot no longer floods dmesg" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="On RTX 50 series the hotspot temperature comes from a GPU register the NVIDIA driver only lets root read, and every refused read is logged to the kernel log. InfoPanel probed it at startup, noted it was unavailable, and then kept reading it every second anyway, adding two NVRM lines to dmesg per second. It now probes once and leaves the register alone when the probe fails. Reported by Chris123NT." />
                         <TextBlock Text="v0.3.4 alpha: ASRock Steel Legend 360 LCD support" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
