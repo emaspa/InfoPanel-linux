@@ -31,7 +31,7 @@ public class NvmlMonitor
     private readonly Func<long> _clock;
     private const int RetryIntervalMs = 60_000;
     private long _nextNvmlAttempt, _nextNvApiAttempt;
-    private sealed record NvApiGpu(IntPtr Handle, int ThermalsMask, bool IsBlackwell);
+    private sealed record NvApiGpu(IntPtr Handle, int ThermalsMask, bool IsBlackwell, bool HotspotRegister);
     private readonly Dictionary<(SensorId? Id, IntPtr Handle), NvApiGpu> _nvApiGpus = [];
     private HashSet<(SensorId? Id, IntPtr Handle)> _devices = [];
 
@@ -171,21 +171,26 @@ public class NvmlMonitor
                 }
                 catch (EntryPointNotFoundException) { }
 
-                _nvApiGpus[(_deviceIds[i], _deviceHandles[i])] = new(apiHandle, mask, isBlackwell);
                 Log.Information("NvApi: GPU {Index} matched (thermals mask 0x{Mask:X}, blackwell={Blackwell})",
                     i, mask, isBlackwell);
 
                 // Blackwell reports the hotspot only through a GPU register read, which the
-                // driver restricts to root (thermals slot 9 still answers, but with the edge
-                // temperature - verified on real hardware - so it must not be used instead).
+                // driver restricts to CAP_SYS_ADMIN (thermals slot 9 still answers, but with
+                // the edge temperature - verified on real hardware - so it must not be used
+                // instead). Every refused read is logged by the driver to dmesg (#11), so
+                // probe once here and never touch the register again in the poll loop
+                // when it fails; the setup only reruns when the GPU set changes.
+                var hotspotRegister = false;
                 if (isBlackwell)
                 {
-                    var (hotspot, _) = _nvApi.ReadTemperatures(apiHandle, mask, isBlackwell: true);
-                    if (!hotspot.HasValue)
+                    hotspotRegister = _nvApi.ReadHotspotRegister(apiHandle).HasValue;
+                    if (!hotspotRegister)
                     {
-                        Log.Information("NvApi: GPU {Index}: hotspot temperature unavailable (Blackwell exposes it via a register read that requires root)", i);
+                        Log.Information("NvApi: GPU {Index}: hotspot temperature unavailable (Blackwell exposes it via a register read that requires root or CAP_SYS_ADMIN)", i);
                     }
                 }
+
+                _nvApiGpus[(_deviceIds[i], _deviceHandles[i])] = new(apiHandle, mask, isBlackwell, hotspotRegister);
             }
         }
         catch (NvmlUnavailableException) { throw; }
@@ -383,6 +388,10 @@ public class NvmlMonitor
                 if (_nvApi != null && _nvApiGpus.TryGetValue((_deviceIds[i], handle), out var gpu))
                 {
                     var (hotspot, vram) = _nvApi.ReadTemperatures(gpu.Handle, gpu.ThermalsMask, gpu.IsBlackwell);
+                    if (gpu.HotspotRegister)
+                    {
+                        hotspot = _nvApi.ReadHotspotRegister(gpu.Handle);
+                    }
                     if (hotspot.HasValue)
                     {
                         UpdateSensor($"{prefix}/temperature_hotspot", hotspot.Value, "°C");

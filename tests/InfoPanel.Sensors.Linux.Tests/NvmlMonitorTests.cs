@@ -61,8 +61,11 @@ public class NvmlMonitorTests : IDisposable
             Assert.Single(h.Apis);
             Assert.Equal(13, h.Native.Scans);
             Assert.Equal(1, h.Apis[0].MaskProbes);
-            Assert.Equal(122, h.Apis[0].Reads); // one setup probe and 121 polls
+            Assert.Equal(121, h.Apis[0].Reads);
             Assert.Equal(121, h.Apis[0].VoltageReads);
+            // The register read is refused without CAP_SYS_ADMIN and the driver logs
+            // every attempt to dmesg (#11): one setup probe, then never again.
+            Assert.Equal(1, h.Apis[0].RegisterReads);
             Assert.Single(sink.Messages, m => m.StartsWith("NvApi: GPU 0 matched"));
             Assert.Single(sink.Messages, m => m.Contains("hotspot temperature unavailable"));
             Assert.False(HwmonMonitor.SENSORHASH.ContainsKey(Harness.Prefix + "/temperature_hotspot"));
@@ -70,6 +73,24 @@ public class NvmlMonitorTests : IDisposable
             Assert.Equal(0.95, HwmonMonitor.SENSORHASH[Harness.Prefix + "/voltage"].ValueNow);
         }
         finally { Log.Logger = oldLog; }
+    }
+
+    [Fact]
+    public void BlackwellHotspotRegisterIsPolledWhenTheProbeSucceeds()
+    {
+        using var h = new Harness();
+        h.Create = () =>
+        {
+            var api = new CountingNvApi { HotspotRegisterValue = 71 };
+            h.Apis.Add(api);
+            return api;
+        };
+        for (var time = 0; time <= 10_000; time += 1000) h.Tick(time);
+        Assert.Single(h.Apis);
+        Assert.Equal(11, h.Apis[0].Reads);
+        Assert.Equal(12, h.Apis[0].RegisterReads); // one setup probe and 11 polls
+        Assert.Equal(71, HwmonMonitor.SENSORHASH[Harness.Prefix + "/temperature_hotspot"].ValueNow);
+        Assert.Equal(60, HwmonMonitor.SENSORHASH[Harness.Prefix + "/temperature_vram"].ValueNow);
     }
 
     [Theory]
@@ -189,7 +210,8 @@ public class NvmlMonitorTests : IDisposable
         Assert.Single(h.Apis);
         Assert.Equal(2, h.Apis[0].MaskProbes);
         Assert.Equal(0, h.Apis[0].Disposals);
-        Assert.Equal(new long[] { 41, 42, 41, 42, 42, 41 }, h.Apis[0].ReadHandles);
+        Assert.Equal(new long[] { 41, 42, 42, 41 }, h.Apis[0].ReadHandles);
+        Assert.Equal(new long[] { 41, 42 }, h.Apis[0].RegisterHandles); // probed once per GPU at setup
     }
 
     [Fact]
@@ -531,9 +553,10 @@ public class NvmlMonitorTests : IDisposable
 
     private sealed class CountingNvApi : INvApi
     {
-        public int Disposals, MaskProbes, Reads, VoltageReads;
+        public int Disposals, MaskProbes, Reads, RegisterReads, VoltageReads;
         public bool FailMask, Lost;
-        public readonly List<long> ReadHandles = [];
+        public int? HotspotRegisterValue;
+        public readonly List<long> ReadHandles = [], RegisterHandles = [];
         public IntPtr SingleGpuHandle => new(42);
         public IntPtr FindGpuByBusId(uint busId) => new(40 + busId);
         public int CalculateThermalsMask(IntPtr handle) { MaskProbes++; if (FailMask) throw new InvalidOperationException("mask setup failed"); return 0x7FFFF; }
@@ -545,6 +568,7 @@ public class NvmlMonitorTests : IDisposable
             if (Lost) throw new NvApiUnavailableException(-10);
             return (null, 60);
         }
+        public int? ReadHotspotRegister(IntPtr handle) { Assert.Equal(0, Disposals); RegisterReads++; RegisterHandles.Add(handle.ToInt64()); return HotspotRegisterValue; }
         public int? ReadVoltageMv(IntPtr handle) { Assert.Equal(0, Disposals); VoltageReads++; return 950; }
         public void Dispose() => Disposals++;
     }

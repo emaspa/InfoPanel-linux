@@ -75,7 +75,12 @@ Native Linux providers, no kernel modules or vendor daemons required:
   limit, GPU/hotspot/VRAM temperatures, core voltage, performance state,
   throttling flags, fan RPM). Hotspot, VRAM temperature and voltage need
   the proprietary driver 525+; on RTX 50 series the hotspot additionally
-  requires root and is omitted otherwise.
+  requires root and is omitted otherwise (probed once at startup, so the
+  driver's "does not have permission to access register" line appears once
+  in dmesg, not every second). To read it without running as root, grant
+  the binary `CAP_SYS_ADMIN`, which is close to root and is reset by
+  package upgrades:
+  `sudo setcap cap_sys_admin+ep /opt/infopanel/infopanel`.
 - **Drive health**: SMART data (health, wear, spare, power-on hours, data
   written) collected by a root systemd timer into `/run/infopanel/smart.json`
   and read by the bundled plugin without elevating the app.

@@ -171,9 +171,11 @@ internal sealed class NvApi : INvApi
     }
 
     /// <summary>
-    /// Reads hotspot and VRAM temperature (°C). Values in the thermals response
+    /// Reads hotspot and VRAM temperature (°C) from the thermals query. Values
     /// are fixed-point /256; slots outside 1..254 after scaling are not present.
-    /// isBlackwell selects the register-based hotspot and the GDDR7 VRAM slot.
+    /// On Blackwell the thermals query has no hotspot (slot 9 answers with the
+    /// edge temperature), so isBlackwell returns null there and selects the
+    /// GDDR7 VRAM slot; the hotspot comes from <see cref="ReadHotspotRegister"/>.
     /// </summary>
     public (int? Hotspot, int? Vram) ReadTemperatures(IntPtr handle, int mask, bool isBlackwell)
     {
@@ -191,18 +193,22 @@ internal sealed class NvApi : INvApi
             }
         }
 
-        if (isBlackwell)
-        {
-            var raw = ReadRegister(handle, REG_OFFSET_BLACKWELL_HOTSPOT);
-            if (raw.HasValue)
-            {
-                var value = (int)((raw.Value & 0xFFFF) / 256);
-                if (value > 0 && value < 255)
-                    hotspot = value;
-            }
-        }
-
         return (hotspot, vram);
+    }
+
+    /// <summary>
+    /// Reads the Blackwell hotspot temperature (°C) through a GPU register. The
+    /// driver only allows this with CAP_SYS_ADMIN and logs every refused attempt
+    /// to the kernel log, so callers must probe once and stop on failure rather
+    /// than retry every poll.
+    /// </summary>
+    public int? ReadHotspotRegister(IntPtr handle)
+    {
+        var raw = ReadRegister(handle, REG_OFFSET_BLACKWELL_HOTSPOT);
+        if (!raw.HasValue) return null;
+
+        var value = (int)((raw.Value & 0xFFFF) / 256);
+        return value > 0 && value < 255 ? value : null;
     }
 
     /// <summary>Reads GPU core voltage in millivolts.</summary>

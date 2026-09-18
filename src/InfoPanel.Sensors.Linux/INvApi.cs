@@ -6,6 +6,7 @@ internal interface INvApi : IDisposable
     IntPtr SingleGpuHandle { get; }
     int CalculateThermalsMask(IntPtr handle);
     (int? Hotspot, int? Vram) ReadTemperatures(IntPtr handle, int mask, bool isBlackwell);
+    int? ReadHotspotRegister(IntPtr handle);
     int? ReadVoltageMv(IntPtr handle);
 }
 
