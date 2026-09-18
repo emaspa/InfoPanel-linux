@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.3.4 alpha: ASRock Steel Legend 360 LCD support" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.3.5 alpha: RTX 50 series hotspot no longer floods dmesg" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="On RTX 50 series the hotspot temperature comes from a GPU register the NVIDIA driver only lets root read, and every refused read is logged to the kernel log. InfoPanel probed it at startup, noted it was unavailable, and then kept reading it every second anyway, adding two NVRM lines to dmesg per second. It now probes once and leaves the register alone when the probe fails. Reported by Chris123NT." />
+                        <TextBlock Text="v0.3.4 alpha: ASRock Steel Legend 360 LCD support" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="The ASRock Steel Legend 360 LCD (USB 26CE:0A11) is now detected and driven as a 480x480 panel, with udev rules for access without root. It wakes the panel after a full power cycle, and puts it back to sleep when InfoPanel stops. Contributed by Ulfy." />
                         <TextBlock Text="v0.3.3 alpha: NVIDIA sensors stop re-initializing every 10 seconds" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
