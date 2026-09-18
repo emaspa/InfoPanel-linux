@@ -218,6 +218,13 @@ Panels are auto-detected when plugged in (udev rules required, see
 hardware under Linux; the rest use the same protocol implementations as the
 Windows build and are expected to work - reports welcome.
 
+Before the system suspends, InfoPanel stops every panel (sending its sleep or
+close command) and restarts them after resume, like the Windows build does on
+power events. It listens to systemd-logind's `PrepareForSleep` and holds a
+sleep delay lock, so systemd waits (up to `InhibitDelayMaxSec`, 5 s by
+default) for the panels to be put to sleep first. Without logind the panels
+are simply left running across the suspend.
+
 ### Thermalright (TRCC family)
 
 **Trofeo / HID protocol** - USB `0416:5302`, `0418:5303`, `0418:5304`:

@@ -318,6 +318,25 @@ namespace InfoPanel
 
         public async Task StartDevicesAsync(CancellationToken token)
         {
+            await StartPanelTasksAsync(token);
+
+            if (Settings.WebServer)
+            {
+                await WebServerTask.Instance.StartAsync(token);
+            }
+
+            // Stop the panels before a system suspend and bring them back after
+            // resume, as the Windows app does on PowerModeChanged.
+            _sleepMonitor = new LogindSleepMonitor(
+                beforeSleep: StopPanelTasksAsync,
+                afterResume: () => _stopping ? Task.CompletedTask : StartPanelTasksAsync(token));
+            await _sleepMonitor.StartAsync();
+        }
+
+        private LogindSleepMonitor? _sleepMonitor;
+
+        private static async Task StartPanelTasksAsync(CancellationToken token)
+        {
             await BeadaPanelTask.Instance.StartAsync(token);
             await TuringPanelTask.Instance.StartAsync(token);
             await ThermalrightPanelTask.Instance.StartAsync(token);
@@ -326,21 +345,10 @@ namespace InfoPanel
             await VmaxPanelTask.Instance.StartAsync(token);
             await JonsboPanelTask.Instance.StartAsync(token);
             await LianLiPanelTask.Instance.StartAsync(token);
-
-            if (Settings.WebServer)
-            {
-                await WebServerTask.Instance.StartAsync(token);
-            }
         }
 
-        public async Task StopDevicesAsync()
+        private static async Task StopPanelTasksAsync()
         {
-            _stopping = true;
-            HwmonMonitor.Instance.CatalogChanged -= OnCatalogChanged;
-            ConfigPersistence.PostLoadHook = null;
-            try { Hotkeys?.Stop(); } catch { }
-            try { ForegroundApps?.Dispose(); } catch { }
-            try { await WebServerTask.Instance.StopAsync(shutdown: true); } catch { }
             await BeadaPanelTask.Instance.StopAsync(shutdown: true);
             await TuringPanelTask.Instance.StopAsync(shutdown: true);
             await ThermalrightPanelTask.Instance.StopAsync(shutdown: true);
@@ -349,6 +357,19 @@ namespace InfoPanel
             await VmaxPanelTask.Instance.StopAsync(shutdown: true);
             await JonsboPanelTask.Instance.StopAsync(shutdown: true);
             await LianLiPanelTask.Instance.StopAsync(shutdown: true);
+        }
+
+        public async Task StopDevicesAsync()
+        {
+            _stopping = true;
+            try { _sleepMonitor?.Dispose(); } catch { }
+            _sleepMonitor = null;
+            HwmonMonitor.Instance.CatalogChanged -= OnCatalogChanged;
+            ConfigPersistence.PostLoadHook = null;
+            try { Hotkeys?.Stop(); } catch { }
+            try { ForegroundApps?.Dispose(); } catch { }
+            try { await WebServerTask.Instance.StopAsync(shutdown: true); } catch { }
+            await StopPanelTasksAsync();
 
             try { await Monitors.PluginMonitor.Instance.StopAsync().WaitAsync(TimeSpan.FromSeconds(3)); } catch { }
             try { HwmonMonitor.Instance.Stop(); } catch { }
