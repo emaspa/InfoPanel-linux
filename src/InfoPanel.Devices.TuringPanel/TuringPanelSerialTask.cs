@@ -128,11 +128,24 @@ namespace InfoPanel
 
             try
             {
-                using var screen = ScreenFactory.Create(_screenType, _device.DeviceLocation, _nativeWidth, _nativeHeight);
+                var port = await TuringPanel.TuringPanelHelper.ResolveSerialPort(_device);
+                if (port == null)
+                {
+                    Logger.Debug("TuringPanel {Device}: no serial port found, panel unplugged or asleep", _device);
+                    return;
+                }
+
+                if (port != _device.DeviceLocation)
+                {
+                    Logger.Information("TuringPanel {Device}: port moved from {Old} to {New}", _device, _device.DeviceLocation, port);
+                    UiThread.Post(() => _device.DeviceLocation = port);
+                }
+
+                using var screen = ScreenFactory.Create(_screenType, port, _nativeWidth, _nativeHeight);
 
                 if (screen == null)
                 {
-                    Logger.Warning("TuringPanelE: Screen not found on port {Port}", _device.DeviceLocation);
+                    Logger.Warning("TuringPanelE: Screen not found on port {Port}", port);
                     return;
                 }
 

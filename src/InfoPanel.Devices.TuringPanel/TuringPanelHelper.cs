@@ -159,19 +159,7 @@ namespace InfoPanel.TuringPanel
             await _semaphore.WaitAsync();
             try
             {
-                var wakeCount = await WakeSerialDevices();
-                var attempts = 1;
-                while (wakeCount > 0)
-                {
-                    await Task.Delay(1000); // Wait a bit before checking again
-                    wakeCount = await WakeSerialDevices();
-                    attempts++;
-                    if (attempts >= 5)
-                    {
-                        Logger.Warning("Max attempts reached while waking devices.");
-                        break;
-                    }
-                }
+                await WakeSerialDevicesUntilAwake();
 
                 Logger.Information("No more sleeping devices to wake. Proceeding to search for Turing panel devices.");
 
@@ -253,6 +241,93 @@ namespace InfoPanel.TuringPanel
             }
         }
 
+        /// <summary>
+        /// Resolves the serial port a panel is on right now. The saved DeviceLocation
+        /// is only refreshed by a Scan, but ttyACM numbers are handed out in enumeration
+        /// order and change across replugs, reboots and panel sleep (issue #1), so the
+        /// port is looked up again by the VID/PID in DeviceId. When no port matches, a
+        /// sleeping panel is woken first. Returns null when no matching port exists.
+        /// </summary>
+        public static async Task<string?> ResolveSerialPort(TuringPanelDevice device)
+        {
+            if (!TryParseVidPid(device.DeviceId, out var vid, out var pid))
+            {
+                return device.DeviceLocation;
+            }
+
+            await _semaphore.WaitAsync();
+            try
+            {
+                var port = SelectSerialPort(GetLinuxSerialPorts(), vid, pid, device.DeviceLocation);
+                if (port != null)
+                {
+                    return port;
+                }
+
+                await WakeSerialDevicesUntilAwake();
+                return SelectSerialPort(GetLinuxSerialPorts(), vid, pid, device.DeviceLocation);
+            }
+            catch (Exception ex)
+            {
+                Logger.Error(ex, "TuringPanelHelper: Error resolving serial port for {Device}", device);
+                return device.DeviceLocation;
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// Picks the port for a VID/PID, keeping the saved one while it still belongs to
+        /// that VID/PID so two identical panels do not trade places.
+        /// </summary>
+        internal static string? SelectSerialPort(IReadOnlyList<(string portPath, int vid, int pid)> ports, int vid, int pid, string? savedPort)
+        {
+            var matches = ports.Where(p => p.vid == vid && p.pid == pid).Select(p => p.portPath).ToList();
+            if (matches.Count == 0)
+            {
+                return null;
+            }
+
+            return savedPort != null && matches.Contains(savedPort) ? savedPort : matches[0];
+        }
+
+        /// <summary>
+        /// Ports that must be opened to wake a sleeping panel. A CH340 USB7INCH (1A86:5722)
+        /// always is. A Turzx 5" sleeps as the CT21INCH port (1A86:CA21) and re-enumerates
+        /// as 1D6B:0106 once opened; some units keep CA21 next to the awake port, so it
+        /// is only woken while no awake 1D6B:0106/0121 port exists (as upstream
+        /// turing-smart-screen-python does).
+        /// </summary>
+        internal static List<(string portPath, int vid, int pid)> GetPortsToWake(IReadOnlyList<(string portPath, int vid, int pid)> ports)
+        {
+            var revCAwake = ports.Any(p => p.vid == 0x1d6b && (p.pid == 0x0106 || p.pid == 0x0121));
+
+            return ports
+                .Where(p => p.vid == 0x1a86 && (p.pid == 0x5722 || (p.pid == 0xca21 && !revCAwake)))
+                .ToList();
+        }
+
+        /// <summary>Wakes sleeping panels, retrying once a second for up to 5 attempts.
+        /// Callers hold _semaphore.</summary>
+        private static async Task WakeSerialDevicesUntilAwake()
+        {
+            var wakeCount = await WakeSerialDevices();
+            var attempts = 1;
+            while (wakeCount > 0)
+            {
+                await Task.Delay(1000); // Wait a bit before checking again
+                wakeCount = await WakeSerialDevices();
+                attempts++;
+                if (attempts >= 5)
+                {
+                    Logger.Warning("Max attempts reached while waking devices.");
+                    break;
+                }
+            }
+        }
+
         private static async Task<int> WakeSerialDevices()
         {
             try
@@ -260,17 +335,17 @@ namespace InfoPanel.TuringPanel
                 return await Task.Run(() =>
                 {
                     var count = 0;
-                    var serialPorts = GetLinuxSerialPorts();
 
-                    foreach (var (portPath, vid, pid) in serialPorts)
+                    foreach (var (portPath, _, pid) in GetPortsToWake(GetLinuxSerialPorts()))
                     {
-                        // Only wake CH340 USB to Serial converters
-                        if (vid != 0x1a86 || pid != 0x5722)
-                            continue;
-
                         try
                         {
                             using var serialPort = new SerialPort(portPath, 115200);
+                            if (pid == 0xca21)
+                            {
+                                // Upstream wakes CT21INCH with an rtscts=True open
+                                serialPort.Handshake = Handshake.RequestToSend;
+                            }
                             serialPort.Open();
                             serialPort.Close();
                         }
