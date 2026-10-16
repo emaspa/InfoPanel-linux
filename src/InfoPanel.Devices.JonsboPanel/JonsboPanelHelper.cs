@@ -18,8 +18,7 @@ namespace InfoPanel.JonsboPanel
 
         /// <summary>
         /// MS9132 entries only: true when the panel EDID confirmed DS339 geometry
-        /// (376x960); false when the EDID could not be read, in which case the device
-        /// might equally be a VMAX 4.6" (same MS9132 bridge, same VID/PID).
+        /// (376x960). Unreadable panels are omitted from discovery.
         /// </summary>
         public bool Ms9132Confirmed { get; set; } = true;
     }
@@ -35,7 +34,7 @@ namespace InfoPanel.JonsboPanel
     {
         private static readonly ILogger Logger = Log.ForContext(typeof(JonsboPanelHelper));
 
-        public static List<JonsboPanelDiscoveryInfo> ScanDevices()
+        public static List<JonsboPanelDiscoveryInfo> ScanDevices(List<string>? issues = null)
         {
             var devices = new List<JonsboPanelDiscoveryInfo>();
 
@@ -76,13 +75,19 @@ namespace InfoPanel.JonsboPanel
                     var modelInfo = JonsboPanelModelDatabase.Models[JonsboPanelModel.DS339];
                     var size = ProbeMs9132PanelSize(hid);
 
-                    if (size is { } s && (s.Width != modelInfo.Width || s.Height != modelInfo.Height))
+                    if (size == null)
+                    {
+                        issues?.Add("MS9132 panel could not be identified. Check USB/HID permissions, then scan again.");
+                        Logger.Warning("JonsboPanelHelper: Unreadable MS9132 EDID; skipping unidentified panel");
+                        continue;
+                    }
+                    if (!IsDs339(size))
                     {
                         // A different MS9132-bridged panel (e.g. VMAX 4.6" at 320x960):
                         // not ours, leave it to that family's scan.
                         Logger.Information(
                             "JonsboPanelHelper: MS9132 EDID reports {W}x{H}, not a DS339 - skipping",
-                            s.Width, s.Height);
+                            size.Value.Width, size.Value.Height);
                     }
                     else
                     {
@@ -114,6 +119,8 @@ namespace InfoPanel.JonsboPanel
 
             return devices;
         }
+
+        public static bool IsDs339((int Width, int Height)? size) => size is (376, 960);
 
         /// <summary>
         /// Reads the attached panel's native resolution from the first detailed timing

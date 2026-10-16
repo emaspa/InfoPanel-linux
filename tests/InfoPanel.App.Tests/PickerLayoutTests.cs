@@ -17,6 +17,35 @@ public sealed class PickerLayoutTests(HeadlessUi ui, ITestOutputHelper output) :
     private const string DiskName = "WD_BLACK SN850X 4000GB (…0995, nvme0n1) Read Latency";
 
     [Fact]
+    public Task ValkyrieDevicesHaveTheirOwnSection() => ui.Run(() =>
+    {
+        var host = new global::InfoPanel.AppHost();
+        host.Settings.ValkyriePanelDevices.Add(new VmaxPanelDevice
+        {
+            DeviceId = "test-v360", Model = global::InfoPanel.VmaxPanel.VmaxPanelModel.ValkyrieV360,
+        });
+        var appType = typeof(global::InfoPanel.AppHost).Assembly.GetType("InfoPanel.App")!;
+        var app = Activator.CreateInstance(appType)!;
+        appType.GetField("_host", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(app, host);
+        var page = new DevicesPage();
+        typeof(DevicesPage).GetField("_app", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.SetValue(page, app);
+        typeof(DevicesPage).GetMethod("RebuildRows", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.Invoke(page, null);
+        using var root = HeadlessUi.CreateRoot();
+        root.Content = page;
+        root.Prepare();
+        root.Measure(new Size(1300, 1200));
+        root.Arrange(new Rect(0, 0, 1300, 1200));
+        root.UpdateLayout();
+        var texts = page.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        var vmax = texts.IndexOf("VMAX / AuyiHomu");
+        var vk = texts.IndexOf("Valkyrie");
+        var model = texts.IndexOf("Valkyrie V360 LCD");
+        var jonsbo = texts.IndexOf("Jonsbo");
+        Assert.True(vmax >= 0 && vk > vmax && model > vk && jonsbo > model, string.Join(" | ", texts));
+        Assert.DoesNotContain("VMAX / AuyiHomu / Valkyrie", texts);
+    });
+
+    [Fact]
     public Task DesignerSplitterMinimumLeavesRoomForIndentedValues() => ui.Run(() =>
     {
         var page = new DesignerPage();

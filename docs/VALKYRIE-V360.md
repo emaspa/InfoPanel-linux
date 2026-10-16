@@ -1,17 +1,19 @@
 # Valkyrie V360 LCD (320×240)
 
 The V360 screen uses the MacroSilicon MS9132 bridge (`345f:9132`). It is managed
-under **VMAX / AuyiHomu / Valkyrie**, reusing the existing UYVY renderer and device
-supervisor. Existing VMAX configuration names and XML remain compatible.
+under its own **Valkyrie** section, reusing the existing UYVY renderer and device
+supervisor. Valkyrie devices have a separate device list and streaming switch;
+previous Valkyrie entries in the VMAX collection migrate with their settings and hotkeys.
 
 ## Identification and access
 
 The same USB ID appears on several unrelated screens. Discovery reads the first
 EDID detailed timing descriptor: 320×240 selects V360, 320×960 selects VMAX,
-and 376×960 belongs to the Jonsbo DS339 path. Unknown readable geometry is skipped.
-An unreadable EDID does not select V360. A stable USB serial pairs the HID control
+and 376×960 belongs to the Jonsbo DS339 path. Unknown or unreadable geometry is skipped instead of defaulting to Jonsbo or VMAX.
+A confirmed V360 scan repairs a matching stale DS339 configuration. A stable USB serial pairs the HID control
 interface with the video interface; V360 open rechecks the geometry before init.
-The existing `345f:9132` udev rules cover both USB and hidraw nodes.
+The existing `345f:9132` udev rules cover both USB and hidraw nodes. RPM installation
+reapplies the rules to already-connected V360/MC360 USB and HID nodes.
 
 ## Transport
 
@@ -43,8 +45,9 @@ restored software brightness and 180-degree rotation during streaming. I also
 verified that stopping and restarting the device task reacquired both interfaces
 and that clean shutdown released them. I have not tested physical suspend/resume.
 
-The solution test suite passes 351 tests, including geometry routing, the
-initialization trace digest, post-frame command order and XML settings round-trip.
+The solution test suite passes 361 tests, including geometry routing, the
+initialization trace digest, post-frame command order, XML settings round-trip,
+separate family switches, stale-configuration migration and device-page grouping.
 Other Valkyrie models or panels using the same USB ID have not been verified.
 The [MC360](VALKYRIE-MC360.md) has a separate experimental bulk transport and does
 not use this initialization. Unmapped generic resolutions are not model entries.

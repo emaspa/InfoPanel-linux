@@ -39,6 +39,20 @@ if [ -d /run/systemd/system ]; then
 fi
 if [ -S /run/udev/control ]; then
     udevadm control --reload-rules || :
+    # Apply permissions to already-connected Valkyrie/shared MS9132 LCDs.
+    # Reloading rules alone only affects the next plug-in event.
+    for device in /sys/bus/usb/devices/*; do
+        [ -r "$device/idVendor" ] && [ -r "$device/idProduct" ] || continue
+        read -r vendor < "$device/idVendor"
+        read -r product < "$device/idProduct"
+        case "$vendor:$product" in
+            345f:9132|374a:a021)
+                udevadm trigger --action=change "$device" || :
+                udevadm trigger --action=change --subsystem-match=hidraw --parent-match="$(readlink -f "$device")" || :
+                ;;
+        esac
+    done
+    udevadm settle --timeout=5 || :
 fi
 
 %preun

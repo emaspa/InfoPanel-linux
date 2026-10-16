@@ -229,7 +229,7 @@ namespace InfoPanel.Views.Pages
                     device.JpegQuality, q => { device.JpegQuality = q; _app.Host.SaveSettings(); });
             }
 
-            AddFamilyHeader("VMAX / AuyiHomu / Valkyrie", settings.VmaxPanelMultiDeviceMode,
+            AddFamilyHeader("VMAX / AuyiHomu", settings.VmaxPanelMultiDeviceMode,
                 v => { settings.VmaxPanelMultiDeviceMode = v; _app.Host.SaveSettings(); });
             foreach (var device in settings.VmaxPanelDevices.ToList())
             {
@@ -246,6 +246,30 @@ namespace InfoPanel.Views.Pages
                         : !device.Enabled ? "disabled"
                         : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
                     remove: () => { settings.VmaxPanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
+                    rotation: device.Rotation,
+                    setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
+                AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
+                    device.TargetFrameRate, f => { device.TargetFrameRate = f; _app.Host.SaveSettings(); },
+                    null, null);
+            }
+
+            AddFamilyHeader("Valkyrie", settings.ValkyriePanelMultiDeviceMode,
+                v => { settings.ValkyriePanelMultiDeviceMode = v; _app.Host.SaveSettings(); });
+            foreach (var device in settings.ValkyriePanelDevices.ToList())
+            {
+                AddRow(
+                    title: device.ModelInfo?.Name ?? device.Model.ToString(),
+                    subtitle: Subtitle(device.DeviceId, device.DeviceLocation,
+                        device.DisplayWidth > 0 ? $"renders at {device.DisplayWidth}×{device.DisplayHeight}{(device.ModelInfo?.Experimental == true ? "; experimental, not hardware-tested on Linux" : "")}" : null),
+                    isEnabled: device.Enabled,
+                    setEnabled: v => { device.Enabled = v; _app.Host.SaveSettings(); },
+                    profileGuid: device.ProfileGuid,
+                    setProfile: g => { device.ProfileGuid = g; _app.Host.SaveSettings(); },
+                    status: () => device.RuntimeProperties.IsRunning
+                        ? RunningStatus(device.ProfileGuid, device.RuntimeProperties.FrameRate, device.RuntimeProperties.FrameTime)
+                        : !device.Enabled ? "disabled"
+                        : device.RuntimeProperties.ErrorMessage is { Length: > 0 } err ? err : "idle",
+                    remove: () => { settings.ValkyriePanelDevices.Remove(device); _app.Host.SaveSettings(); RebuildRows(); },
                     rotation: device.Rotation,
                     setRotation: r => { device.Rotation = r; _app.Host.SaveSettings(); });
                 AddPanelOptions(device.Brightness, b => { device.Brightness = b; _app.Host.SaveSettings(); },
@@ -339,6 +363,7 @@ namespace InfoPanel.Views.Pages
             foreach (var d in settings.ThermalrightPanelDevices) deviceChoices.Add(new("Thermalright", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.ThermaltakePanelDevices) deviceChoices.Add(new("Thermaltake", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.JlPanelDevices) deviceChoices.Add(new("Jl", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
+            foreach (var d in settings.ValkyriePanelDevices) deviceChoices.Add(new("Valkyrie", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.VmaxPanelDevices) deviceChoices.Add(new("Vmax", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.JonsboPanelDevices) deviceChoices.Add(new("Jonsbo", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
             foreach (var d in settings.LianLiPanelDevices) deviceChoices.Add(new("LianLi", d.DeviceId, d.ModelInfo?.Name ?? d.Model.ToString()));
@@ -1002,62 +1027,13 @@ namespace InfoPanel.Views.Pages
                     }
                 }
 
-                // Jonsbo AIO (DS916 HLVMAX serial, DS339 MS9132)
-                var jonsbo = await Task.Run(JonsboPanelHelper.ScanDevices);
-                foreach (var found in jonsbo)
-                {
-                    var existing = settings.JonsboPanelDevices.FirstOrDefault(d => d.DeviceId == found.DeviceId);
-                    if (existing == null)
-                    {
-                        // The MS9132 bridge is shared with the VMAX 4.6"; when the EDID
-                        // probe could not confirm which panel is attached, don't shadow
-                        // an existing VMAX configuration with a Jonsbo entry.
-                        if (found.Model == JonsboPanelModel.DS339 && !found.Ms9132Confirmed
-                            && settings.VmaxPanelDevices.Count > 0)
-                            continue;
-
-                        settings.JonsboPanelDevices.Add(new JonsboPanelDevice
-                        {
-                            DeviceId = found.DeviceId,
-                            DeviceLocation = found.DeviceLocation,
-                            Model = found.Model,
-                        });
-                        added++;
-                    }
-                    else
-                    {
-                        existing.DeviceLocation = found.DeviceLocation;
-                        updated++;
-                    }
-                }
-
-                // All three panels share 345F:9132. The EDID routes known geometry;
-                // when unreadable, keep the existing per-device Jonsbo/VMAX choice.
-                var vmax = await Task.Run(VmaxPanelHelper.ScanDevices);
-                vmax.RemoveAll(found => jonsbo.Any(j => j.Model == JonsboPanelModel.DS339
-                    && j.DeviceLocation == found.SerialNumber
-                    && (j.Ms9132Confirmed || !settings.VmaxPanelDevices.Any(v => v.DeviceId == found.DeviceId))));
-                foreach (var found in vmax)
-                {
-                    var existing = settings.VmaxPanelDevices.FirstOrDefault(d => d.DeviceId == found.DeviceId);
-                    if (existing == null)
-                    {
-                        settings.VmaxPanelDevices.Add(new VmaxPanelDevice
-                        {
-                            DeviceId = found.DeviceId,
-                            DeviceLocation = found.DeviceLocation,
-                            Model = found.Model,
-                            TargetFrameRate = found.ModelInfo?.IsValkyrie == true ? 10 : 1,
-                        });
-                        added++;
-                    }
-                    else
-                    {
-                        existing.DeviceLocation = found.DeviceLocation;
-                        existing.Model = found.Model;
-                        updated++;
-                    }
-                }
+                // Shared MS9132 bridges require a positive EDID identity.
+                var scanIssues = new List<string>();
+                var jonsbo = await Task.Run(() => JonsboPanelHelper.ScanDevices(scanIssues));
+                var vmax = await Task.Run(() => VmaxPanelHelper.ScanDevices(scanIssues));
+                var reconciled = InfoPanel.Services.PanelDiscoveryReconciler.Apply(settings, jonsbo, vmax);
+                added += reconciled.Added;
+                updated += reconciled.Updated;
 
                 // Lian Li (encrypted bulk USB)
                 foreach (var found in await LianLiPanelHelper.GetUsbDevices())
@@ -1103,7 +1079,8 @@ namespace InfoPanel.Views.Pages
                     settings.LianLiPanelMultiDeviceMode = true;
 
                 _app.Host.SaveSettings();
-                ScanStatus.Text = $"Scan complete: {added} new, {updated} known device(s).";
+                ScanStatus.Text = $"Scan complete: {added} new, {updated} known device(s)."
+                    + (scanIssues.Count > 0 ? " " + string.Join(" ", scanIssues.Distinct()) : "");
                 RebuildRows();
             }
             catch (Exception ex)

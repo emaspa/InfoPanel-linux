@@ -112,6 +112,12 @@ namespace InfoPanel.Models
         [ObservableProperty]
         private bool _vmaxPanelMultiDeviceMode = false;
 
+        private readonly ObservableCollection<VmaxPanelDevice> _valkyriePanelDevices = [];
+        public ObservableCollection<VmaxPanelDevice> ValkyriePanelDevices => _valkyriePanelDevices;
+
+        [ObservableProperty]
+        private bool _valkyriePanelMultiDeviceMode = false;
+
         private readonly ObservableCollection<JonsboPanelDevice> _jonsboPanelDevices = [];
 
         public ObservableCollection<JonsboPanelDevice> JonsboPanelDevices
@@ -191,6 +197,7 @@ namespace InfoPanel.Models
             ThermaltakePanelDevices.CollectionChanged += ThermaltakePanelDevices_CollectionChanged;
             JlPanelDevices.CollectionChanged += JlPanelDevices_CollectionChanged;
             VmaxPanelDevices.CollectionChanged += VmaxPanelDevices_CollectionChanged;
+            ValkyriePanelDevices.CollectionChanged += ValkyriePanelDevices_CollectionChanged;
             JonsboPanelDevices.CollectionChanged += JonsboPanelDevices_CollectionChanged;
             LianLiPanelDevices.CollectionChanged += LianLiPanelDevices_CollectionChanged;
         }
@@ -366,6 +373,35 @@ namespace InfoPanel.Models
             if (e.PropertyName != nameof(VmaxPanelDevice.RuntimeProperties))
             {
                 OnPropertyChanged(nameof(VmaxPanelDevices));
+            }
+        }
+
+        private void ValkyriePanelDevices_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.OldItems != null)
+            {
+                foreach (VmaxPanelDevice device in e.OldItems)
+                {
+                    device.PropertyChanged -= ValkyrieDevice_PropertyChanged;
+                }
+            }
+
+            if (e.NewItems != null)
+            {
+                foreach (VmaxPanelDevice device in e.NewItems)
+                {
+                    device.PropertyChanged += ValkyrieDevice_PropertyChanged;
+                }
+            }
+
+            OnPropertyChanged(nameof(ValkyriePanelDevices));
+        }
+
+        private void ValkyrieDevice_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(VmaxPanelDevice.RuntimeProperties))
+            {
+                OnPropertyChanged(nameof(ValkyriePanelDevices));
             }
         }
 

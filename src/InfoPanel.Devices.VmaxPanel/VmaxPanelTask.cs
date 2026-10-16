@@ -74,7 +74,7 @@ namespace InfoPanel.Services
 
             try
             {
-                if (DeviceRuntime.Settings.VmaxPanelMultiDeviceMode)
+                if (DeviceRuntime.Settings.VmaxPanelMultiDeviceMode || DeviceRuntime.Settings.ValkyriePanelMultiDeviceMode)
                     await RunMultiDeviceMode(token);
             }
             catch (TaskCanceledException) { }
@@ -91,9 +91,9 @@ namespace InfoPanel.Services
                 try
                 {
                     var settings = DeviceRuntime.Settings;
-                    if (!settings.VmaxPanelMultiDeviceMode) break;
+                    if (!settings.VmaxPanelMultiDeviceMode && !settings.ValkyriePanelMultiDeviceMode) break;
 
-                    var enabledConfigs = settings.VmaxPanelDevices.Where(d => d.Enabled).ToList();
+                    var enabledConfigs = ValkyriePanelSettings.EnabledDevices(settings).ToList();
 
                     foreach (var config in enabledConfigs)
                     {
