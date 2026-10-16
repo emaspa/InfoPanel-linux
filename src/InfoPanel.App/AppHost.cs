@@ -101,6 +101,7 @@ namespace InfoPanel
             // Configuration
             Settings = ConfigPersistence.LoadSettings() ?? new Settings();
             MigrateLianLiDevices();
+            if (ValkyriePanelSettings.Migrate(Settings)) SaveSettings();
             foreach (var profile in ConfigPersistence.LoadProfiles() ?? [])
             {
                 Profiles.Add(profile);
@@ -152,8 +153,9 @@ namespace InfoPanel
                             if (Settings.JlPanelMultiDeviceMode) await JlPanelTask.Instance.StartAsync();
                             break;
                         case nameof(Settings.VmaxPanelMultiDeviceMode):
+                        case nameof(Settings.ValkyriePanelMultiDeviceMode):
                             await VmaxPanelTask.Instance.StopAsync();
-                            if (Settings.VmaxPanelMultiDeviceMode) await VmaxPanelTask.Instance.StartAsync();
+                            if (Settings.VmaxPanelMultiDeviceMode || Settings.ValkyriePanelMultiDeviceMode) await VmaxPanelTask.Instance.StartAsync();
                             break;
                         case nameof(Settings.JonsboPanelMultiDeviceMode):
                             await JonsboPanelTask.Instance.StopAsync();

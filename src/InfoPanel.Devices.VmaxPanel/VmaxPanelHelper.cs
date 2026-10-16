@@ -24,7 +24,7 @@ namespace InfoPanel.VmaxPanel
     {
         private static readonly ILogger Logger = Log.ForContext(typeof(VmaxPanelHelper));
 
-        public static List<VmaxPanelDiscoveryInfo> ScanDevices()
+        public static List<VmaxPanelDiscoveryInfo> ScanDevices(List<string>? issues = null)
         {
             var devices = new List<VmaxPanelDiscoveryInfo>();
 
@@ -32,7 +32,7 @@ namespace InfoPanel.VmaxPanel
             {
                 try
                 {
-                    devices.AddRange(ScanUsbDevices(vendorId, productId));
+                    devices.AddRange(ScanUsbDevices(vendorId, productId, issues));
                 }
                 catch (Exception ex)
                 {
@@ -44,7 +44,12 @@ namespace InfoPanel.VmaxPanel
             return devices;
         }
 
-        private static List<VmaxPanelDiscoveryInfo> ScanUsbDevices(int vendorId, int productId)
+        public static VmaxPanelModelInfo? ModelFromSize((int Width, int Height)? size) =>
+            size is { } geometry
+                ? VmaxPanelModelDatabase.GetModelByPanelSize(geometry.Width, geometry.Height)
+                : null;
+
+        private static List<VmaxPanelDiscoveryInfo> ScanUsbDevices(int vendorId, int productId, List<string>? issues)
         {
             var devices = new List<VmaxPanelDiscoveryInfo>();
             if (vendorId == 0x374A && productId == 0xA021)
@@ -57,15 +62,20 @@ namespace InfoPanel.VmaxPanel
                     continue;
 
                 using var usb = deviceReg.Device;
-                if (usb == null) continue;
+                if (usb == null)
+                {
+                    issues?.Add("LCD USB device could not be opened. Check USB permissions, then scan again.");
+                    Logger.Warning("VmaxPanelHelper: Cannot open USB device; check udev permissions");
+                    continue;
+                }
                 var serial = usb.Info.SerialString ?? "";
                 var hid = hidDevices.FirstOrDefault(h =>
                     !string.IsNullOrEmpty(serial) && h.GetSerialNumber() == serial);
                 // Match both interfaces of the same physical panel before probing.
                 var size = hid == null ? null : Ms9132PanelProbe.ReadSize(hid.DevicePath);
-                var modelInfo = size is { } geometry
-                    ? VmaxPanelModelDatabase.GetModelByPanelSize(geometry.Width, geometry.Height)
-                    : VmaxPanelModelDatabase.GetModelByVidPid(vendorId, productId);
+                var modelInfo = ModelFromSize(size);
+                if (size == null)
+                    issues?.Add("MS9132 panel could not be identified. Check USB/HID permissions, then scan again.");
                 if (modelInfo == null) continue; // e.g. Jonsbo DS339, 376x960
 
                 deviceReg.DeviceProperties.TryGetValue("DeviceID", out var deviceIdValue);

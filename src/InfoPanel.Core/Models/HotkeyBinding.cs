@@ -25,7 +25,7 @@ namespace InfoPanel.Models
         [ObservableProperty]
         private string _key = "None";
 
-        /// <summary>Device type: "Beada", "Turing", "Thermalright", "Thermaltake", "Jl", "Vmax", or "Jonsbo".</summary>
+        /// <summary>Device type: "Beada", "Turing", "Thermalright", "Thermaltake", "Jl", "Vmax", "Valkyrie", or "Jonsbo".</summary>
         [ObservableProperty]
         private string _deviceType = string.Empty;
 

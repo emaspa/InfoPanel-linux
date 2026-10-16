@@ -105,6 +105,9 @@ namespace InfoPanel.ViewModels
                 outputs.AddRange(host.Settings.JlPanelDevices
                     .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
                     .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
+                outputs.AddRange(host.Settings.ValkyriePanelDevices
+                    .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
+                    .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
                 outputs.AddRange(host.Settings.VmaxPanelDevices
                     .Where(d => d.Enabled && d.ProfileGuid == Profile.Guid)
                     .Select(d => d.ModelInfo?.Name ?? d.Model.ToString()));
