@@ -310,11 +310,17 @@ CDC serial JPEG protocol at 2 Mbaud (VID `33C3`):
 | JL Chill Arc 360 | 480×960 |
 | JL Strip Display (OEM SKUs, PID 7791–7810) | 1920×462 |
 
-### VMAX / AuyiHomu
+### VMAX / AuyiHomu / Valkyrie
 
 | Model | Resolution | USB ID |
 |---|---|---|
 | VMAX 4.6" LCD (AuyiHomu HY-001, HY-002) | 320×960 | `345F:9132` |
+| Valkyrie V360 LCD ✓ | 320×240 | `345F:9132` |
+| Valkyrie MC360 LCD (experimental) | 640×480 | `374A:A021`, `Vk-Copl-08` |
+
+See [V360 protocol and hardware validation](docs/VALKYRIE-V360.md) and
+[MC360 protocol and validation limits](docs/VALKYRIE-MC360.md). Only identified
+retail models are listed; matching a screen size alone does not add compatibility.
 
 ### Jonsbo
 
@@ -326,8 +332,8 @@ the OEM JONSBO-AIO app:
 | Jonsbo DS916 ✓ | 462×1920 | Serial `33C3:F101` (HLVMAX, raw JPEG frames) |
 | Jonsbo DS339 ✓ | 376×960 | USB `345F:9132` (MacroSilicon MS9132, HID + bulk UYVY422) |
 
-The DS339 shares its USB ID with the VMAX 4.6"; the device scan reads the
-panel EDID to tell them apart.
+The DS339 shares its USB ID with the VMAX 4.6" and Valkyrie V360; the device
+scan reads the panel EDID to tell them apart.
 
 ### Turing Smart Screen
 

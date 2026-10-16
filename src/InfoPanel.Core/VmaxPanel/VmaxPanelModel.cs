@@ -4,5 +4,7 @@ namespace InfoPanel.VmaxPanel
     {
         Unknown,
         Vmax46Inch,
+        ValkyrieV360,
+        ValkyrieMc360,
     }
 }
