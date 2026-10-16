@@ -15,6 +15,7 @@ namespace InfoPanel.VmaxPanel
         public string DevicePath { get; set; } = "";
         public int VendorId { get; set; }
         public int ProductId { get; set; }
+        public string SerialNumber { get; set; } = "";
         public VmaxPanelModel Model { get; set; }
         public VmaxPanelModelInfo? ModelInfo { get; set; }
     }
@@ -46,19 +47,37 @@ namespace InfoPanel.VmaxPanel
         private static List<VmaxPanelDiscoveryInfo> ScanUsbDevices(int vendorId, int productId)
         {
             var devices = new List<VmaxPanelDiscoveryInfo>();
-            var modelInfo = VmaxPanelModelDatabase.GetModelByVidPid(vendorId, productId);
-            if (modelInfo == null) return devices;
+            if (vendorId == 0x374A && productId == 0xA021)
+                return ValkyrieUsbDevice.ScanDevices();
+            var hidDevices = DeviceList.Local.GetHidDevices(vendorId, productId).ToList();
 
             foreach (UsbRegistry deviceReg in UsbDevice.AllDevices)
             {
                 if (deviceReg.Vid != vendorId || deviceReg.Pid != productId)
                     continue;
 
+                using var usb = deviceReg.Device;
+                if (usb == null) continue;
+                var serial = usb.Info.SerialString ?? "";
+                var hid = hidDevices.FirstOrDefault(h =>
+                    !string.IsNullOrEmpty(serial) && h.GetSerialNumber() == serial);
+                // Match both interfaces of the same physical panel before probing.
+                var size = hid == null ? null : Ms9132PanelProbe.ReadSize(hid.DevicePath);
+                var modelInfo = size is { } geometry
+                    ? VmaxPanelModelDatabase.GetModelByPanelSize(geometry.Width, geometry.Height)
+                    : VmaxPanelModelDatabase.GetModelByVidPid(vendorId, productId);
+                if (modelInfo == null) continue; // e.g. Jonsbo DS339, 376x960
+
                 deviceReg.DeviceProperties.TryGetValue("DeviceID", out var deviceIdValue);
                 deviceReg.DeviceProperties.TryGetValue("LocationInformation", out var locationValue);
 
                 var deviceId = deviceIdValue as string ?? deviceReg.DevicePath;
                 var location = locationValue as string ?? deviceReg.SymbolicName ?? string.Empty;
+                if (modelInfo.Model == VmaxPanelModel.ValkyrieV360)
+                {
+                    deviceId = $@"USB\VID_{vendorId:X4}&PID_{productId:X4}\{serial}";
+                    location = serial;
+                }
 
                 Logger.Information("VmaxPanelHelper: Found {Model} at {DeviceId}", modelInfo.Name, deviceId);
 
@@ -67,6 +86,7 @@ namespace InfoPanel.VmaxPanel
                     DeviceId = deviceId,
                     DeviceLocation = location,
                     DevicePath = deviceReg.DevicePath,
+                    SerialNumber = serial,
                     VendorId = vendorId,
                     ProductId = productId,
                     Model = modelInfo.Model,

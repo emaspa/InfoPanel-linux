@@ -25,6 +25,7 @@ namespace InfoPanel.Services
         public VmaxPanelDeviceTask(VmaxPanelDevice device)
         {
             _device = device;
+            _frameConsumer.ResendCachedOnSkip = device.Model == VmaxPanelModel.ValkyrieV360;
         }
 
         protected override async Task DoWorkAsync(CancellationToken token)
@@ -49,7 +50,15 @@ namespace InfoPanel.Services
                     Logger.Information("VmaxPanelDevice {Device}: Opening USB device (attempt {Retry})",
                         _device, retryCount + 1);
 
-                    using var vmaxDevice = VmaxUsbDevice.Open(_device.DeviceId);
+                    if (_device.Model == VmaxPanelModel.ValkyrieMc360)
+                    {
+                        using var mc360 = ValkyrieUsbDevice.Open(_device.DeviceId)
+                            ?? throw new IOException("MC360 device not found.");
+                        retryCount = 0;
+                        await RunValkyrieLoop(mc360, token);
+                        continue;
+                    }
+                    using var vmaxDevice = VmaxUsbDevice.Open(_device.DeviceId, _device.Model);
                     if (vmaxDevice == null)
                     {
                         _device.UpdateRuntimeProperties(errorMessage: "Device not found");
@@ -59,7 +68,10 @@ namespace InfoPanel.Services
                     }
 
                     retryCount = 0;
-                    await RunRenderSendLoop(vmaxDevice, token);
+                    if (modelInfo.IsValkyrie)
+                        await RunValkyrieLoop(vmaxDevice, token);
+                    else
+                        await RunRenderSendLoop(vmaxDevice, token);
                 }
                 catch (OperationCanceledException)
                 {
@@ -81,6 +93,36 @@ namespace InfoPanel.Services
             }
         }
 
+        private async Task RunValkyrieLoop(IValkyriePanelDevice device, CancellationToken token)
+        {
+            FpsCounter fpsCounter = new(30);
+            _device.UpdateRuntimeProperties(isRunning: true, errorMessage: string.Empty);
+            // One producer/sender owns the reusable pixel buffer. Only the tested
+            // V360 path resends static frames; experimental panels update on change.
+            (int Brightness, LCD_ROTATION Rotation, Guid Profile, bool Screen)? lastOptions = null;
+            while (!token.IsCancellationRequested)
+            {
+                var options = (_device.Brightness, _device.Rotation, _device.ProfileGuid, _device.ScreenSwitch);
+                if (lastOptions != options)
+                {
+                    _frameConsumer.Invalidate();
+                    lastOptions = options;
+                }
+                var stopwatch = Stopwatch.StartNew();
+                var frame = GenerateFrame();
+                if (frame is { } ready)
+                {
+                    device.SendFrame(ready.Buffer, ready.Length);
+                    fpsCounter.Update(stopwatch.ElapsedMilliseconds);
+                    _device.UpdateRuntimeProperties(frameRate: fpsCounter.FramesPerSecond, frameTime: fpsCounter.FrameTime);
+                }
+                device.SetScreenSwitch(_device.ScreenSwitch);
+                device.KeepAlive();
+                var delay = 1000 / Math.Clamp(_device.TargetFrameRate, 1, 30) - (int)stopwatch.ElapsedMilliseconds;
+                if (delay > 0) await Task.Delay(delay, token);
+            }
+        }
+
         private async Task RunRenderSendLoop(VmaxUsbDevice vmaxDevice, CancellationToken token)
         {
             using var renderCts = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -98,7 +140,7 @@ namespace InfoPanel.Services
                 {
                     while (!renderToken.IsCancellationRequested)
                     {
-                        var frame = GenerateUyvyFrame();
+                        var frame = GenerateFrame();
                         if (frame == null)
                         {
                             // Content unchanged: nothing to send; pace the loop.
@@ -183,7 +225,7 @@ namespace InfoPanel.Services
         private readonly SharedFrameConsumer _frameConsumer = new();
 
         /// <summary>Returns null when the profile content has not changed (frame skipped).</summary>
-        private RenderedFrame? GenerateUyvyFrame()
+        private RenderedFrame? GenerateFrame()
         {
             if (DeviceRuntime.GetProfile(_device.ProfileGuid) is Profile profile)
             {
@@ -194,9 +236,14 @@ namespace InfoPanel.Services
                     try
                     {
                         var length = resizedBitmap.Width * resizedBitmap.Height * 2;
-                        var output = ArrayPool<byte>.Shared.Rent(length);
-                        ToUyvy(resizedBitmap, output, _device.Brightness);
-                        return (object)new RenderedFrame(output, length);
+                        bool pooled = !_device.ModelInfo!.IsValkyrie;
+                        var output = pooled ? ArrayPool<byte>.Shared.Rent(length) : (_rawPixels ??= new byte[length]);
+                        if (!_device.ModelInfo.UsesBgr565)
+                            ToUyvy(resizedBitmap, output, _device.Brightness);
+                        else
+                            ValkyrieUsbProtocol.ConvertRgba(resizedBitmap.GetPixelSpan(), resizedBitmap.Width,
+                                resizedBitmap.Height, resizedBitmap.RowBytes, output, _device.Brightness);
+                        return (object)new RenderedFrame(output, length, ReturnToPool: pooled);
                     }
                     finally
                     {
@@ -259,6 +306,7 @@ namespace InfoPanel.Services
         }
 
         private byte[]? _cachedBlackUyvy;
+        private byte[]? _rawPixels;
 
         private byte[] GenerateBlackUyvy()
         {
@@ -266,7 +314,7 @@ namespace InfoPanel.Services
             {
                 // Black in UYVY is Y=16, U=V=128 - an all-zero buffer would be green.
                 _cachedBlackUyvy = new byte[_panelWidth * _panelHeight * 2];
-                for (int i = 0; i < _cachedBlackUyvy.Length; i += 2)
+                for (int i = 0; !_device.ModelInfo!.UsesBgr565 && i < _cachedBlackUyvy.Length; i += 2)
                 {
                     _cachedBlackUyvy[i] = 0x80;
                     _cachedBlackUyvy[i + 1] = 0x10;

@@ -8,7 +8,7 @@ using System.Threading;
 
 namespace InfoPanel.VmaxPanel
 {
-    public sealed class VmaxUsbDevice : IDisposable
+    public sealed class VmaxUsbDevice : IDisposable, IValkyriePanelDevice
     {
         private static readonly ILogger Logger = Log.ForContext<VmaxUsbDevice>();
 
@@ -97,12 +97,15 @@ namespace InfoPanel.VmaxPanel
         private DateTime _lastStreamingStatusPolled = DateTime.MinValue;
         private byte[]? _frameBuffer;
         private bool _hasSentFrame;
+        private VmaxPanelModel _model;
+        private long _framesSent;
+        private static readonly byte[] V360FramePrefix = [0xFF, 0, 0, 0, 0, 0x14, 0, 0xF0];
         private bool? _currentScreenSwitch;
         private bool _disposed;
 
         private VmaxUsbDevice() { }
 
-        public static VmaxUsbDevice? Open(string deviceId)
+        public static VmaxUsbDevice? Open(string deviceId, VmaxPanelModel model = VmaxPanelModel.Vmax46Inch)
         {
             foreach (UsbRegistry deviceReg in UsbDevice.AllDevices)
             {
@@ -112,7 +115,7 @@ namespace InfoPanel.VmaxPanel
 
                 deviceReg.DeviceProperties.TryGetValue("DeviceID", out var registryDeviceIdValue);
                 var registryDeviceId = registryDeviceIdValue as string;
-                if (!string.IsNullOrEmpty(deviceId)
+                if (model != VmaxPanelModel.ValkyrieV360 && !string.IsNullOrEmpty(deviceId)
                     && !IsMatchingDevice(deviceId, registryDeviceId, deviceReg.DevicePath))
                     continue;
 
@@ -123,24 +126,49 @@ namespace InfoPanel.VmaxPanel
                     continue;
                 }
 
-                var device = new VmaxUsbDevice { _usbDevice = usbDevice };
+                var device = new VmaxUsbDevice { _usbDevice = usbDevice, _model = model };
 
-                if (usbDevice is IUsbDevice wholeUsbDevice)
+                try
                 {
-                    device._wholeUsbDevice = wholeUsbDevice;
-                    var claimed = wholeUsbDevice.ClaimInterface(InterfaceNumber);
-                    Logger.Information(
-                        "VmaxUsbDevice: ClaimInterface({Interface})={Claimed}",
-                        InterfaceNumber,
-                        claimed);
+                    if (model == VmaxPanelModel.ValkyrieV360
+                        && !string.Equals(deviceId, $@"USB\VID_345F&PID_9132\{usbDevice.Info.SerialString}", StringComparison.Ordinal))
+                    {
+                        device.Dispose();
+                        continue;
+                    }
+
+                    if (usbDevice is IUsbDevice wholeUsbDevice)
+                    {
+                        device._wholeUsbDevice = wholeUsbDevice;
+                        var claimed = wholeUsbDevice.ClaimInterface(InterfaceNumber);
+                        if (!claimed)
+                            throw new IOException("Cannot claim MS9132 display interface 3: " + UsbDevice.LastErrorString);
+                        Logger.Information(
+                            "VmaxUsbDevice: ClaimInterface({Interface})={Claimed}",
+                            InterfaceNumber,
+                            claimed);
+                    }
+
+                    if (model == VmaxPanelModel.ValkyrieV360)
+                    {
+                        device._hidRaw = OpenValkyrieHid(usbDevice.Info.SerialString);
+                        ValkyrieV360Protocol.Initialize(device.ValkyrieCommand);
+                    }
+                    else
+                    {
+                        device._hidRaw = InitializeStreamingMode();
+                    }
+
+                    var writeEndpoint = FindWriteEndpoint(usbDevice);
+                    device._writer = usbDevice.OpenEndpointWriter(writeEndpoint);
+                    Logger.Information("VmaxUsbDevice: Opened {DeviceId} using endpoint 0x{Endpoint:X2}", registryDeviceId ?? deviceReg.DevicePath, (byte)writeEndpoint);
+                    return device;
                 }
-
-                device._hidRaw = InitializeStreamingMode();
-
-                var writeEndpoint = FindWriteEndpoint(usbDevice);
-                device._writer = usbDevice.OpenEndpointWriter(writeEndpoint);
-                Logger.Information("VmaxUsbDevice: Opened {DeviceId} using endpoint 0x{Endpoint:X2}", registryDeviceId ?? deviceReg.DevicePath, (byte)writeEndpoint);
-                return device;
+                catch
+                {
+                    device.Dispose();
+                    throw;
+                }
             }
 
             Logger.Warning(
@@ -148,6 +176,26 @@ namespace InfoPanel.VmaxPanel
                 deviceId,
                 InterfaceNumber);
             return null;
+        }
+
+        private static LinuxHidRawFeature OpenValkyrieHid(string serial)
+        {
+            // Match the HID and video handles by serial, not by the shared VID/PID.
+            // Never initialize another attached MS9132 screen by accident.
+            if (string.IsNullOrEmpty(serial))
+                throw new IOException("V360 USB serial is unavailable; cannot safely match the HID interface.");
+            var hid = DeviceList.Local.GetHidDevices(0x345F, 0x9132)
+                .FirstOrDefault(h => string.Equals(h.GetSerialNumber(), serial, StringComparison.Ordinal));
+            if (hid == null || Ms9132PanelProbe.ReadSize(hid.DevicePath) != (320, 240))
+                throw new IOException("The selected USB device is not a confirmed 320x240 V360 panel.");
+            return LinuxHidRawFeature.Open(hid.DevicePath)
+                ?? throw new IOException("Cannot open V360 HID interface; check udev permissions.");
+        }
+
+        private void ValkyrieCommand(byte[] payload, bool readReply)
+        {
+            _hidRaw!.SetFeature(payload);
+            if (readReply) _hidRaw.GetFeature();
         }
 
         private static bool IsMatchingDevice(string requestedDeviceId, string? registryDeviceId, string? devicePath)
@@ -302,11 +350,14 @@ namespace InfoPanel.VmaxPanel
             if (pixelDataLength < 0 || pixelDataLength > pixelData.Length)
                 throw new ArgumentOutOfRangeException(nameof(pixelDataLength));
 
-            var frameLength = FramePrefix.Length + pixelDataLength + FrameSuffix.Length;
+            var prefix = _model == VmaxPanelModel.ValkyrieV360 ? V360FramePrefix : FramePrefix;
+            if (_model == VmaxPanelModel.ValkyrieV360 && pixelDataLength != ValkyrieV360Protocol.PixelDataLength)
+                throw new ArgumentException("V360 requires exactly 320x240 UYVY pixels.", nameof(pixelDataLength));
+            var frameLength = prefix.Length + pixelDataLength + FrameSuffix.Length;
             if (_frameBuffer == null || _frameBuffer.Length != frameLength)
             {
                 _frameBuffer = new byte[frameLength];
-                Buffer.BlockCopy(FramePrefix, 0, _frameBuffer, 0, FramePrefix.Length);
+                Buffer.BlockCopy(prefix, 0, _frameBuffer, 0, prefix.Length);
                 Buffer.BlockCopy(FrameSuffix, 0, _frameBuffer, FramePrefix.Length + pixelDataLength, FrameSuffix.Length);
             }
 
@@ -325,8 +376,19 @@ namespace InfoPanel.VmaxPanel
                 offset += bytesWritten;
             }
 
+            if (_model == VmaxPanelModel.ValkyrieV360)
+            {
+                if (!_hasSentFrame)
+                    ValkyrieV360Protocol.PostFrame(ValkyrieCommand);
+                else if (_framesSent % ValkyrieV360Protocol.CommitEveryFrames == 0)
+                    ValkyrieCommand([0xB5, 0x00, 0x32], true);
+                _framesSent++;
+            }
+            else
+            {
+                PollStreamingStatusIfDue();
+            }
             _hasSentFrame = true;
-            PollStreamingStatusIfDue();
         }
 
         public void SetScreenSwitch(bool enabled)
@@ -336,6 +398,13 @@ namespace InfoPanel.VmaxPanel
 
             try
             {
+                if (_model == VmaxPanelModel.ValkyrieV360)
+                {
+                    // VMAX's B6 F0 05 backlight register is not verified on V360.
+                    ValkyrieCommand([0xA6, 0x05, enabled ? (byte)1 : (byte)0], false);
+                    _currentScreenSwitch = enabled;
+                    return;
+                }
                 byte[] response = [];
                 foreach (var featureReport in GetScreenSwitchFeatureReports(enabled))
                 {
@@ -384,6 +453,9 @@ namespace InfoPanel.VmaxPanel
                 Logger.Warning(ex, "VmaxUsbDevice: Streaming status poll failed; continuing frame transfer.");
             }
         }
+
+        void IValkyriePanelDevice.SendFrame(byte[] pixels, int length) => SendUyvyFrame(pixels, length);
+        void IValkyriePanelDevice.KeepAlive() { }
 
         public void Dispose()
         {
