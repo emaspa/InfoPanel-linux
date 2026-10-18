@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.3.7 alpha: Turzx 5&quot; found again after replug, reboot or sleep" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.3.8 alpha: Valkyrie V360 and MC360 LCDs" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="The Valkyrie V360 AIO screen (320x240) now has its own Valkyrie section on the Devices page. It shares its USB ID with the VMAX 4.6&quot; and Jonsbo DS339, so Scan reads the panel's EDID to tell them apart, and a V360 that an earlier release added as a VMAX or DS339 is moved over with its settings. The Valkyrie MC360 (640x480) is supported too, but nobody has tested it on real hardware yet. Contributed by EsiksonX (#13)." />
+                        <TextBlock Text="v0.3.7 alpha: Turzx 5&quot; found again after replug, reboot or sleep" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Serial Turing panels were reopened on the /dev/ttyACM path saved at Scan time, but those numbers change after a replug, reboot or panel sleep, so the panel could stay dark until the next Scan. InfoPanel now looks the port up again by USB ID every time the panel starts. A Turzx 5&quot; that is asleep (showing up only as the CT21INCH port, 1a86:ca21) is now woken the way turing-smart-screen-python does it. Reported by Goliohs (#1)." />
                         <TextBlock Text="v0.3.6 alpha: panels sleep and wake with the system" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
