@@ -43,8 +43,8 @@ if [ -S /run/udev/control ]; then
     # Reloading rules alone only affects the next plug-in event.
     for device in /sys/bus/usb/devices/*; do
         [ -r "$device/idVendor" ] && [ -r "$device/idProduct" ] || continue
-        read -r vendor < "$device/idVendor"
-        read -r product < "$device/idProduct"
+        vendor="$(cat "$device/idVendor")"
+        product="$(cat "$device/idProduct")"
         case "$vendor:$product" in
             345f:9132|374a:a021)
                 udevadm trigger --action=change "$device" || :
