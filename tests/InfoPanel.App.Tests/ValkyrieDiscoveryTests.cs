@@ -54,6 +54,48 @@ public class ValkyrieDiscoveryTests
         Assert.Single(settings.ValkyriePanelDevices);
     }
 
+    [Theory]
+    [InlineData(320, 240, VmaxPanelModel.ValkyrieV360)]
+    [InlineData(320, 960, VmaxPanelModel.Vmax46Inch)]
+    [InlineData(960, 320, VmaxPanelModel.Vmax46Inch)] // VMAX EDID not yet captured: keep the old path
+    [InlineData(376, 960, VmaxPanelModel.Unknown)]
+    public void ReadableEdidKeepsVmaxAsTheFallback(int width, int height, VmaxPanelModel expected)
+    {
+        Assert.Equal(expected, VmaxPanelHelper.ClassifyMs9132((width, height))?.Model ?? VmaxPanelModel.Unknown);
+    }
+
+    [Fact]
+    public void VmaxInitSkipsOnlyPositivelyIdentifiedOtherPanels()
+    {
+        Assert.True(VmaxPanelHelper.IsOtherMs9132Panel((320, 240)));
+        Assert.True(VmaxPanelHelper.IsOtherMs9132Panel((376, 960)));
+        Assert.False(VmaxPanelHelper.IsOtherMs9132Panel((320, 960)));
+        Assert.False(VmaxPanelHelper.IsOtherMs9132Panel(null));
+    }
+
+    [Fact]
+    public void ConfirmedV360ReplacesTheVmaxEntryEarlierReleasesCreated()
+    {
+        var profile = Guid.NewGuid();
+        var settings = new Settings { VmaxPanelMultiDeviceMode = true };
+        settings.VmaxPanelDevices.Add(new VmaxPanelDevice
+        {
+            DeviceId = "/dev/bus/usb/001/005", Model = VmaxPanelModel.Vmax46Inch,
+            ProfileGuid = profile, Enabled = true, Brightness = 40, Rotation = LCD_ROTATION.Rotate180FlipNone,
+        });
+        settings.HotkeyBindings.Add(new HotkeyBinding { DeviceId = "/dev/bus/usb/001/005", DeviceType = "Vmax", ProfileGuid = profile });
+        var found = V360();
+        found.LegacyDeviceId = "/dev/bus/usb/001/005";
+        Assert.Equal((1, 0), PanelDiscoveryReconciler.Apply(settings, [], [found]));
+        Assert.Empty(settings.VmaxPanelDevices);
+        Assert.False(settings.VmaxPanelMultiDeviceMode);
+        var device = Assert.Single(settings.ValkyriePanelDevices);
+        Assert.Equal((profile, true, 40, LCD_ROTATION.Rotate180FlipNone),
+            (device.ProfileGuid, device.Enabled, device.Brightness, device.Rotation));
+        Assert.True(settings.ValkyriePanelMultiDeviceMode);
+        Assert.Equal(("Valkyrie", DeviceId), (settings.HotkeyBindings[0].DeviceType, settings.HotkeyBindings[0].DeviceId));
+    }
+
     [Fact]
     public void UnknownScanDoesNotDeleteSavedConfigurationsOrGuessModel()
     {

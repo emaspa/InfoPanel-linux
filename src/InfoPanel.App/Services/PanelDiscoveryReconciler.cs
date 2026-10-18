@@ -37,9 +37,14 @@ public static class PanelDiscoveryReconciler
             var family = isValkyrie ? settings.ValkyriePanelDevices : settings.VmaxPanelDevices;
             var wasEmpty = family.Count == 0;
             var existing = family.FirstOrDefault(d => Same(d.DeviceId, found.DeviceId));
-            // Only confirmed V360 geometry permits removing the old erroneous DS339.
-            var stale = found.Model == VmaxPanelModel.ValkyrieV360
+            // Only confirmed V360 geometry permits removing the entries earlier releases
+            // created for it: a DS339 when its EDID was unreadable, otherwise a VMAX 4.6".
+            var isV360 = found.Model == VmaxPanelModel.ValkyrieV360;
+            var stale = isV360
                 ? settings.JonsboPanelDevices.FirstOrDefault(d => d.Model == JonsboPanelModel.DS339 && Same(d.DeviceId, found.DeviceId))
+                : null;
+            var staleVmax = isV360 && !string.IsNullOrEmpty(found.LegacyDeviceId)
+                ? settings.VmaxPanelDevices.FirstOrDefault(d => d.Model == VmaxPanelModel.Vmax46Inch && Same(d.DeviceId, found.LegacyDeviceId))
                 : null;
             if (existing == null)
             {
@@ -48,9 +53,10 @@ public static class PanelDiscoveryReconciler
                     DeviceId = found.DeviceId, DeviceLocation = found.DeviceLocation, Model = found.Model,
                     TargetFrameRate = isValkyrie ? 10 : 1,
                     // Preserve assignments, but don't start a previously disabled device.
-                    ProfileGuid = stale?.ProfileGuid ?? Guid.Empty,
-                    Enabled = stale?.Enabled ?? false,
-                    Brightness = stale?.Brightness ?? 99,
+                    ProfileGuid = staleVmax?.ProfileGuid ?? stale?.ProfileGuid ?? Guid.Empty,
+                    Enabled = staleVmax?.Enabled ?? stale?.Enabled ?? false,
+                    Brightness = staleVmax?.Brightness ?? stale?.Brightness ?? 99,
+                    Rotation = staleVmax?.Rotation ?? default,
                 };
                 family.Add(existing);
                 added++;
@@ -67,6 +73,17 @@ public static class PanelDiscoveryReconciler
                 foreach (var binding in settings.HotkeyBindings.Where(b => b.DeviceType == "Jonsbo" && Same(b.DeviceId, stale.DeviceId)))
                     binding.DeviceType = "Valkyrie";
                 if (settings.JonsboPanelDevices.Count == 0) settings.JonsboPanelMultiDeviceMode = false;
+            }
+            if (staleVmax != null)
+            {
+                // The V360 is now keyed by serial, so hotkeys move to the new ID as well.
+                settings.VmaxPanelDevices.Remove(staleVmax);
+                foreach (var binding in settings.HotkeyBindings.Where(b => b.DeviceType == "Vmax" && Same(b.DeviceId, staleVmax.DeviceId)))
+                {
+                    binding.DeviceType = "Valkyrie";
+                    binding.DeviceId = found.DeviceId;
+                }
+                if (settings.VmaxPanelDevices.Count == 0) settings.VmaxPanelMultiDeviceMode = false;
             }
             if (wasEmpty)
             {

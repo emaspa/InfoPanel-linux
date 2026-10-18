@@ -255,6 +255,16 @@ namespace InfoPanel.VmaxPanel
                 LinuxHidRawFeature? raw = null;
                 try
                 {
+                    // The bridge's VID/PID is shared: never run the VMAX init on a panel
+                    // whose EDID says it is a V360 or DS339 (e.g. a stale VMAX entry).
+                    var size = Ms9132PanelProbe.ReadSize(hidDevice.DevicePath);
+                    if (VmaxPanelHelper.IsOtherMs9132Panel(size))
+                    {
+                        Logger.Information("VmaxUsbDevice: Skipping {Path}, EDID {W}x{H} is not a VMAX panel",
+                            hidDevice.DevicePath, size!.Value.Width, size.Value.Height);
+                        continue;
+                    }
+
                     Logger.Information("VmaxUsbDevice: Trying HID init via {Path}", hidDevice.DevicePath);
 
                     raw = LinuxHidRawFeature.Open(hidDevice.DevicePath);
@@ -358,10 +368,10 @@ namespace InfoPanel.VmaxPanel
             {
                 _frameBuffer = new byte[frameLength];
                 Buffer.BlockCopy(prefix, 0, _frameBuffer, 0, prefix.Length);
-                Buffer.BlockCopy(FrameSuffix, 0, _frameBuffer, FramePrefix.Length + pixelDataLength, FrameSuffix.Length);
+                Buffer.BlockCopy(FrameSuffix, 0, _frameBuffer, prefix.Length + pixelDataLength, FrameSuffix.Length);
             }
 
-            Buffer.BlockCopy(pixelData, 0, _frameBuffer, FramePrefix.Length, pixelDataLength);
+            Buffer.BlockCopy(pixelData, 0, _frameBuffer, prefix.Length, pixelDataLength);
 
             var offset = 0;
             while (offset < _frameBuffer.Length)
