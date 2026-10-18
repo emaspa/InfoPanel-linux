@@ -323,9 +323,9 @@ CDC serial JPEG protocol at 2 Mbaud (VID `33C3`):
 | Valkyrie V360 LCD ✓ | 320×240 | `345F:9132` |
 | Valkyrie MC360 LCD (experimental) | 640×480 | `374A:A021`, `Vk-Copl-08` |
 
-See [V360 protocol and hardware validation](docs/VALKYRIE-V360.md) and
-[MC360 protocol and validation limits](docs/VALKYRIE-MC360.md). Only identified
-retail models are listed; matching a screen size alone does not add compatibility.
+Protocol details and test status are in [docs/VALKYRIE-V360.md](docs/VALKYRIE-V360.md)
+and [docs/VALKYRIE-MC360.md](docs/VALKYRIE-MC360.md). Only identified retail
+models are listed; a matching screen size alone doesn't make a panel supported.
 
 ### Jonsbo
 
@@ -585,6 +585,8 @@ rendering backend for diagnosing platform issues.
 - [ozgurce](https://github.com/ozgurce): the standalone Lian Li family
   (Universal Screen and HydroShift II models).
 - [yattuLizard](https://github.com/yattuLizard): VMAX / AuyiHomu panel
+  support.
+- [EsiksonX](https://github.com/EsiksonX): Valkyrie V360 and MC360 panel
   support.
 - [fweepa](https://github.com/fweepa): stopwatch plugin and hotkeys.
 - [Orkunowski](https://github.com/Orkunowski): designer UX improvements.
