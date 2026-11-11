@@ -187,10 +187,12 @@ Key design points:
   every 100 ms, until something changes. Thermalright panels send frames
   on a fixed schedule, so render and encode time don't lower their frame
   rate. JPEG encoding uses libjpeg-turbo and runs outside the shared-frame
-  lock. ffmpeg scales video to the size it is drawn at. When a video file
-  has at least 1.5 times that many pixels, InfoPanel re-encodes it once at
-  that size into `~/.cache/infopanel/video` and plays the copy. For a
-  2400x1080 file on a 1600x720 panel that halves ffmpeg's CPU use. Plugin-image
+  lock. ffmpeg scales video to the size it is drawn at. With hardware
+  decoding off, a video file with at least 1.5 times that many pixels is
+  re-encoded once at that size into `~/.cache/infopanel/video` and played
+  from the copy. For a 2400x1080 file on a 1600x720 panel that halves
+  ffmpeg's CPU use. With it on, ffmpeg decodes and scales on an integrated
+  GPU through VA-API in preference to CUDA. Plugin-image
   resamples are cached per frame and output size, and static images, glow
   text, text layouts and font lookups are cached while unchanged. Frames
   are drawn on the CPU by default. Settings can move them to any GPU that

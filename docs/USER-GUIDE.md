@@ -157,7 +157,9 @@ Don't expect a big CPU saving. The CPU renderer draws a typical panel frame in a
 
 If you game on the discrete GPU, pick the integrated one, so the panels never compete with the game for the card. On a laptop, rendering on the discrete GPU keeps it from sleeping.
 
-**Hardware video decoding**, under the same heading, is a separate switch for video items. It lets ffmpeg decode on the GPU, which cut ffmpeg from about 0.19 to 0.09 of a CPU core for a 2400x1080 video in our tests. It is off by default because some VA-API drivers stall. If a video stops updating with it on, InfoPanel restarts ffmpeg for that video without hardware decoding.
+**Hardware video decoding**, under the same heading, is a separate switch for video items. With it on, ffmpeg decodes and scales video on a GPU: the one picked under "Render panels on" if there is one, otherwise an integrated GPU through VA-API, and an NVIDIA card through CUDA only when nothing else can. For a 2400x1080 video on a 1600x720 panel, the AMD integrated GPU brought ffmpeg to 0.08 of a CPU core and 225 MB. CUDA on an RTX 5090 used about the same CPU but 410 MB.
+
+The switch is off by default. In software, InfoPanel plays large videos from a scaled copy, which costs about 0.09 of a core, so the GPU saves little there. It helps most with RTSP streams and with videos that get no scaled copy. Some VA-API drivers have also stalled. If a video stops updating, or the GPU can't decode it, InfoPanel restarts ffmpeg for that video in software.
 
 ## Hotkeys
 

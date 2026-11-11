@@ -6,8 +6,10 @@ namespace InfoPanel.App.Tests
 {
     public class FfmpegArgumentTests
     {
+        private static readonly HardwareDecoder Auto = new(HardwareDecodeApi.Auto);
+
         private static string Join(bool isLive, (int, int)? scale, bool hwaccel, string source = "/videos/a b.mp4") =>
-            string.Join(' ', FfmpegVideoDecoder.BuildArguments(source, isLive, scale, hwaccel));
+            string.Join(' ', FfmpegVideoDecoder.BuildArguments(source, isLive, scale, hwaccel ? Auto : null));
 
         [Fact]
         public void File_NoScale_NoHwaccel()
@@ -20,7 +22,7 @@ namespace InfoPanel.App.Tests
         [Fact]
         public void File_Scale_Hwaccel()
         {
-            var args = FfmpegVideoDecoder.BuildArguments("/v.mp4", isLive: false, (1600, 720), hwaccel: true);
+            var args = FfmpegVideoDecoder.BuildArguments("/v.mp4", isLive: false, (1600, 720), Auto);
 
             Assert.Equal(
                 "-hide_banner -loglevel error -nostdin -hwaccel auto -stream_loop -1 -threads 4 -i /v.mp4 -an -sn -filter_threads 1 -vf scale=1600:720:flags=bilinear -f rawvideo -pix_fmt rgba pipe:1",
@@ -38,7 +40,7 @@ namespace InfoPanel.App.Tests
         [Fact]
         public void SourceWithSpacesAndQuotes_IsOneArgument()
         {
-            var args = FfmpegVideoDecoder.BuildArguments("/v/it's \"x\".mp4", isLive: false, null, hwaccel: false);
+            var args = FfmpegVideoDecoder.BuildArguments("/v/it's \"x\".mp4", isLive: false, null, null);
             Assert.Equal("/v/it's \"x\".mp4", args[args.IndexOf("-i") + 1]);
         }
 
@@ -58,6 +60,42 @@ namespace InfoPanel.App.Tests
             Assert.StartsWith(
                 "-hide_banner -loglevel error -nostdin -hwaccel auto -rtsp_transport tcp -threads 4 -i rtsp://cam",
                 Join(isLive: true, scale: null, hwaccel: true, source: "rtsp://cam"));
+        }
+
+        private static readonly HardwareDecoder Vaapi = new(HardwareDecodeApi.Vaapi, "/dev/dri/renderD129");
+        private static readonly HardwareDecoder Cuda = new(HardwareDecodeApi.Cuda);
+
+        [Fact]
+        public void Vaapi_EvenSize_ScalesOnTheGpu()
+        {
+            Assert.Equal(
+                "-hide_banner -loglevel error -nostdin -hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -hwaccel_output_format vaapi -stream_loop -1 -threads 4 -i /v.mp4 -an -sn -filter_threads 1 -vf scale_vaapi=w=1600:h=720:format=nv12,hwdownload,format=nv12 -f rawvideo -pix_fmt rgba pipe:1",
+                string.Join(' ', FfmpegVideoDecoder.BuildArguments("/v.mp4", isLive: false, (1600, 720), Vaapi)));
+        }
+
+        [Fact]
+        public void Cuda_EvenSize_ScalesOnTheGpu()
+        {
+            var joined = string.Join(' ', FfmpegVideoDecoder.BuildArguments("/v.mp4", isLive: false, (1600, 720), Cuda));
+            Assert.Contains("-hwaccel cuda -hwaccel_output_format cuda -stream_loop", joined);
+            Assert.Contains("-vf scale_cuda=w=1600:h=720:format=nv12,hwdownload,format=nv12", joined);
+        }
+
+        [Fact]
+        public void Vaapi_OddSize_DownloadsAndScalesOnTheCpu()
+        {
+            var joined = string.Join(' ', FfmpegVideoDecoder.BuildArguments("/v.mp4", isLive: false, (801, 450), Vaapi));
+            Assert.Contains("-hwaccel vaapi -hwaccel_device /dev/dri/renderD129 -stream_loop", joined);
+            Assert.DoesNotContain("hwaccel_output_format", joined);
+            Assert.Contains("-vf scale=801:450:flags=bilinear", joined);
+        }
+
+        [Fact]
+        public void Vaapi_NoScale_KeepsFramesOnTheCpu()
+        {
+            var joined = string.Join(' ', FfmpegVideoDecoder.BuildArguments("rtsp://cam", isLive: true, (1600, 720), Vaapi));
+            Assert.DoesNotContain("hwaccel_output_format", joined);
+            Assert.DoesNotContain("-vf", joined);
         }
 
         [Theory]

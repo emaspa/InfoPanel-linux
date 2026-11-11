@@ -1,3 +1,4 @@
+using InfoPanel.Gpu;
 using InfoPanel.Utils;
 using Serilog;
 using SkiaSharp;
@@ -47,9 +48,10 @@ namespace InfoPanel.Video
         private static volatile bool _hardwareDecode;
 
         /// <summary>
-        /// Adds <c>-hwaccel auto</c> to ffmpeg (Settings.HardwareVideoDecode, pushed by the
-        /// host). Off by default: it saves little CPU, wakes a sleeping dGPU on hybrid
-        /// laptops, and one driver deadlocked under it. Changing it restarts running
+        /// Decodes and scales on a GPU picked by <see cref="VideoHardwareDecoder"/>
+        /// (Settings.HardwareVideoDecode, pushed by the host). Off by default: with
+        /// scaled copies software decoding costs about the same, a GPU may be woken
+        /// up for it, and one driver deadlocked under it. Changing it restarts running
         /// decoders so the toggle applies immediately.
         /// </summary>
         public static bool HardwareDecode
@@ -177,16 +179,41 @@ namespace InfoPanel.Video
         /// <summary>
         /// ffmpeg command line. <paramref name="scale"/> null keeps the source size;
         /// live sources ignore it (a restart there is a multi-second reconnect).
+        /// <paramref name="hw"/> null decodes in software.
         /// </summary>
-        internal static List<string> BuildArguments(string source, bool isLive, (int Width, int Height)? scale, bool hwaccel)
+        internal static List<string> BuildArguments(string source, bool isLive, (int Width, int Height)? scale, HardwareDecoder? hw)
         {
             List<string> args = ["-hide_banner", "-loglevel", "error", "-nostdin"];
 
-            // Before -i: an input option. Falls back to software decode on its own when
-            // the stream is unsupported ("Failed setup for format cuda").
-            if (hwaccel)
+            if (isLive)
             {
-                args.AddRange(["-hwaccel", "auto"]);
+                scale = null;
+            }
+
+            // Scaling on the GPU sends smaller frames back over the bus and skips the
+            // CPU scale: 0.123 -> 0.083 cores on VA-API for 2400x1080 at 1600x720.
+            // The GPU scalers output NV12, which needs even sizes; odd ones download
+            // full-size frames and scale on the CPU.
+            var gpuScale = scale is { } even && even.Width % 2 == 0 && even.Height % 2 == 0
+                && hw?.Api is HardwareDecodeApi.Vaapi or HardwareDecodeApi.Cuda;
+
+            // Input options, before -i. Without -hwaccel_output_format ffmpeg falls back
+            // to software decode on its own when the GPU can't decode the stream. With
+            // it, frames must stay on the GPU and ffmpeg exits instead; the read loop
+            // then retries this source in software.
+            switch (hw?.Api)
+            {
+                case HardwareDecodeApi.Vaapi:
+                    args.AddRange(["-hwaccel", "vaapi", "-hwaccel_device", hw.Device!]);
+                    if (gpuScale) args.AddRange(["-hwaccel_output_format", "vaapi"]);
+                    break;
+                case HardwareDecodeApi.Cuda:
+                    args.AddRange(["-hwaccel", "cuda"]);
+                    if (gpuScale) args.AddRange(["-hwaccel_output_format", "cuda"]);
+                    break;
+                case HardwareDecodeApi.Auto:
+                    args.AddRange(["-hwaccel", "auto"]);
+                    break;
             }
 
             // No -re for file sources: combined with -stream_loop it stalls at every
@@ -209,11 +236,13 @@ namespace InfoPanel.Video
             // 4K60 file at 2.7x real time.
             args.AddRange(["-threads", "4", "-i", source, "-an", "-sn", "-filter_threads", "1"]);
 
-            // Software scale also after hardware decode: scale_cuda needs even sizes and
-            // cannot output RGBA on every build. Odd sizes are fine for swscale RGB output.
-            if (!isLive && scale is { } size)
+            if (scale is { } size)
             {
-                args.AddRange(["-vf", $"scale={size.Width}:{size.Height}:flags=bilinear"]);
+                // The GPU scalers can't output RGBA on every build: NV12 down, RGBA on the CPU.
+                var filter = gpuScale
+                    ? $"{(hw!.Api == HardwareDecodeApi.Vaapi ? "scale_vaapi" : "scale_cuda")}=w={size.Width}:h={size.Height}:format=nv12,hwdownload,format=nv12"
+                    : $"scale={size.Width}:{size.Height}:flags=bilinear";
+                args.AddRange(["-vf", filter]);
             }
 
             args.AddRange(["-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1"]);
@@ -363,13 +392,15 @@ namespace InfoPanel.Video
                 while (!token.IsCancellationRequested)
                 {
                     int width, height;
-                    bool hwaccel;
+                    HardwareDecoder? hw;
                     long generation;
                     lock (_stateLock)
                     {
                         width = OutputWidth;
                         height = OutputHeight;
-                        hwaccel = _hardwareDecode && !_hwaccelBlocked.ContainsKey(_source);
+                        hw = _hardwareDecode && !_hwaccelBlocked.ContainsKey(_source)
+                            ? VideoHardwareDecoder.Get(GpuRendering.Selected)
+                            : null;
                         generation = _generation;
                         _stopReason = null;
                         _stoppedByWatchdog = false;
@@ -377,7 +408,9 @@ namespace InfoPanel.Video
 
                     var input = _source;
                     var scale = width == Width && height == Height ? ((int, int)?)null : (width, height);
-                    if (scale != null && !_isLive && VideoScaleCache.Shared is { } cache
+                    // Software decoding only: the GPU decodes and scales the original at
+                    // about the same cost, without the copy's re-encoding loss.
+                    if (hw == null && scale != null && !_isLive && VideoScaleCache.Shared is { } cache
                         && cache.GetOrStart(_source, Width, Height, width, height, Duration,
                             () => RequestRestart("scaled copy ready"), token) is { } copy)
                     {
@@ -394,7 +427,7 @@ namespace InfoPanel.Video
                     };
                     // Same arena cap as the app: 299 -> 238 MB for a 2400x1080 file.
                     startInfo.Environment["GLIBC_TUNABLES"] = NativeHeap.ChildTunables(startInfo.Environment.TryGetValue("GLIBC_TUNABLES", out var tunables) ? tunables : null);
-                    foreach (var arg in BuildArguments(input, _isLive, scale, hwaccel))
+                    foreach (var arg in BuildArguments(input, _isLive, scale, hw))
                     {
                         startInfo.ArgumentList.Add(arg);
                     }
@@ -414,13 +447,13 @@ namespace InfoPanel.Video
                         process.Start();
                         process.BeginErrorReadLine();
 
-                        Logger.Debug("ffmpeg started for {Source}: {Width}x{Height}, hwaccel {Hwaccel}, input {Input}",
-                            _source, width, height, hwaccel, input);
+                        Logger.Debug("ffmpeg started for {Source}: {Width}x{Height}, decoder {Decoder}, input {Input}",
+                            _source, width, height, hw?.Description ?? "software", input);
 
                         lock (_stateLock)
                         {
                             _process = process;
-                            _processHwaccel = hwaccel;
+                            _processHwaccel = hw != null;
                             _processStderr = stderr;
                             Volatile.Write(ref _lastFrameMs, Environment.TickCount64);
                             _frameSinceStart = false;
@@ -471,8 +504,10 @@ namespace InfoPanel.Video
                     {
                         int? exitCode = null;
                         try { if (process is { HasExited: true }) exitCode = process.ExitCode; } catch { }
-                        Logger.Warning(error, "ffmpeg exited unexpectedly for {Source} (exit code {ExitCode}); restarting. Last stderr:{Stderr}",
-                            _source, exitCode, stderr.Format());
+                        // Typically the GPU can't decode this codec or profile; software can.
+                        var disabledHwaccel = hw != null && _hwaccelBlocked.TryAdd(_source, 0);
+                        Logger.Warning(error, "ffmpeg exited unexpectedly for {Source} (exit code {ExitCode}); restarting{Fallback}. Last stderr:{Stderr}",
+                            _source, exitCode, disabledHwaccel ? " with software decode for this source" : "", stderr.Format());
                     }
 
                     process?.Dispose();
