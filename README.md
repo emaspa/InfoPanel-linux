@@ -184,7 +184,10 @@ Key design points:
   that treats a stopped stream as disconnect). JPEG encoding runs outside
   the shared-frame lock, video and plugin-image resamples are cached per
   frame and output size, and text layouts and font lookups are cached
-  while unchanged.
+  while unchanged. Frames are drawn on the CPU by default. Settings can
+  move them to any GPU that headless EGL exposes, so an integrated GPU can
+  draw the panels while the discrete one runs games. If the GPU fails,
+  frames go back to the CPU.
 - **Demand-driven sensing**: only sensors referenced by a profile that is
   actually being consumed are polled each second, and a plugin whose
   sensors are unused for a few minutes stops completely (audio capture,
@@ -505,6 +508,9 @@ Requirements and optional dependencies:
 - **Fast JPEG encoding for panels**: `libturbojpeg.so.0` (`libjpeg-turbo` on
   Arch, `libturbojpeg0` on Debian/Ubuntu, `turbojpeg` on Fedora; the packages
   depend on it). Without it InfoPanel uses Skia's slower encoder.
+- **GPU rendering** (optional, Settings > Render panels on): the NVIDIA
+  proprietary driver, or Mesa for AMD and Intel. Either needs EGL device
+  support, which current versions have.
 - **Audio Spectrum**: PulseAudio or PipeWire (uses `parec`/`pactl`).
 - **SMART sensors**: `smartmontools`.
 

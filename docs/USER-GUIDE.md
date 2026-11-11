@@ -140,6 +140,20 @@ Some panels share one USB ID across many models (for example most Thermalright H
 
 If a panel is not detected, confirm the udev rules are installed and the panel is listed by `lsusb`. See the README for the full supported model tables.
 
+## Rendering on a GPU
+
+Panel frames are drawn on the CPU by default. To move that work to a graphics card, open Settings and pick a GPU under **Render panels on**. The list names each GPU InfoPanel can draw on without a display attached, with its driver and PCI address. On a machine with both an integrated and a discrete GPU, you choose which one does the work. The line under the list says where frames are drawn right now.
+
+The choice covers everything that reads the shared panel frames: USB panels, desktop overlays and the web viewer. It takes effect on the next frame. No restart needed.
+
+If the GPU fails, InfoPanel goes back to the CPU and shows the reason under the list. The usual causes are a missing driver, a context error or a frame that never finishes. After an error it tries the GPU again five seconds later. After a frame that never finishes it stays on the CPU until you pick a device again.
+
+Don't expect a big CPU saving. The CPU renderer draws a typical panel frame in a few milliseconds, and frames whose content hasn't changed are reused. In our tests an AMD integrated GPU used about the same CPU as the CPU renderer, and the NVIDIA driver used more. GPU rendering mainly helps when a profile is heavy to draw.
+
+If you game on the discrete GPU, pick the integrated one, so the panels never compete with the game for the card. On a laptop, rendering on the discrete GPU keeps it from sleeping.
+
+**Hardware video decoding**, under the same heading, is a separate switch for video items. It lets ffmpeg decode on the GPU, which cut ffmpeg from about 0.3 to 0.2 of a CPU core in our tests. It is off by default because some VA-API drivers stall. If a video stops updating with it on, InfoPanel restarts ffmpeg without hardware decoding.
+
 ## Hotkeys
 
 Configure global hotkeys on the Devices page to switch the profile shown on a panel, and to control the stopwatch plugin (start, stop, reset). On Wayland sessions hotkeys are grabbed through XWayland and fire while an X11 window (games, most apps) has focus.
@@ -161,6 +175,7 @@ Enable the web server in Settings to view live profile renders from any browser 
 
 - **Panel not detected**: install udev rules, replug, check `lsusb` for the device id, and see the logs (About page opens the log folder).
 - **Panel stopped responding** after a crash: unplug and replug it, or reset it with `usbreset <vid:pid>`.
+- **GPU rendering falls back to the CPU**: the line under **Render panels on** gives the reason, and the log has details. GPU rendering needs the NVIDIA proprietary driver, or Mesa for AMD and Intel.
 - **Overlay not visible on Wayland**: overlays render through XWayland; make sure XWayland is available (it is on standard GNOME and KDE sessions).
 - **Weather shows no data**: set the API key and city in the weather plugin's configuration on the Plugins page.
 - **Sensor missing after a reboot or hardware change**: allow up to 10 seconds for discovery, then check the Sensors page and the selected item's binding status in the designer. InfoPanel will not choose arbitrarily between indistinguishable devices. Use **Replace Sensor** if needed. For diagnostics, run `infopanel --dump-sensors --verbose`: it prints canonical IDs, labels, availability, current legacy aliases and identity strength. Check the logs for the original ID and resolution result. Network names and weak disk fallbacks retain the naming limitations described above; physical GPU relocation can change PCI-based IDs.

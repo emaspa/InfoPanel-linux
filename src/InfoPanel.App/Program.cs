@@ -9,6 +9,7 @@ namespace InfoPanel
         [STAThread]
         public static int Main(string[] args)
         {
+            Gpu.GpuRendering.PrepareProcess();
             var verbose = args.Contains("--verbose");
 
             Log.Logger = new LoggerConfiguration()

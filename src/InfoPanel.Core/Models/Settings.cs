@@ -186,6 +186,18 @@ namespace InfoPanel.Models
         [ObservableProperty]
         private int _targetGraphUpdateRate = 1000;
 
+        /// <summary>
+        /// Where shared panel frames are rendered: "cpu" (Skia raster) or a GPU
+        /// id from GpuDeviceCatalog ("pci:0000:01:00.0").
+        /// </summary>
+        [ObservableProperty]
+        private string _renderDevice = "cpu";
+
+        /// <summary>Lets ffmpeg decode video on the GPU (-hwaccel auto). Off by default:
+        /// small saving, wakes a sleeping dGPU on hybrid laptops.</summary>
+        [ObservableProperty]
+        private bool _hardwareVideoDecode = false;
+
         [ObservableProperty]
         private int _version = 114;
 

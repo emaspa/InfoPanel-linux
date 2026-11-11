@@ -20,6 +20,13 @@ namespace InfoPanel.Drawing
 
         public bool OpenGL => GRContext != null;
 
+        /// <summary>
+        /// When false, images are drawn from the raster image caches even on a GPU
+        /// canvas. The GL texture caches belong to the Avalonia UI context; an
+        /// offscreen GPU renderer with its own context must not use them.
+        /// </summary>
+        public bool UseGpuImageCache { get; init; } = true;
+
         public static SkiaGraphics FromBitmap(SKBitmap bitmap, float fontScale)
         {
             var canvas = new SKCanvas(bitmap);
@@ -114,8 +121,9 @@ namespace InfoPanel.Drawing
             else
             {
                 // Texture context handed to LockedImage; null routes the image
-                // through its raster caches.
-                var imageGrContext = GRContext;
+                // through its raster caches. The offscreen panel GPU context
+                // opts out: the texture caches belong to Avalonia's context.
+                var imageGrContext = UseGpuImageCache ? GRContext : null;
                 var totalMatrix = Canvas.TotalMatrix;
 
                 // Request the image at device resolution so the cached copy blits

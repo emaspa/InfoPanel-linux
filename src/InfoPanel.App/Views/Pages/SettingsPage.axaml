@@ -28,6 +28,14 @@
                     <TextBlock Text="Graph update (ms)" VerticalAlignment="Center" Margin="0,0,12,0" />
                     <NumericUpDown x:Name="GraphRate" Minimum="100" Maximum="10000" Increment="100" FormatString="0" />
                 </DockPanel>
+                <DockPanel MaxWidth="640" HorizontalAlignment="Left">
+                    <TextBlock Text="Render panels on" VerticalAlignment="Center" Margin="0,0,12,0" />
+                    <ComboBox x:Name="RenderDeviceBox" MinWidth="320" />
+                </DockPanel>
+                <TextBlock x:Name="RenderDeviceStatus" FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                <ToggleSwitch x:Name="HardwareVideoDecodeToggle" OnContent="Hardware video decoding" OffContent="Hardware video decoding" />
+                <TextBlock Text="Lets ffmpeg decode video items on the GPU. Saves a little CPU, but keeps a laptop's discrete GPU awake. Falls back to software decoding if the GPU stalls."
+                           FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
             </StackPanel>
 
             <StackPanel Spacing="8">

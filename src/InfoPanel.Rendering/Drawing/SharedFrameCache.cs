@@ -174,13 +174,15 @@ namespace InfoPanel
             // time), silently halving achievable panel frame rates.
             entry.RenderedAtMs = Environment.TickCount64;
 
-            using (var g = SkiaGraphics.FromBitmap(entry.Bitmap, profile.FontScale))
+            var cacheHint = $"DISPLAY-{profile.Guid}-{w}x{h}";
+            if (!Gpu.GpuRendering.TryRender(profile, entry.Bitmap, cacheHint))
             {
+                using var g = SkiaGraphics.FromBitmap(entry.Bitmap, profile.FontScale);
                 if (w != profile.Width || h != profile.Height)
                 {
                     g.Canvas.Scale((float)w / profile.Width, (float)h / profile.Height);
                 }
-                PanelDraw.Run(profile, g, preview: false, cacheHint: $"DISPLAY-{profile.Guid}-{w}x{h}");
+                PanelDraw.Run(profile, g, preview: false, cacheHint: cacheHint);
             }
 
             var pixels = entry.Bitmap.GetPixelSpan();

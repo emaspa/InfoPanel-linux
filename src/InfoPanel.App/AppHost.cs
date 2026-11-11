@@ -179,6 +179,13 @@ namespace InfoPanel
                         case nameof(Settings.TargetGraphUpdateRate):
                             RenderContext.TargetGraphUpdateRate = Settings.TargetGraphUpdateRate;
                             break;
+                        case nameof(Settings.RenderDevice):
+                            Gpu.GpuRendering.Select(Settings.RenderDevice);
+                            break;
+                        case nameof(Settings.HardwareVideoDecode):
+                            // Restarts running video decoders so the change shows at once.
+                            Video.FfmpegVideoDecoder.HardwareDecode = Settings.HardwareVideoDecode;
+                            break;
                         case nameof(Settings.ShowGridLines):
                             RenderContext.ShowGridLines = Settings.ShowGridLines;
                             break;
@@ -202,10 +209,12 @@ namespace InfoPanel
             // Render pacing + designer chrome from settings
             RenderContext.TargetFrameRate = Settings.TargetFrameRate;
             RenderContext.TargetGraphUpdateRate = Settings.TargetGraphUpdateRate;
+            Gpu.GpuRendering.Select(Settings.RenderDevice);
             RenderContext.ShowGridLines = Settings.ShowGridLines;
             RenderContext.GridLinesSpacing = (int)Settings.GridLinesSpacing;
             RenderContext.GridLinesColor = Settings.GridLinesColor;
             RenderContext.SelectedItemColor = Settings.SelectedItemColor;
+            Video.FfmpegVideoDecoder.HardwareDecode = Settings.HardwareVideoDecode;
 
             // Live display items: renderers see designer edits immediately
             RenderContext.GetDisplayItems = Stores.DisplayItemStore.Instance.GetSnapshot;

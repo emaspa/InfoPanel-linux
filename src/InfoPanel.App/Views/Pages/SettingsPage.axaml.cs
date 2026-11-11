@@ -14,7 +14,19 @@ namespace InfoPanel.Views.Pages
         {
             InitializeComponent();
 
-            Loaded += (_, _) => LoadFromSettings();
+            Loaded += (_, _) =>
+            {
+                LoadFromSettings();
+                Gpu.GpuRendering.StatusChanged += OnRenderStatusChanged;
+            };
+            Unloaded += (_, _) => Gpu.GpuRendering.StatusChanged -= OnRenderStatusChanged;
+            RenderDeviceBox.SelectionChanged += (_, _) =>
+            {
+                if (RenderDeviceBox.SelectedItem is ComboBoxItem { Tag: string id })
+                {
+                    Apply(s => s.RenderDevice = id);
+                }
+            };
 
             AutoStartToggle.IsCheckedChanged += (_, _) => Apply(s => s.AutoStart = AutoStartToggle.IsChecked == true);
             AutoStartDelay.ValueChanged += (_, _) => Apply(s => s.AutoStartDelay = (int)(AutoStartDelay.Value ?? 5));
@@ -25,6 +37,7 @@ namespace InfoPanel.Views.Pages
             HideOthersToggle.IsCheckedChanged += (_, _) => Apply(s => s.HideOtherProfilesWhenProgramSpecificShown = HideOthersToggle.IsChecked == true);
             FrameRate.ValueChanged += (_, _) => Apply(s => s.TargetFrameRate = (int)(FrameRate.Value ?? 15));
             GraphRate.ValueChanged += (_, _) => Apply(s => s.TargetGraphUpdateRate = (int)(GraphRate.Value ?? 1000));
+            HardwareVideoDecodeToggle.IsCheckedChanged += (_, _) => Apply(s => s.HardwareVideoDecode = HardwareVideoDecodeToggle.IsChecked == true);
             WebServerToggle.IsCheckedChanged += (_, _) => Apply(s => s.WebServer = WebServerToggle.IsChecked == true);
             WebServerIp.LostFocus += (_, _) => Apply(s => s.WebServerListenIp = WebServerIp.Text ?? "127.0.0.1");
             WebServerPort.ValueChanged += (_, _) => Apply(s => s.WebServerListenPort = (int)(WebServerPort.Value ?? 80));
@@ -57,6 +70,8 @@ namespace InfoPanel.Views.Pages
                 }
                 FrameRate.Value = settings.TargetFrameRate;
                 GraphRate.Value = settings.TargetGraphUpdateRate;
+                LoadRenderDevices(settings.RenderDevice);
+                HardwareVideoDecodeToggle.IsChecked = settings.HardwareVideoDecode;
                 WebServerToggle.IsChecked = settings.WebServer;
                 WebServerIp.Text = settings.WebServerListenIp;
                 WebServerPort.Value = settings.WebServerListenPort;
@@ -79,6 +94,31 @@ namespace InfoPanel.Views.Pages
             app.Host.SaveSettings();
             UpdateWebLink(app.Host.Settings);
         }
+
+        private void LoadRenderDevices(string selected)
+        {
+            var items = new List<ComboBoxItem>
+            {
+                new() { Content = "CPU", Tag = Gpu.GpuRendering.Cpu },
+            };
+            foreach (var device in Gpu.GpuDeviceCatalog.Devices)
+            {
+                items.Add(new ComboBoxItem { Content = device.DisplayName, Tag = device.Id });
+            }
+            // Keep a saved GPU that is missing right now (unplugged eGPU, driver
+            // not loaded) visible instead of silently switching the setting.
+            if (items.All(i => !string.Equals((string)i.Tag!, selected, StringComparison.OrdinalIgnoreCase)))
+            {
+                items.Add(new ComboBoxItem { Content = $"{selected} (not found)", Tag = selected });
+            }
+
+            RenderDeviceBox.ItemsSource = items;
+            RenderDeviceBox.SelectedItem = items.First(i => string.Equals((string)i.Tag!, selected, StringComparison.OrdinalIgnoreCase));
+            RenderDeviceStatus.Text = Gpu.GpuRendering.Status;
+        }
+
+        private void OnRenderStatusChanged() =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => RenderDeviceStatus.Text = Gpu.GpuRendering.Status);
 
         private void UpdateWebLink(Models.Settings settings)
         {
