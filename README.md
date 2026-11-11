@@ -187,7 +187,10 @@ Key design points:
   every 100 ms, until something changes. Thermalright panels send frames
   on a fixed schedule, so render and encode time don't lower their frame
   rate. JPEG encoding uses libjpeg-turbo and runs outside the shared-frame
-  lock. ffmpeg scales video to the size it is drawn at, plugin-image
+  lock. ffmpeg scales video to the size it is drawn at. When a video file
+  has at least 1.5 times that many pixels, InfoPanel re-encodes it once at
+  that size into `~/.cache/infopanel/video` and plays the copy. For a
+  2400x1080 file on a 1600x720 panel that halves ffmpeg's CPU use. Plugin-image
   resamples are cached per frame and output size, and static images, glow
   text, text layouts and font lookups are cached while unchanged. Frames
   are drawn on the CPU by default. Settings can move them to any GPU that
@@ -585,7 +588,8 @@ Environment variables: `INFOPANEL_DATA_DIR` relocates the data directory;
 `INFOPANEL_RENDER_MODE` (`software`, `egl`, `glx`) overrides the UI
 rendering backend for diagnosing platform issues; `INFOPANEL_JPEG_ENCODER=skia`
 encodes panel JPEGs with Skia instead of libjpeg-turbo, in case a panel
-rejects libjpeg-turbo's output.
+rejects libjpeg-turbo's output. `INFOPANEL_VIDEO_CACHE=0` plays videos from
+the original files without scaled copies.
 
 At launch InfoPanel restarts itself once with glibc's malloc limited to 2
 arenas, which saved about 120 MB on a 32-thread CPU. `INFOPANEL_MALLOC_REEXEC=0`

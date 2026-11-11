@@ -1,3 +1,4 @@
+using InfoPanel.Utils;
 using Serilog;
 using SkiaSharp;
 using System.Collections.Concurrent;
@@ -201,7 +202,12 @@ namespace InfoPanel.Video
                 args.AddRange(["-stream_loop", "-1"]);
             }
 
-            args.AddRange(["-i", source, "-an", "-sn"]);
+            // ffmpeg defaults to one decoder thread and one scaler thread per core.
+            // Paced to 24-30 fps that buys nothing but contention: on a 32-thread CPU,
+            // a 2400x1080 file at 1600x720 used 0.28 cores and 444 MB by default, and
+            // 0.21 cores and 284 MB with these limits, which still decode a 40 Mbit/s
+            // 4K60 file at 2.7x real time.
+            args.AddRange(["-threads", "4", "-i", source, "-an", "-sn", "-filter_threads", "1"]);
 
             // Software scale also after hardware decode: scale_cuda needs even sizes and
             // cannot output RGBA on every build. Odd sizes are fine for swscale RGB output.
@@ -369,14 +375,26 @@ namespace InfoPanel.Video
                         _stoppedByWatchdog = false;
                     }
 
+                    var input = _source;
                     var scale = width == Width && height == Height ? ((int, int)?)null : (width, height);
+                    if (scale != null && !_isLive && VideoScaleCache.Shared is { } cache
+                        && cache.GetOrStart(_source, Width, Height, width, height, Duration,
+                            () => RequestRestart("scaled copy ready"), token) is { } copy)
+                    {
+                        // Already at the output size: no scale filter needed.
+                        input = copy;
+                        scale = null;
+                    }
+
                     var startInfo = new ProcessStartInfo("ffmpeg")
                     {
                         RedirectStandardOutput = true,
                         RedirectStandardError = true,
                         UseShellExecute = false,
                     };
-                    foreach (var arg in BuildArguments(_source, _isLive, scale, hwaccel))
+                    // Same arena cap as the app: 299 -> 238 MB for a 2400x1080 file.
+                    startInfo.Environment["GLIBC_TUNABLES"] = NativeHeap.ChildTunables(startInfo.Environment.TryGetValue("GLIBC_TUNABLES", out var tunables) ? tunables : null);
+                    foreach (var arg in BuildArguments(input, _isLive, scale, hwaccel))
                     {
                         startInfo.ArgumentList.Add(arg);
                     }
@@ -396,8 +414,8 @@ namespace InfoPanel.Video
                         process.Start();
                         process.BeginErrorReadLine();
 
-                        Logger.Debug("ffmpeg started for {Source}: {Width}x{Height}, hwaccel {Hwaccel}",
-                            _source, width, height, hwaccel);
+                        Logger.Debug("ffmpeg started for {Source}: {Width}x{Height}, hwaccel {Hwaccel}, input {Input}",
+                            _source, width, height, hwaccel, input);
 
                         lock (_stateLock)
                         {

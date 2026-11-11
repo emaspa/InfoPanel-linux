@@ -13,7 +13,7 @@ namespace InfoPanel.App.Tests
         public void File_NoScale_NoHwaccel()
         {
             Assert.Equal(
-                "-hide_banner -loglevel error -nostdin -stream_loop -1 -i /videos/a b.mp4 -an -sn -f rawvideo -pix_fmt rgba pipe:1",
+                "-hide_banner -loglevel error -nostdin -stream_loop -1 -threads 4 -i /videos/a b.mp4 -an -sn -filter_threads 1 -f rawvideo -pix_fmt rgba pipe:1",
                 Join(isLive: false, scale: null, hwaccel: false));
         }
 
@@ -23,7 +23,7 @@ namespace InfoPanel.App.Tests
             var args = FfmpegVideoDecoder.BuildArguments("/v.mp4", isLive: false, (1600, 720), hwaccel: true);
 
             Assert.Equal(
-                "-hide_banner -loglevel error -nostdin -hwaccel auto -stream_loop -1 -i /v.mp4 -an -sn -vf scale=1600:720:flags=bilinear -f rawvideo -pix_fmt rgba pipe:1",
+                "-hide_banner -loglevel error -nostdin -hwaccel auto -stream_loop -1 -threads 4 -i /v.mp4 -an -sn -filter_threads 1 -vf scale=1600:720:flags=bilinear -f rawvideo -pix_fmt rgba pipe:1",
                 string.Join(' ', args));
             // -hwaccel is an input option: it must come before -i.
             Assert.True(args.IndexOf("-hwaccel") < args.IndexOf("-i"));
@@ -48,7 +48,7 @@ namespace InfoPanel.App.Tests
             var joined = Join(isLive: true, scale: (640, 360), hwaccel: false, source: "rtsp://cam/stream");
 
             Assert.Equal(
-                "-hide_banner -loglevel error -nostdin -rtsp_transport tcp -i rtsp://cam/stream -an -sn -f rawvideo -pix_fmt rgba pipe:1",
+                "-hide_banner -loglevel error -nostdin -rtsp_transport tcp -threads 4 -i rtsp://cam/stream -an -sn -filter_threads 1 -f rawvideo -pix_fmt rgba pipe:1",
                 joined);
         }
 
@@ -56,7 +56,7 @@ namespace InfoPanel.App.Tests
         public void Live_Hwaccel()
         {
             Assert.StartsWith(
-                "-hide_banner -loglevel error -nostdin -hwaccel auto -rtsp_transport tcp -i rtsp://cam",
+                "-hide_banner -loglevel error -nostdin -hwaccel auto -rtsp_transport tcp -threads 4 -i rtsp://cam",
                 Join(isLive: true, scale: null, hwaccel: true, source: "rtsp://cam"));
         }
 

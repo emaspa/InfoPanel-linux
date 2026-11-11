@@ -47,6 +47,11 @@ sudo systemctl enable --now infopanel-smart.timer
 
 The timer is not enabled automatically by these packages. Video and RTSP items
 need `ffmpeg` (`ffmpeg-free` on Fedora; supported codecs depend on that build).
+When a video file has at least 1.5 times the pixels of the size it is drawn
+at, InfoPanel re-encodes it once at that size into `~/.cache/infopanel/video`
+(2 GB at most) and plays the copy, which halves ffmpeg's CPU use. This needs
+an ffmpeg with libx264, which `ffmpeg-free` lacks; without it the original file
+plays.
 Audio Spectrum needs PipeWire's PulseAudio server or PulseAudio and its
 `parec`/`pactl` tools: `pulseaudio-utils` on Ubuntu/Fedora. Fedora calls the
 PipeWire server package `pipewire-pulseaudio`; Ubuntu and Arch use `pipewire-pulse`.
@@ -152,7 +157,7 @@ Don't expect a big CPU saving. The CPU renderer draws a typical panel frame in a
 
 If you game on the discrete GPU, pick the integrated one, so the panels never compete with the game for the card. On a laptop, rendering on the discrete GPU keeps it from sleeping.
 
-**Hardware video decoding**, under the same heading, is a separate switch for video items. It lets ffmpeg decode on the GPU, which cut ffmpeg from about 0.3 to 0.2 of a CPU core in our tests. It is off by default because some VA-API drivers stall. If a video stops updating with it on, InfoPanel restarts ffmpeg for that video without hardware decoding.
+**Hardware video decoding**, under the same heading, is a separate switch for video items. It lets ffmpeg decode on the GPU, which cut ffmpeg from about 0.19 to 0.09 of a CPU core for a 2400x1080 video in our tests. It is off by default because some VA-API drivers stall. If a video stops updating with it on, InfoPanel restarts ffmpeg for that video without hardware decoding.
 
 ## Hotkeys
 
