@@ -17,7 +17,7 @@ namespace InfoPanel.Views
             InitializeComponent();
 
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            Title = $"InfoPanel Linux - v{version?.ToString(3) ?? "0.0.2"} alpha";
+            Title = $"InfoPanel Linux - v{version?.ToString(3) ?? "0.0.2"} beta";
 
             if (Avalonia.Application.Current is App sizeApp)
             {

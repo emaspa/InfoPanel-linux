@@ -130,7 +130,7 @@ namespace InfoPanel.Views.Pages
             }
 
             var version = Assembly.GetExecutingAssembly().GetName().Version;
-            VersionText.Text = $"InfoPanel Linux v{version?.ToString(3) ?? "0.0.2"} alpha";
+            VersionText.Text = $"InfoPanel Linux v{version?.ToString(3) ?? "0.0.2"} beta";
         }
 
         private static void OpenUrl(string url)

@@ -16,8 +16,8 @@ namespace InfoPanel.Services
     {
         private static readonly ILogger Logger = Log.ForContext(typeof(UpdateChecker));
 
-        // Not /releases/latest: that endpoint hides prereleases, and alpha builds
-        // are published as prereleases. The list is newest-first.
+        // Not /releases/latest: that endpoint hides prereleases, so a release
+        // published as one would never be offered. The list is newest-first.
         private const string ReleasesApi = "https://api.github.com/repos/emaspa/InfoPanel-linux/releases?per_page=10";
 
         public sealed record UpdateInfo(Version Version, string Title, string Url, string Notes);
