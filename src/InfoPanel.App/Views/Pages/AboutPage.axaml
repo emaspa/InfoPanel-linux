@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.4.0 beta: much lower CPU use, optional GPU rendering" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.4.1 beta: lighter video playback, less memory" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="ffmpeg runs with fewer threads and plays a large video from a copy re-encoded once at the size it is drawn, kept in ~/.cache/infopanel/video. For a 2400x1080 video on a 1600x720 panel that took ffmpeg from 0.27 to 0.10 of a CPU core and from 450 to about 180 MB. InfoPanel limits glibc's malloc to two arenas, which saved about 120 MB on a 32-thread CPU. Hardware video decoding now uses an integrated GPU through VA-API before an NVIDIA card, and scales on the GPU." />
+                        <TextBlock Text="v0.4.0 beta: much lower CPU use, optional GPU rendering" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Driving two Thermalright panels (one playing a video) and a desktop spectrum window took 2.7 CPU cores in 0.3.8 and takes about 0.2 now. Most of it comes from a Skia library built without retpolines, JPEG encoding through libjpeg-turbo, decoding video at the size it is drawn, cached glow text and images, and not redrawing frames whose content has not changed. Panels now hold their target frame rate instead of overshooting it. Settings can move panel rendering to a GPU, integrated or discrete, and there is an opt-in switch for hardware video decoding." />
                         <TextBlock Text="v0.3.8 alpha: Valkyrie V360 and MC360 LCDs" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
