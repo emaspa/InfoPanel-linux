@@ -1,0 +1,33 @@
+<Project>
+  <!-- Skia native library: SkiaSharp.NativeAssets.Linux 3.119.2+ (3.119.4 comes in
+       through Avalonia.Skia) is compiled with retpolines. Skia's raster pipeline
+       chains stages through indirect calls, so CPU rendering runs 1.6x to 9x slower
+       than on the 3.119.1 build, which has none. Ship the 3.119.1 libSkiaSharp.so
+       for linux-x64 under the managed 3.119.4 assembly: the C API is the same except
+       sk_surface_draw_with_sampling, which neither Avalonia nor InfoPanel calls.
+       SkiaNativeRetpolineFree=false restores the stock library.
+       Lives here so the app and the test projects load the same library;
+       tests/InfoPanel.App.Tests/SkiaNativeTests.cs fails if the slow build returns. -->
+  <PropertyGroup>
+    <SkiaNativeRetpolineFree Condition="'$(SkiaNativeRetpolineFree)' == ''">true</SkiaNativeRetpolineFree>
+    <SkiaNativeRetpolineFreeVersion>3.119.1</SkiaNativeRetpolineFreeVersion>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(SkiaNativeRetpolineFree)' == 'true'">
+    <PackageDownload Include="SkiaSharp.NativeAssets.Linux" Version="[$(SkiaNativeRetpolineFreeVersion)]" />
+  </ItemGroup>
+  <Target Name="UseRetpolineFreeSkiaNative" AfterTargets="ResolvePackageAssets" Condition="'$(SkiaNativeRetpolineFree)' == 'true'">
+    <PropertyGroup>
+      <_FastSkiaNative>$(NuGetPackageRoot)skiasharp.nativeassets.linux/$(SkiaNativeRetpolineFreeVersion)/runtimes/linux-x64/native/libSkiaSharp.so</_FastSkiaNative>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(_FastSkiaNative)')" Text="Retpoline-free Skia native not found at $(_FastSkiaNative) (restore with PackageDownload failed?)" />
+    <ItemGroup>
+      <!-- Framework-dependent builds copy runtimes/linux-x64/native/, RID-specific publishes the file flat. -->
+      <_StockSkiaRuntimeTarget Include="@(RuntimeTargetsCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'libSkiaSharp.so' And $([System.String]::Copy('%(RuntimeTargetsCopyLocalItems.DestinationSubDirectory)').Contains('linux-x64'))" />
+      <RuntimeTargetsCopyLocalItems Remove="@(_StockSkiaRuntimeTarget)" />
+      <RuntimeTargetsCopyLocalItems Include="@(_StockSkiaRuntimeTarget->'$(_FastSkiaNative)')" />
+      <_StockSkiaNative Include="@(NativeCopyLocalItems)" Condition="'%(Filename)%(Extension)' == 'libSkiaSharp.so' And '$(RuntimeIdentifier)' == 'linux-x64'" />
+      <NativeCopyLocalItems Remove="@(_StockSkiaNative)" />
+      <NativeCopyLocalItems Include="@(_StockSkiaNative->'$(_FastSkiaNative)')" />
+    </ItemGroup>
+  </Target>
+</Project>
