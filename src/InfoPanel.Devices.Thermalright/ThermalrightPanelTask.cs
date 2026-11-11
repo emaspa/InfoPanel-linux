@@ -22,6 +22,16 @@ namespace InfoPanel.Services
 
         private ThermalrightPanelTask() { }
 
+        // Like the other panel families: wait for the per-device tasks to finish their
+        // in-flight frame and close the device. Without this, shutdown only cancelled
+        // them and the process exited mid-transfer, which wedges Trofeo firmware until
+        // a physical replug.
+        public override async Task StopAsync(bool shutdown = false)
+        {
+            await base.StopAsync(shutdown);
+            await StopAllDevices();
+        }
+
         public async Task StartDevice(ThermalrightPanelDevice device)
         {
             if (_deviceTasks.TryGetValue(device.Id, out var task))

@@ -229,8 +229,19 @@ namespace InfoPanel
             }
         }
 
+        private int _shutdownStarted;
+
         private void OnShutdownRequested(object? sender, ShutdownRequestedEventArgs e)
         {
+            // Keep Avalonia from finishing the shutdown: once this handler returns
+            // uncancelled the main loop ends, Main returns and the cleanup task below
+            // dies with the process before any device is stopped. Cutting a Trofeo
+            // panel off mid-transfer wedges its firmware until a physical replug.
+            // The cleanup task exits the process itself when done.
+            e.Cancel = true;
+            if (Interlocked.Exchange(ref _shutdownStarted, 1) == 1)
+                return;
+
             Logger.Information("Shutdown requested");
             _cts?.Cancel();
             DisplayWindowManager.Instance.CloseAll();
