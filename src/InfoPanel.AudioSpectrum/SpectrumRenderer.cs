@@ -1157,6 +1157,11 @@ namespace InfoPanel.AudioSpectrum
         {
             float mirrorHeight = totalHeight - mainHeight;
 
+            if (TryFlipRows(canvas, bitmap, width, mainHeight, mirrorHeight, totalHeight))
+            {
+                return;
+            }
+
             // Extract the main area pixels
             var info = new SKImageInfo((int)width, (int)mainHeight);
             using var mainPixels = new SKBitmap(info);
@@ -1169,6 +1174,44 @@ namespace InfoPanel.AudioSpectrum
             canvas.DrawBitmap(mainPixels, new SKRect(0, 0, width, mainHeight),
                 new SKRect(0, 0, width, mirrorHeight));
             canvas.Restore();
+        }
+
+        // A 1:1 mirror on an untransformed (or integer-translated) canvas is a
+        // row-reversed copy: well under 1 ms, where ExtractSubset + DrawBitmap
+        // costs ~5 ms per frame at 2560x720. The main area was drawn over the
+        // same background as the mirror area, so overwriting equals blending.
+        private static bool TryFlipRows(SKCanvas canvas, SKBitmap bitmap, float width, float mainHeight, float mirrorHeight, float totalHeight)
+        {
+            var m = canvas.TotalMatrix;
+            if (mirrorHeight != mainHeight || mainHeight != MathF.Floor(mainHeight) || width != MathF.Floor(width)
+                || totalHeight != MathF.Floor(totalHeight)
+                || m.ScaleX != 1 || m.ScaleY != 1 || m.SkewX != 0 || m.SkewY != 0 || m.Persp0 != 0 || m.Persp1 != 0
+                || m.TransY != 0 || m.TransX != MathF.Floor(m.TransX))
+            {
+                return false;
+            }
+
+            int x0 = (int)m.TransX;
+            int x1 = Math.Min(bitmap.Width, x0 + (int)width);
+            x0 = Math.Max(0, x0);
+            int rows = Math.Min((int)mainHeight, bitmap.Height / 2);
+            if (x1 <= x0 || rows <= 0 || (int)totalHeight > bitmap.Height)
+            {
+                return false;
+            }
+
+            canvas.Flush();
+            int bpp = bitmap.BytesPerPixel;
+            int rowBytes = bitmap.RowBytes;
+            var basePtr = bitmap.GetPixels();
+            int len = (x1 - x0) * bpp;
+            var row = new byte[len];
+            for (int r = 0; r < rows; r++)
+            {
+                System.Runtime.InteropServices.Marshal.Copy(basePtr + r * rowBytes + x0 * bpp, row, 0, len);
+                System.Runtime.InteropServices.Marshal.Copy(row, 0, basePtr + ((int)totalHeight - 1 - r) * rowBytes + x0 * bpp, len);
+            }
+            return true;
         }
 
         private SKColor GetBandColor(int bandIndex, int bandCount, float intensity)

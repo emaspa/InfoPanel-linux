@@ -165,8 +165,11 @@ namespace InfoPanel.AudioSpectrum
                 if (_audioLevelSensor != null) _audioLevelSensor.Value = MathF.Round(_capture.PeakLevel * 100, 2);
                 if (_dataCountSensor != null) _dataCountSensor.Value = _capture.DataReceivedCount;
 
-                // Render directly onto shared memory bitmap
-                if (_spectrumWriter != null)
+                // Render directly onto shared memory bitmap. Skip while the last
+                // frame is unread: the plugin ticks at ~30 Hz, a desktop window
+                // or panel often draws it at 15-25, and the rest were rendered
+                // for nobody.
+                if (_spectrumWriter != null && _spectrumWriter.LastFrameConsumed)
                 {
                     _renderer.RenderToBitmap(bands, peaks, _spectrumWriter.Bitmap);
                     _spectrumWriter.Invalidate();

@@ -23,6 +23,11 @@ namespace InfoPanel.Plugins.Graphics
         /// <summary>Bumped on every Invalidate; lets consumers skip unchanged frames.</summary>
         public long FrameCounter { get; private set; }
 
+        private volatile bool _consumed = true;
+
+        /// <inheritdoc />
+        public bool LastFrameConsumed => _consumed;
+
         public InProcPluginImageWriter(int width, int height)
         {
             Width = width;
@@ -40,6 +45,7 @@ namespace InfoPanel.Plugins.Graphics
                 (_front, _back) = (_back, _front);
                 Bitmap = _back;
                 _hasFrame = true;
+                _consumed = false;
                 FrameCounter++;
             }
         }
@@ -57,6 +63,7 @@ namespace InfoPanel.Plugins.Graphics
                 _back = new SKBitmap(width, height, SKColorType.Rgba8888, SKAlphaType.Premul);
                 Bitmap = _back;
                 _hasFrame = false;
+                _consumed = true;
             }
         }
 
@@ -70,6 +77,7 @@ namespace InfoPanel.Plugins.Graphics
             {
                 if (_disposed || !_hasFrame) return false;
                 access(_front);
+                _consumed = true;
                 return true;
             }
         }

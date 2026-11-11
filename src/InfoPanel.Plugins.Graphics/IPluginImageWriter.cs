@@ -27,5 +27,13 @@ namespace InfoPanel.Plugins.Graphics
         /// After this call, Bitmap points to a new buffer with the specified size.
         /// </summary>
         void Resize(int width, int height);
+
+        /// <summary>
+        /// False while the frame published by the last <see cref="Invalidate"/> has
+        /// not been read by any consumer yet. A plugin that renders faster than it
+        /// is displayed can skip drawing until it turns true. Hosts that cannot
+        /// tell report true.
+        /// </summary>
+        bool LastFrameConsumed => true;
     }
 }
