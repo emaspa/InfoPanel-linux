@@ -742,90 +742,102 @@ namespace InfoPanel.AudioSpectrum
             // Threshold for red zone in Classic mode (top 1/3)
             float redThreshold = (colorMode == VfdColorMode.Classic || colorMode == VfdColorMode.OrangeRed) ? 1f / 3f : float.MaxValue;
 
+            // Every line in a row shares its color (it depends on the row only), so
+            // each row's segments across all bands go into one path per kind and are
+            // drawn once. Per-line paints and blurs meant ~16k draws and thousands of
+            // blur passes per frame at 30 fps; this is a few hundred.
+            var activeLinesPerBand = new int[count];
+            var peakLinePerBand = new int[count];
             for (int i = 0; i < count; i++)
             {
-                float x = i * totalBarWidth + gap / 2;
-                int activeLines = Math.Min((int)(bands[i] / 100f * linesPerBar), linesPerBar - 2);
-                int peakLine = Math.Min((int)(peaks[i] / 100f * linesPerBar), linesPerBar - 2);
+                activeLinesPerBand[i] = Math.Min((int)(bands[i] / 100f * linesPerBar), linesPerBar - 2);
+                peakLinePerBand[i] = Math.Min((int)(peaks[i] / 100f * linesPerBar), linesPerBar - 2);
+            }
 
-                for (int s = 0; s < linesPerBar; s++)
+            using var ghostPaint = new SKPaint { IsAntialias = true, Color = vfdDim, StrokeWidth = lineThickness * 0.6f, StrokeCap = SKStrokeCap.Butt, Style = SKPaintStyle.Stroke };
+            using var linePaint = new SKPaint { IsAntialias = true, StrokeWidth = lineThickness, StrokeCap = SKStrokeCap.Butt, Style = SKPaintStyle.Stroke };
+            using var bloomBlur = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 2);
+            using var bloomPaint = new SKPaint { IsAntialias = true, StrokeWidth = lineThickness + 3, StrokeCap = SKStrokeCap.Butt, Style = SKPaintStyle.Stroke, MaskFilter = bloomBlur };
+            using var peakBlur = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 3);
+            using var peakBloomPaint = new SKPaint { IsAntialias = true, StrokeWidth = lineThickness + 4, StrokeCap = SKStrokeCap.Butt, Style = SKPaintStyle.Stroke, MaskFilter = peakBlur };
+
+            using var ghostPath = new SKPath();
+            using var activePath = new SKPath();
+            using var activeBloomPath = new SKPath();
+            using var peakPath = new SKPath();
+            using var peakBloomPath = new SKPath();
+
+            for (int s = 0; s < linesPerBar; s++)
+            {
+                float y = height - (s + 0.5f) * pitch;
+                ghostPath.Reset();
+                activePath.Reset();
+                activeBloomPath.Reset();
+                peakPath.Reset();
+                peakBloomPath.Reset();
+
+                for (int i = 0; i < count; i++)
                 {
-                    float y = height - (s + 0.5f) * pitch;
-                    bool active = s < activeLines;
-                    bool isPeak = ShowPeaks && s == peakLine && peakLine > 0;
-
-                    if (active)
+                    float x = i * totalBarWidth + gap / 2;
+                    if (s < activeLinesPerBand[i])
                     {
-                        // Brighter toward the top of the active area
-                        float intensity = (float)s / linesPerBar;
-                        byte alpha = (byte)(180 + intensity * 75);
-                        bool inRedZone = intensity >= redThreshold;
-                        var baseColor = inRedZone ? vfdRed : vfdBright;
-                        var color = ApplyBrightness(baseColor).WithAlpha(alpha);
-
-                        // Thin horizontal phosphor line
-                        using var paint = new SKPaint
-                        {
-                            IsAntialias = true,
-                            Color = color,
-                            StrokeWidth = lineThickness,
-                            StrokeCap = SKStrokeCap.Butt
-                        };
-                        canvas.DrawLine(x, y, x + barWidth, y, paint);
-
-                        // Phosphor bloom (soft glow around each lit line)
-                        using var bloomPaint = new SKPaint
-                        {
-                            IsAntialias = true,
-                            Color = color.WithAlpha((byte)(25 + intensity * 30)),
-                            StrokeWidth = lineThickness + 3,
-                            StrokeCap = SKStrokeCap.Butt,
-                            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 2)
-                        };
-                        canvas.DrawLine(x - 1, y, x + barWidth + 1, y, bloomPaint);
+                        activePath.MoveTo(x, y);
+                        activePath.LineTo(x + barWidth, y);
+                        activeBloomPath.MoveTo(x - 1, y);
+                        activeBloomPath.LineTo(x + barWidth + 1, y);
                     }
-                    else if (isPeak)
+                    else if (ShowPeaks && s == peakLinePerBand[i] && peakLinePerBand[i] > 0)
                     {
-                        // Peak: bright single line
-                        float peakIntensity = (float)s / linesPerBar;
-                        bool peakInRedZone = peakIntensity >= redThreshold;
-                        var color = ApplyBrightness(peakInRedZone ? vfdRed : vfdBright);
-                        using var paint = new SKPaint
-                        {
-                            IsAntialias = true,
-                            Color = color,
-                            StrokeWidth = lineThickness,
-                            StrokeCap = SKStrokeCap.Butt
-                        };
-                        canvas.DrawLine(x, y, x + barWidth, y, paint);
-
-                        using var bloomPaint = new SKPaint
-                        {
-                            IsAntialias = true,
-                            Color = color.WithAlpha(35),
-                            StrokeWidth = lineThickness + 4,
-                            StrokeCap = SKStrokeCap.Butt,
-                            MaskFilter = SKMaskFilter.CreateBlur(SKBlurStyle.Normal, 3)
-                        };
-                        canvas.DrawLine(x - 1, y, x + barWidth + 1, y, bloomPaint);
+                        peakPath.MoveTo(x, y);
+                        peakPath.LineTo(x + barWidth, y);
+                        peakBloomPath.MoveTo(x - 1, y);
+                        peakBloomPath.LineTo(x + barWidth + 1, y);
                     }
                     else
                     {
                         // Ghost grid line (faint unlit phosphor, characteristic VFD look)
-                        using var paint = new SKPaint
-                        {
-                            IsAntialias = true,
-                            Color = vfdDim,
-                            StrokeWidth = lineThickness * 0.6f,
-                            StrokeCap = SKStrokeCap.Butt
-                        };
-                        canvas.DrawLine(x, y, x + barWidth, y, paint);
+                        ghostPath.MoveTo(x, y);
+                        ghostPath.LineTo(x + barWidth, y);
                     }
                 }
 
+                float intensity = (float)s / linesPerBar;
+                bool inRedZone = intensity >= redThreshold;
+
+                if (!ghostPath.IsEmpty)
+                    canvas.DrawPath(ghostPath, ghostPaint);
+
+                if (!activePath.IsEmpty)
+                {
+                    // Brighter toward the top of the active area
+                    byte alpha = (byte)(180 + intensity * 75);
+                    var color = ApplyBrightness(inRedZone ? vfdRed : vfdBright).WithAlpha(alpha);
+
+                    // Thin horizontal phosphor lines, then their soft bloom
+                    linePaint.Color = color;
+                    canvas.DrawPath(activePath, linePaint);
+                    bloomPaint.Color = color.WithAlpha((byte)(25 + intensity * 30));
+                    canvas.DrawPath(activeBloomPath, bloomPaint);
+                }
+
+                if (!peakPath.IsEmpty)
+                {
+                    // Peak: bright single line
+                    var color = ApplyBrightness(inRedZone ? vfdRed : vfdBright);
+                    linePaint.Color = color;
+                    canvas.DrawPath(peakPath, linePaint);
+                    peakBloomPaint.Color = color.WithAlpha(35);
+                    canvas.DrawPath(peakBloomPath, peakBloomPaint);
+                }
+            }
+
+            for (int i = 0; i < count; i++)
+            {
                 // Column-level glow for active bars (ambient phosphor scatter)
+                int activeLines = activeLinesPerBand[i];
                 if (activeLines > 2)
                 {
+                    float x = i * totalBarWidth + gap / 2;
                     float barHeight = activeLines * pitch;
                     canvas.DrawRect(x - 1, height - barHeight, barWidth + 2, barHeight, bgGlow);
                 }
