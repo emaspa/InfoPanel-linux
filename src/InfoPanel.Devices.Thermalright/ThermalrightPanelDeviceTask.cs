@@ -1260,8 +1260,9 @@ namespace InfoPanel.Services
             UpdateDeviceDisplayName();
             await Task.Delay(100, token);
 
-            // Skia's libjpeg-turbo encoder uses 4:2:0 chroma subsampling by default,
-            // matching TRCC's CompressionImage output closely enough for this panel.
+            // JpegEncoder (libturbojpeg, or Skia as fallback) uses 4:2:0 chroma
+            // subsampling, matching TRCC's CompressionImage output closely enough
+            // for this panel.
             _maxJpegSize = 230_000;
 
             // Frame loop: concurrent read+write via Task.Run (matching TRCC's async pattern),
