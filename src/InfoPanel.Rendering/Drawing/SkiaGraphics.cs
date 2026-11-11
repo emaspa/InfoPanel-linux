@@ -113,31 +113,77 @@ namespace InfoPanel.Drawing
             }
             else
             {
-                // For per-frame sources (video, plugin) request the frame at device
-                // resolution: on a scaled canvas (profile rendered at panel size)
-                // this makes the expensive per-frame resample happen once at the
-                // real output size instead of at profile size only to be shrunk
-                // again by the canvas transform. Their caches are keyed per size,
-                // so consumers at different scales coexist. Static images keep
-                // profile-coordinate requests: their frame cache is single-size,
-                // and mixed-size requests from panel and preview would invalidate
-                // it on every draw.
-                var deviceW = width;
-                var deviceH = height;
-                if (lockedImage.Type is Models.LockedImage.ImageType.FFMPEG or Models.LockedImage.ImageType.PLUGIN)
+                // Texture context handed to LockedImage; null routes the image
+                // through its raster caches.
+                var imageGrContext = GRContext;
+                var totalMatrix = Canvas.TotalMatrix;
+
+                // Request the image at device resolution so the cached copy blits
+                // about 1:1 instead of being resampled by the canvas transform on
+                // every draw. Per-frame sources (video, plugin) always do: their
+                // caches are keyed per size. Static images do whenever they use
+                // the raster cache: its entries are per cacheHint, and every
+                // consumer drawing at a fixed scale (shared panel frames, whose
+                // hint carries the render size, previews, window) has its own
+                // hint. The Avalonia GL texture cache keeps profile-size requests,
+                // since the designer's zoom changes continuously and every zoom
+                // step would re-resize.
+                var requestDeviceSize = lockedImage.Type is Models.LockedImage.ImageType.FFMPEG or Models.LockedImage.ImageType.PLUGIN
+                    || (imageGrContext == null && IsScaleTranslate(totalMatrix));
+
+                var requestW = width;
+                var requestH = height;
+                if (requestDeviceSize)
                 {
-                    var totalMatrix = Canvas.TotalMatrix;
-                    deviceW = Math.Max(1, (int)MathF.Round(width * totalMatrix.ScaleX));
-                    deviceH = Math.Max(1, (int)MathF.Round(height * totalMatrix.ScaleY));
+                    requestW = Math.Max(1, (int)MathF.Round(width * MathF.Abs(totalMatrix.ScaleX)));
+                    requestH = Math.Max(1, (int)MathF.Round(height * MathF.Abs(totalMatrix.ScaleY)));
                 }
-                lockedImage.AccessSK(deviceW, deviceH, image =>
+                lockedImage.AccessSK(requestW, requestH, image =>
                 {
-                    if (image != null)
-                    {
-                        DrawImage(image, x, y, width, height, rotation, rotationCenterX, rotationCenterY, flipX: flipX, opacity: opacity);
-                    }
-                }, cache, cacheHint, GRContext);
+                    if (image == null)
+                        return;
+
+                    if (requestDeviceSize && rotation == 0 && opacity >= 1f
+                        && TryDrawPixelAligned(image, new SKRect(x, y, x + width, y + height), totalMatrix, flipX))
+                        return;
+
+                    DrawImage(image, x, y, width, height, rotation, rotationCenterX, rotationCenterY, flipX: flipX, opacity: opacity);
+                }, cache, cacheHint, imageGrContext);
             }
+        }
+
+        /// <summary>
+        /// Draws a device-size image 1:1 at its destination rounded to whole
+        /// device pixels. On a scaled canvas the destination usually starts at a
+        /// fractional pixel (x = -10 at 2/3 scale is -6.67), which made every
+        /// draw a bilinear resample of the whole image instead of a copy; the
+        /// snap moves the image by at most half a device pixel.
+        /// </summary>
+        private bool TryDrawPixelAligned(SKImage image, SKRect destRect, in SKMatrix totalMatrix, bool flipX)
+        {
+            if (totalMatrix.ScaleX <= 0 || totalMatrix.ScaleY <= 0)
+                return false;
+
+            var device = totalMatrix.MapRect(destRect);
+            if (MathF.Abs(device.Width - image.Width) > 1f || MathF.Abs(device.Height - image.Height) > 1f)
+                return false;
+
+            var left = MathF.Round(device.Left);
+            var top = MathF.Round(device.Top);
+
+            Canvas.Save();
+            Canvas.ResetMatrix();
+            if (flipX)
+                Canvas.Scale(-1, 1, left + image.Width / 2f, 0);
+            Canvas.DrawImage(image, left, top);
+            Canvas.Restore();
+            return true;
+        }
+
+        /// <summary>True when the matrix only scales and translates (mirroring allowed).</summary>
+        internal static bool IsScaleTranslate(in SKMatrix m)
+        {
+            return m.SkewX == 0 && m.SkewY == 0 && m.Persp0 == 0 && m.Persp1 == 0 && m.Persp2 == 1;
         }
 
         public void DrawLine(float x1, float y1, float x2, float y2, string color, float strokeWidth)
@@ -229,6 +275,12 @@ namespace InfoPanel.Drawing
             {
                 string effectiveGlowColor = !string.IsNullOrEmpty(glowColor) ? glowColor! : WithAlpha(color, 0.6f);
                 TryParseBlendMode(glowBlendMode, out var blendMode);
+
+                if (UseGlowCache && TryDrawCachedGlow(text, fontName, fontStyle, fontSize, color, effectiveGlowColor, glowRadius, blendMode, x, y, rightAlign, centerAlign, bold, italic, underline, strikeout, wrap, ellipsis, width))
+                {
+                    Canvas.Restore();
+                    return;
+                }
 
                 // Bound both layers to the text plus the blur's reach. Unbounded layers
                 // are clip-sized: every glowing item allocated, blurred and composited

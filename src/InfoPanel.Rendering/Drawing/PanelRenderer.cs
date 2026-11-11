@@ -8,7 +8,9 @@ namespace InfoPanel
 {
     public sealed class PanelRenderer
     {
-        public static SKBitmap RenderSK(Profile profile, bool preview = false, float scale = 1, bool cache = true, SKColorType colorType = SKColorType.Bgra8888, SKAlphaType alphaType = SKAlphaType.Premul)
+        // RGBA by default, like the shared panel frames: cached images are stored
+        // in that format and would need a channel swap on every draw otherwise.
+        public static SKBitmap RenderSK(Profile profile, bool preview = false, float scale = 1, bool cache = true, SKColorType colorType = SKColorType.Rgba8888, SKAlphaType alphaType = SKAlphaType.Premul)
         {
             var bitmap = new SKBitmap(profile.Width, profile.Height, colorType, alphaType);
             

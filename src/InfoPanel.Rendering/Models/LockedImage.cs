@@ -428,6 +428,82 @@ namespace InfoPanel.Models
             canvas.Clear(SKColors.Transparent);
         }
 
+        /// <summary>
+        /// Resizes a decoded frame for the frame cache in the panel frames' pixel
+        /// format. The platform default (BGRA premul) made every draw onto the
+        /// RGBA frame swap channels and blend per pixel; an RGBA image tagged
+        /// opaque draws as a plain copy.
+        /// </summary>
+        internal static SKImage? CreateFrameImage(SKBitmap? source, int width, int height)
+        {
+            if (source == null)
+                return null;
+
+            using var resized = source.Resize(
+                new SKImageInfo(width, height, SKColorType.Rgba8888, SKAlphaType.Premul),
+                new SKSamplingOptions(SKCubicResampler.Mitchell));
+            if (resized == null)
+                return null;
+
+            using var pixmap = resized.PeekPixels();
+            if (IsFullyOpaque(pixmap))
+            {
+                // Premul and opaque pixels are identical when every alpha is 255
+                using var opaque = pixmap.WithAlphaType(SKAlphaType.Opaque);
+                return SKImage.FromPixelCopy(opaque);
+            }
+
+            return SKImage.FromPixelCopy(pixmap);
+        }
+
+        /// <summary>True when every pixel of a 32-bit RGBA/BGRA pixmap has alpha 255.</summary>
+        internal static bool IsFullyOpaque(SKPixmap pixmap)
+        {
+            if (pixmap.ColorType is not (SKColorType.Rgba8888 or SKColorType.Bgra8888))
+                return false;
+            if (pixmap.AlphaType == SKAlphaType.Opaque)
+                return true;
+
+            var bytes = pixmap.GetPixelSpan();
+            var rowBytes = pixmap.RowBytes;
+            var width = pixmap.Width;
+            for (int y = 0; y < pixmap.Height; y++)
+            {
+                var row = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, uint>(bytes.Slice(y * rowBytes, width * 4));
+                if (!RowIsOpaque(row))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool RowIsOpaque(ReadOnlySpan<uint> pixels)
+        {
+            // Alpha is the high byte of each little-endian pixel in both layouts:
+            // AND everything together and check that byte survived.
+            const uint alphaMask = 0xFF000000;
+            var i = 0;
+            if (System.Numerics.Vector.IsHardwareAccelerated && pixels.Length >= System.Numerics.Vector<uint>.Count)
+            {
+                var acc = new System.Numerics.Vector<uint>(uint.MaxValue);
+                var vectors = System.Runtime.InteropServices.MemoryMarshal.Cast<uint, System.Numerics.Vector<uint>>(pixels);
+                foreach (var v in vectors)
+                    acc &= v;
+                for (int k = 0; k < System.Numerics.Vector<uint>.Count; k++)
+                {
+                    if ((acc[k] & alphaMask) != alphaMask)
+                        return false;
+                }
+                i = vectors.Length * System.Numerics.Vector<uint>.Count;
+            }
+
+            for (; i < pixels.Length; i++)
+            {
+                if ((pixels[i] & alphaMask) != alphaMask)
+                    return false;
+            }
+            return true;
+        }
+
         private int GetCurrentFrameCount()
         {
             if (_codec == null || _cumulativeFrameTimes == null || Frames <= 1 || TotalFrameTime == 0)
@@ -887,12 +963,11 @@ namespace InfoPanel.Models
                 if (bitmapFrame.Image == null)
                 {
                     using var bitmap = GetSKBitmapFromSK(frame);
-                    //using var resizedBitmap = bitmap?.Resize(new SKImageInfo(targetWidth, targetHeight), SKSamplingOptions.Default);
-                    using var resizedBitmap = bitmap?.Resize(new SKImageInfo(targetWidth, targetHeight), new SKSamplingOptions(SKCubicResampler.Mitchell));
+                    var resizedImage = CreateFrameImage(bitmap, targetWidth, targetHeight);
 
-                    if (grContext != null && cache && resizedBitmap != null)
+                    if (grContext != null && cache && resizedImage != null)
                     {
-                        using var image = SKImage.FromBitmap(resizedBitmap);
+                        using var image = resizedImage;
                         bitmapFrame.Image = image.ToTextureImage(grContext);
 
                         // Evict other GPU texture frames for animated images to prevent VRAM accumulation
@@ -909,7 +984,7 @@ namespace InfoPanel.Models
                     }
                     else
                     {
-                        bitmapFrame.Image = SKImage.FromBitmap(resizedBitmap);
+                        bitmapFrame.Image = resizedImage;
 
                         // Long animations: keep only the current frame resident, like the
                         // GPU branch above. Caching every frame of a big GIF at target
