@@ -19,6 +19,29 @@ namespace InfoPanel.Extensions
                 return sourceBitmap;
             }
 
+            // Same-size 180° turn (e.g. Wonder Vision mounted upside down, frame already
+            // rendered at panel size): reversing the pixel order is exact and a vectorized
+            // copy, versus a full bilinear-sampled transformed draw per frame.
+            if (rotation == LCD_ROTATION.Rotate180FlipNone &&
+                sourceBitmap.Width == targetWidth && sourceBitmap.Height == targetHeight &&
+                sourceBitmap.BytesPerPixel == 4 && sourceBitmap.RowBytes == sourceBitmap.Width * 4)
+            {
+                var rotated = new SKBitmap(targetWidth, targetHeight, sourceBitmap.ColorType, sourceBitmap.AlphaType);
+                if (rotated.RowBytes == rotated.Width * 4)
+                {
+                    unsafe
+                    {
+                        int count = targetWidth * targetHeight;
+                        var src = new ReadOnlySpan<uint>((void*)sourceBitmap.GetPixels(), count);
+                        var dst = new Span<uint>((void*)rotated.GetPixels(), count);
+                        src.CopyTo(dst);
+                        dst.Reverse();
+                    }
+                    return rotated;
+                }
+                rotated.Dispose();
+            }
+
             // Calculate scaling to maintain aspect ratio
             var scale = Math.Min((float)targetWidth / effectiveWidth, (float)targetHeight / effectiveHeight);
             var scaledWidth = (int)(effectiveWidth * scale);

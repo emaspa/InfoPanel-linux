@@ -59,7 +59,12 @@ namespace InfoPanel.Drawing
             if (opacity < 1f)
             {
                 using var layerPaint = new SKPaint { Color = new SKColor(255, 255, 255, (byte)(255 * opacity)) };
-                Canvas.SaveLayer(layerPaint);
+                // Unrotated, the image lands exactly in destRect (flips mirror within
+                // it), so the layer needs no more than that instead of the whole clip.
+                if (rotation == 0)
+                    Canvas.SaveLayer(destRect, layerPaint);
+                else
+                    Canvas.SaveLayer(layerPaint);
             }
 
             if (flipX || flipY)
@@ -225,14 +230,21 @@ namespace InfoPanel.Drawing
                 string effectiveGlowColor = !string.IsNullOrEmpty(glowColor) ? glowColor! : WithAlpha(color, 0.6f);
                 TryParseBlendMode(glowBlendMode, out var blendMode);
 
+                // Bound both layers to the text plus the blur's reach. Unbounded layers
+                // are clip-sized: every glowing item allocated, blurred and composited
+                // two full-canvas buffers per frame, which dominated panel render time.
+                var layerBounds = GetTextBounds(text, fontName, fontStyle, fontSize, color, x, y, rightAlign, centerAlign, bold, italic, underline, strikeout, wrap, ellipsis, width);
+                var pad = glowRadius * 3f + fontSize * FontScale * 0.5f + 2f;
+                layerBounds.Inflate(pad, pad);
+
                 // Outer layer: composites the combined glow+text against the background using the chosen blend mode
                 using var outerPaint = new SKPaint { BlendMode = blendMode };
-                Canvas.SaveLayer(outerPaint);
+                Canvas.SaveLayer(layerBounds, outerPaint);
 
                 // Inner layer: draw blurred glow with normal compositing
                 using var blurFilter = SKImageFilter.CreateBlur(glowRadius, glowRadius);
                 using var glowPaint = new SKPaint { ImageFilter = blurFilter };
-                Canvas.SaveLayer(glowPaint);
+                Canvas.SaveLayer(layerBounds, glowPaint);
                 DrawStringCore(text, fontName, fontStyle, fontSize, effectiveGlowColor, x, y, rightAlign, centerAlign, bold, italic, underline, strikeout, wrap, ellipsis, width);
                 Canvas.Restore();
 
@@ -344,15 +356,35 @@ namespace InfoPanel.Drawing
             }
         }
 
-        private void DrawStringCoreLocked(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign, bool centerAlign, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width)
+        private TextBlockKey CreateTextBlockKey(string text, string fontName, string fontStyle, int fontSize, string color, bool rightAlign, bool centerAlign, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width)
         {
             var alignment = rightAlign ? TextAlignment.Right
                 : centerAlign && width > 0 ? TextAlignment.Center
                 : TextAlignment.Left;
 
-            var tb = GetOrCreateTextBlock(new TextBlockKey(
+            return new TextBlockKey(
                 text, fontName, fontStyle, fontSize * FontScale, color,
-                bold, italic, underline, strikeout, wrap, ellipsis, width, alignment));
+                bold, italic, underline, strikeout, wrap, ellipsis, width, alignment);
+        }
+
+        /// <summary>
+        /// Local-space rectangle covered by the text DrawStringCore paints at (x, y).
+        /// The layout is cached, so the following draw reuses it.
+        /// </summary>
+        private SKRect GetTextBounds(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign, bool centerAlign, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width)
+        {
+            lock (_textLock)
+            {
+                var tb = GetOrCreateTextBlock(CreateTextBlockKey(text, fontName, fontStyle, fontSize, color, rightAlign, centerAlign, bold, italic, underline, strikeout, wrap, ellipsis, width));
+                float left = width == 0 && rightAlign ? x - tb.MeasuredWidth : x;
+                float w = Math.Max(width, tb.MeasuredWidth);
+                return new SKRect(left, y, left + w, y + tb.MeasuredHeight);
+            }
+        }
+
+        private void DrawStringCoreLocked(string text, string fontName, string fontStyle, int fontSize, string color, int x, int y, bool rightAlign, bool centerAlign, bool bold, bool italic, bool underline, bool strikeout, bool wrap, bool ellipsis, int width)
+        {
+            var tb = GetOrCreateTextBlock(CreateTextBlockKey(text, fontName, fontStyle, fontSize, color, rightAlign, centerAlign, bold, italic, underline, strikeout, wrap, ellipsis, width));
 
             float adjustedX = x;
             if (width == 0 && rightAlign)
