@@ -587,6 +587,10 @@ rendering backend for diagnosing platform issues; `INFOPANEL_JPEG_ENCODER=skia`
 encodes panel JPEGs with Skia instead of libjpeg-turbo, in case a panel
 rejects libjpeg-turbo's output.
 
+At launch InfoPanel restarts itself once with glibc's malloc limited to 2
+arenas, which saved about 120 MB on a 32-thread CPU. `INFOPANEL_MALLOC_REEXEC=0`
+skips the restart. A `glibc.malloc.arena_max` you set in `GLIBC_TUNABLES` wins.
+
 ## Credits
 
 - [habibrehmansg](https://github.com/habibrehmansg): creator of the

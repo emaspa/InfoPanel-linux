@@ -9,6 +9,7 @@ namespace InfoPanel
         [STAThread]
         public static int Main(string[] args)
         {
+            Utils.NativeHeap.LimitArenas();
             Gpu.GpuRendering.PrepareProcess();
             var verbose = args.Contains("--verbose");
 
