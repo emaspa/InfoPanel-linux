@@ -132,11 +132,12 @@ namespace InfoPanel.Services
         // payload; only the render/resize/encode is skipped.
         private readonly SharedFrameConsumer _frameConsumer = new() { ResendCachedOnSkip = true };
 
-        // Freshness window for the shared frame cache. Slightly under the target
-        // interval: the extract/encode stages and poll granularity sit on top of
-        // this gate in the frame pipeline, so using the full interval as the gate
-        // consistently lands the real cadence 15-25ms above the target.
-        private int FrameIntervalMs => Math.Max(1, 1000 / Math.Max(1, _device.TargetFrameRate) - 12);
+        // Freshness window for the shared frame cache. The render loop below runs
+        // on an absolute schedule at the target interval; the gate sits a few ms
+        // under it so a frame rendered at the previous slot (stamped at render
+        // start) is always stale at the next one, and a second consumer of the
+        // same profile reuses it instead of rendering again.
+        private int FrameIntervalMs => Math.Max(1, 1000 / Math.Max(1, _device.TargetFrameRate) - 5);
 
         /// <summary>Returns null when the profile content has not changed (frame skipped).</summary>
         public byte[]? GenerateFrameBuffer()
@@ -2068,9 +2069,20 @@ namespace InfoPanel.Services
                     var stopwatch = new Stopwatch();
                     bool lastFlickerFix = _device.FlickerFix;
                     var nextDueMs = Environment.TickCount64;
+                    var pacer = new InfoPanel.Drawing.FramePacer();
 
                     while (!renderToken.IsCancellationRequested)
                     {
+                        // Absolute schedule at the target rate. The previous
+                        // "interval minus 12 ms" freshness gate plus 5 ms polling
+                        // ran panels at 27-30 fps for a 23 fps target.
+                        var waitMs = pacer.WaitMs(Environment.TickCount64, _device.TargetFrameRate);
+                        if (waitMs > 0)
+                        {
+                            await Task.Delay(waitMs, token);
+                            continue;
+                        }
+
                         // Update display name if flicker fix toggle changed
                         if (_flickerFixCropHeight > 0 && _device.FlickerFix != lastFlickerFix)
                         {
@@ -2112,19 +2124,8 @@ namespace InfoPanel.Services
 
                         if (!isCached)
                         {
-                            // Fresh frame: its render cost paces us when slower than
-                            // the target; when faster, the shared frame stays fresh
-                            // and the next iterations fall into the poll branch until
-                            // it goes stale. nextDueMs throttles cached keepalives.
+                            // nextDueMs throttles cached keepalives after fresh content.
                             nextDueMs = Environment.TickCount64 + targetFrameTime;
-                        }
-                        else
-                        {
-                            // Cache not stale yet or content unchanged: poll again
-                            // shortly. Sleeping a full frame interval here on top of
-                            // a render that already overran it is what capped panels
-                            // at roughly half their achievable rate.
-                            await Task.Delay(5, token);
                         }
                     }
                 }

@@ -38,6 +38,35 @@ namespace InfoPanel
             public byte[]? PreviousPixels;    // last frame's pixels for change detection
             public long Version;              // bumps when pixels actually changed
             public long RenderedAtMs = long.MinValue;
+            public int UnchangedRenders;      // consecutive renders that left Version as is
+        }
+
+        /// <summary>
+        /// Renders that produce identical pixels stretch the freshness window (see
+        /// <see cref="EffectiveMaxAgeMs"/>). Most panel content changes at sensor
+        /// rate, ~1 Hz, while panels poll at 20-30 fps.
+        /// </summary>
+        public static bool IdleBackoffEnabled { get; set; } = true;
+
+        /// <summary>Longest a backed-off frame is reused: bounds how late a change shows.</summary>
+        public const int IdleBackoffCapMs = 100;
+        private const int IdleBackoffAfter = 5;
+
+        /// <summary>
+        /// Freshness window after <paramref name="unchangedRenders"/> renders in a
+        /// row left the pixels unchanged: the requested age until the fifth, then
+        /// doubling per further unchanged render up to <see cref="IdleBackoffCapMs"/>.
+        /// The first changed frame resets it. Video, GIFs and the audio spectrum
+        /// change every frame and never back off.
+        /// </summary>
+        public static int EffectiveMaxAgeMs(int maxAgeMs, int unchangedRenders)
+        {
+            if (!IdleBackoffEnabled || unchangedRenders < IdleBackoffAfter || maxAgeMs >= IdleBackoffCapMs)
+            {
+                return maxAgeMs;
+            }
+            var doublings = Math.Min(unchangedRenders - IdleBackoffAfter + 1, 8);
+            return Math.Min(IdleBackoffCapMs, maxAgeMs << doublings);
         }
 
         private static readonly ConcurrentDictionary<(Guid Guid, int W, int H), Entry> _entries = new();
@@ -125,7 +154,7 @@ namespace InfoPanel
             return entry.Bitmap != null
                 && entry.Bitmap.Width == w
                 && entry.Bitmap.Height == h
-                && Environment.TickCount64 - entry.RenderedAtMs < maxAgeMs;
+                && Environment.TickCount64 - entry.RenderedAtMs < EffectiveMaxAgeMs(maxAgeMs, entry.UnchangedRenders);
         }
 
         private static void Render(Entry entry, Profile profile, int w, int h)
@@ -160,11 +189,17 @@ namespace InfoPanel
                 entry.PreviousPixels = new byte[pixels.Length];
                 pixels.CopyTo(entry.PreviousPixels);
                 entry.Version++;
+                entry.UnchangedRenders = 0;
             }
             else if (!pixels.SequenceEqual(entry.PreviousPixels))
             {
                 pixels.CopyTo(entry.PreviousPixels);
                 entry.Version++;
+                entry.UnchangedRenders = 0;
+            }
+            else
+            {
+                entry.UnchangedRenders++;
             }
         }
     }
