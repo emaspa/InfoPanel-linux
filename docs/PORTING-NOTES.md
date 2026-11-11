@@ -9,8 +9,9 @@ the items below.
 
 ## Approved deviations
 
-1. **TrofeoBulk JPEG encoding: SkiaSharp instead of GDI+.**
-   System.Drawing does not exist on Linux. libjpeg-turbo uses 4:2:0 chroma
+1. **TrofeoBulk JPEG encoding: libjpeg-turbo instead of GDI+.**
+   System.Drawing does not exist on Linux. Frames go through the system
+   libturbojpeg, or Skia's encoder when that is missing. Both use 4:2:0 chroma
    subsampling at all qualities (the property TRCC compatibility needs);
    the 230 KB adaptive-quality cap is unchanged. Byte output differs from
    GDI+ at the same quality number - expected and harmless.

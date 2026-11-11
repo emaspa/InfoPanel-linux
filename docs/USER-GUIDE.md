@@ -53,7 +53,7 @@ PipeWire server package `pipewire-pulseaudio`; Ubuntu and Arch use `pipewire-pul
 
 ### Tarball
 
-1. Download the latest `infopanel-<version>-linux-x64.tar.gz` from [GitHub Releases](https://github.com/emaspa/InfoPanel-linux/releases). It includes .NET; the host still needs glibc, the GCC/C++ runtime, zlib, ICU, fontconfig and the X11 client libraries (libX11, libICE, libSM, libXcursor, libXext, libXi, libXrandr). The deb, rpm and AUR packages pull these in automatically.
+1. Download the latest `infopanel-<version>-linux-x64.tar.gz` from [GitHub Releases](https://github.com/emaspa/InfoPanel-linux/releases). It includes .NET; the host still needs glibc, the GCC/C++ runtime, zlib, ICU, fontconfig, the X11 client libraries (libX11, libICE, libSM, libXcursor, libXext, libXi, libXrandr) and libjpeg-turbo's `libturbojpeg.so.0`. Without libjpeg-turbo the app still runs but encodes panel JPEGs about 7 times slower. The deb, rpm and AUR packages pull these in automatically.
 2. Extract it and run the installer:
    ```bash
    tar xf infopanel-<version>-linux-x64.tar.gz
@@ -142,17 +142,17 @@ If a panel is not detected, confirm the udev rules are installed and the panel i
 
 ## Rendering on a GPU
 
-Panel frames are drawn on the CPU by default. To move that work to a graphics card, open Settings and pick a GPU under **Render panels on**. The list names each GPU InfoPanel can draw on without a display attached, with its driver and PCI address. On a machine with both an integrated and a discrete GPU, you choose which one does the work. The line under the list says where frames are drawn right now.
+Panel frames are drawn on the CPU by default. To move that work to a graphics card, open Settings and pick a GPU under **Rendering > Render panels on**. The list names each GPU InfoPanel can draw on without a display attached, with its driver and PCI address. On a machine with both an integrated and a discrete GPU, you choose which one does the work. The line under the list says where frames are drawn right now.
 
 The choice covers everything that reads the shared panel frames: USB panels, desktop overlays and the web viewer. It takes effect on the next frame. No restart needed.
 
-If the GPU fails, InfoPanel goes back to the CPU and shows the reason under the list. The usual causes are a missing driver, a context error or a frame that never finishes. After an error it tries the GPU again five seconds later. After a frame that never finishes it stays on the CPU until you pick a device again.
+If the GPU fails, InfoPanel goes back to the CPU and shows the reason under the list. The usual causes are a missing driver, a context error or a frame that never finishes. If frames start failing on a GPU that was working, for example after a suspend, InfoPanel tries a fresh context five seconds later, up to five times. If the GPU can't be set up at all, or a frame never finishes, it stays on the CPU until you pick a device again.
 
 Don't expect a big CPU saving. The CPU renderer draws a typical panel frame in a few milliseconds, and frames whose content hasn't changed are reused. In our tests an AMD integrated GPU used about the same CPU as the CPU renderer, and the NVIDIA driver used more. GPU rendering mainly helps when a profile is heavy to draw.
 
 If you game on the discrete GPU, pick the integrated one, so the panels never compete with the game for the card. On a laptop, rendering on the discrete GPU keeps it from sleeping.
 
-**Hardware video decoding**, under the same heading, is a separate switch for video items. It lets ffmpeg decode on the GPU, which cut ffmpeg from about 0.3 to 0.2 of a CPU core in our tests. It is off by default because some VA-API drivers stall. If a video stops updating with it on, InfoPanel restarts ffmpeg without hardware decoding.
+**Hardware video decoding**, under the same heading, is a separate switch for video items. It lets ffmpeg decode on the GPU, which cut ffmpeg from about 0.3 to 0.2 of a CPU core in our tests. It is off by default because some VA-API drivers stall. If a video stops updating with it on, InfoPanel restarts ffmpeg for that video without hardware decoding.
 
 ## Hotkeys
 

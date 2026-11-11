@@ -73,6 +73,18 @@ and repository updates are mutable, so this pins the tested distribution/ABI
 family, not a byte-for-byte snapshot of every dependency. Arch is rolling, so
 its check accepts any `VERSION_ID`, including official image build dates.
 
+### Skia native library
+
+`Directory.Build.targets` replaces the `libSkiaSharp.so` that SkiaSharp
+3.119.2 and later ship with the one from `SkiaSharp.NativeAssets.Linux`
+3.119.1. The newer builds use retpolines, which make CPU rendering 1.6 to 9
+times slower. The swap applies to every build, publish and test run;
+`-p:SkiaNativeRetpolineFree=false` restores the stock library. CI does not run
+the .NET tests, so after changing SkiaSharp or Avalonia versions run
+`SkiaNativeTests` locally (it fails when the loaded library has retpolines)
+and keep `SkiaNativeRetpolineFreeVersion` on a build whose C API matches the
+managed assembly.
+
 ## One-time maintainer setup
 
 1. Confirm the existing AUR package is still owned by AUR account
@@ -160,12 +172,11 @@ verify Arch's announcement and update the pin in `packaging/publish-aur.sh`.
    ```bash
    python3 packaging/version.py v0.3.1
    git tag -a v0.3.1 -m 'InfoPanel 0.3.1'
-   git push linux v0.3.1
+   git push origin v0.3.1
    ```
 
-   Push the tag to the `emaspa/InfoPanel-linux` remote. In the maintainer's
-   clone that remote is named `linux`; `origin` there is the Windows fork, and a
-   tag pushed to it triggers nothing.
+   Push the tag to the remote that points at `emaspa/InfoPanel-linux`
+   (`origin` in a plain clone). A tag pushed to a fork triggers nothing.
 
    These are maintainer instructions; the automation implementation does not
    create or push your tag. The tag must contain the release workflow.
@@ -253,7 +264,6 @@ own SDK/lint tools. `VERSION` comes from the csproj. These commands publish
 nothing and do not require secrets:
 
 ```bash
-cd /home/emanuele/infopanel-v2
 export VERSION="$(python3 packaging/version.py)"
 export SOURCE_DATE_EPOCH="$(git show -s --format=%ct HEAD)"
 mkdir -p artifacts

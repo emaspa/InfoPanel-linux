@@ -165,7 +165,8 @@ InfoPanel.App (Avalonia 12 UI, tray, headless CLI)
    │    └─ InfoPanel.Devices    supervisor/worker framework, frame mailbox
    ├─ InfoPanel.Sensors(.Linux) hwmon/GPU monitors, plugin monitor
    ├─ InfoPanel.Rendering       SkiaSharp pipeline: PanelDraw, graphs,
-   │                            image cache, font cache
+   │                            image/font caches, ffmpeg video, JPEG
+   │                            encoder, optional GPU (EGL) renderer
    ├─ InfoPanel.Platform(.Linux) OS seams: SG_IO SCSI, autostart, X11
    │                            hotkeys, foreground app detection
    └─ InfoPanel.Core            models, XML persistence, stores (UI-free)
@@ -181,13 +182,17 @@ Key design points:
   profile renders directly at panel size instead of downscaling every
   frame. A content-version check lets unchanged frames skip the resize,
   encode and USB transfer (throttled keepalives protect panel firmware
-  that treats a stopped stream as disconnect). JPEG encoding runs outside
-  the shared-frame lock, video and plugin-image resamples are cached per
-  frame and output size, and text layouts and font lookups are cached
-  while unchanged. Frames are drawn on the CPU by default. Settings can
-  move them to any GPU that headless EGL exposes, so an integrated GPU can
-  draw the panels while the discrete one runs games. If the GPU fails,
-  frames go back to the CPU.
+  that treats a stopped stream as disconnect). When a profile renders the
+  same pixels several times in a row it is redrawn less often, down to
+  every 100 ms, until something changes. Thermalright panels send frames
+  on a fixed schedule, so render and encode time don't lower their frame
+  rate. JPEG encoding uses libjpeg-turbo and runs outside the shared-frame
+  lock. ffmpeg scales video to the size it is drawn at, plugin-image
+  resamples are cached per frame and output size, and static images, glow
+  text, text layouts and font lookups are cached while unchanged. Frames
+  are drawn on the CPU by default. Settings can move them to any GPU that
+  headless EGL exposes, so an integrated GPU can draw the panels while the
+  discrete one runs games. If the GPU fails, frames go back to the CPU.
 - **Demand-driven sensing**: only sensors referenced by a profile that is
   actually being consumed are polled each second, and a plugin whose
   sensors are unused for a few minutes stops completely (audio capture,
@@ -267,7 +272,7 @@ are simply left running across the suspend.
 | Model | Resolution |
 |---|---|
 | Grand / Hydro / Hyper / Peerless Vision 240/360 | 480×480 |
-| Wonder Vision 360 6.67" (v1 and v2 firmware) | 2400×1080 (renders 1600×720) |
+| Wonder Vision 360 6.67" (v1 and v2 firmware) ✓ | 2400×1080 (renders 1600×720) |
 | Rainbow Vision 360 6.67" | 2400×1080 (renders 1600×720) |
 | Levita Vision 360 6.67" | 2400×1080 (renders 1600×720) |
 | TL-M10 Vision | 1920×462 |
@@ -508,7 +513,7 @@ Requirements and optional dependencies:
 - **Fast JPEG encoding for panels**: `libturbojpeg.so.0` (`libjpeg-turbo` on
   Arch, `libturbojpeg0` on Debian/Ubuntu, `turbojpeg` on Fedora; the packages
   depend on it). Without it InfoPanel uses Skia's slower encoder.
-- **GPU rendering** (optional, Settings > Render panels on): the NVIDIA
+- **GPU rendering** (optional, Settings > Rendering > Render panels on): the NVIDIA
   proprietary driver, or Mesa for AMD and Intel. Either needs EGL device
   support, which current versions have.
 - **Audio Spectrum**: PulseAudio or PipeWire (uses `parec`/`pactl`).
@@ -578,7 +583,9 @@ A single instance is enforced via a lock file in the data directory.
 
 Environment variables: `INFOPANEL_DATA_DIR` relocates the data directory;
 `INFOPANEL_RENDER_MODE` (`software`, `egl`, `glx`) overrides the UI
-rendering backend for diagnosing platform issues.
+rendering backend for diagnosing platform issues; `INFOPANEL_JPEG_ENCODER=skia`
+encodes panel JPEGs with Skia instead of libjpeg-turbo, in case a panel
+rejects libjpeg-turbo's output.
 
 ## Credits
 
