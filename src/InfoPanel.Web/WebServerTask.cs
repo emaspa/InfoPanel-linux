@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Builder;
+using InfoPanel.Imaging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Hosting;
 using SkiaSharp;
@@ -303,9 +304,7 @@ namespace InfoPanel
                         byte[]? payload = null;
                         SharedFrameCache.WithFrame(profile, Math.Max(50, DeviceRuntime.Settings.WebServerRefreshRate), (bitmap, _) =>
                         {
-                            using var pixmap = bitmap.PeekPixels();
-                            using var data = pixmap.Encode(SKEncodedImageFormat.Jpeg, 90);
-                            payload = data?.ToArray();
+                            payload = JpegEncoder.TryEncode(bitmap, 90);
                         });
 
                         if (payload == null)

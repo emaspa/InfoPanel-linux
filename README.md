@@ -502,6 +502,9 @@ Requirements and optional dependencies:
 - **Intel GPU engine utilization**: `sysctl kernel.perf_event_paranoid=-1`
   (see comments in `packaging/infopanel-udev.rules`).
 - **Video/RTSP display items**: a system `ffmpeg` binary.
+- **Fast JPEG encoding for panels**: `libturbojpeg.so.0` (`libjpeg-turbo` on
+  Arch, `libturbojpeg0` on Debian/Ubuntu, `turbojpeg` on Fedora; the packages
+  depend on it). Without it InfoPanel uses Skia's slower encoder.
 - **Audio Spectrum**: PulseAudio or PipeWire (uses `parec`/`pactl`).
 - **SMART sensors**: `smartmontools`.
 

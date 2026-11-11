@@ -1,5 +1,6 @@
 using InfoPanel.Drawing;
 using InfoPanel.Extensions;
+using InfoPanel.Imaging;
 using InfoPanel.Models;
 using InfoPanel.ThermaltakePanel;
 using InfoPanel.Utils;
@@ -217,10 +218,7 @@ namespace InfoPanel.Services
                                 encodeBitmap = dimmed;
                             }
 
-                            int quality = _device.JpegQuality;
-                            using var image = SKImage.FromBitmap(encodeBitmap);
-                            using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
-                            return data.ToArray();
+                            return JpegEncoder.Encode(encodeBitmap, _device.JpegQuality);
                         }
                         finally
                         {
@@ -267,9 +265,7 @@ namespace InfoPanel.Services
             using var bitmap = new SKBitmap(_panelWidth, _panelHeight, SKColorType.Rgba8888, SKAlphaType.Opaque);
             using var canvas = new SKCanvas(bitmap);
             canvas.Clear(SKColors.Black);
-            using var image = SKImage.FromBitmap(bitmap);
-            using var data = image.Encode(SKEncodedImageFormat.Jpeg, 50);
-            _cachedBlackJpeg = data.ToArray();
+            _cachedBlackJpeg = JpegEncoder.Encode(bitmap, 50);
             return _cachedBlackJpeg;
         }
     }

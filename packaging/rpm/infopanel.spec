@@ -7,7 +7,7 @@ URL:            https://github.com/emaspa/InfoPanel-linux
 Source0:        %{url}/releases/download/v%{version}/infopanel-%{version}-linux-x64.tar.gz
 Source1:        stage-package.sh
 BuildArch:      x86_64
-Requires:       glibc, libgcc, libstdc++, zlib-ng-compat, libicu, fontconfig, libX11, libICE, libSM, libXcursor, libXext, libXi, libXrandr
+Requires:       glibc, libgcc, libstdc++, zlib-ng-compat, libicu, fontconfig, libX11, libICE, libSM, libXcursor, libXext, libXi, libXrandr, turbojpeg
 Suggests:       ffmpeg-free
 Suggests:       smartmontools
 Suggests:       (pipewire-pulseaudio or pulseaudio)

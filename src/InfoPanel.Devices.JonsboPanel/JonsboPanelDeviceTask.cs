@@ -1,5 +1,6 @@
 using InfoPanel.Drawing;
 using InfoPanel.Extensions;
+using InfoPanel.Imaging;
 using InfoPanel.JonsboPanel;
 using InfoPanel.Models;
 using InfoPanel.Utils;
@@ -266,18 +267,16 @@ namespace InfoPanel.Services
                     }
 
                     int quality = _device.JpegQuality;
-                    using var image = SKImage.FromBitmap(encodeBitmap);
 
                     // Drop quality until the JPEG fits the soft payload cap.
                     for (int attempt = 0; attempt < 5; attempt++)
                     {
-                        using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
-                        if (data.Size <= maxBytes || quality <= 30)
-                            return data.ToArray();
+                        var data = JpegEncoder.Encode(encodeBitmap, quality);
+                        if (data.Length <= maxBytes || quality <= 30)
+                            return data;
                         quality = Math.Max(30, quality - 15);
                     }
-                    using var fallback = image.Encode(SKEncodedImageFormat.Jpeg, 30);
-                    return fallback.ToArray();
+                    return JpegEncoder.Encode(encodeBitmap, 30);
                 }
                 finally
                 {
@@ -318,9 +317,7 @@ namespace InfoPanel.Services
             using var bitmap = new SKBitmap(_panelWidth, _panelHeight, SKColorType.Rgba8888, SKAlphaType.Opaque);
             using var canvas = new SKCanvas(bitmap);
             canvas.Clear(SKColors.Black);
-            using var image = SKImage.FromBitmap(bitmap);
-            using var data = image.Encode(SKEncodedImageFormat.Jpeg, 50);
-            _cachedBlackJpeg = data.ToArray();
+            _cachedBlackJpeg = JpegEncoder.Encode(bitmap, 50);
             return _cachedBlackJpeg;
         }
 

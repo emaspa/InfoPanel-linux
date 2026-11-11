@@ -43,6 +43,7 @@ does not remove user profiles.
 | libxext | libxext6 | libXext |
 | libxi | libxi6 | libXi |
 | libxrandr | libxrandr2 | libXrandr |
+| libjpeg-turbo | libturbojpeg0 | turbojpeg |
 | ffmpeg (optional) | ffmpeg | ffmpeg-free |
 | smartmontools (optional) | smartmontools | smartmontools |
 | pipewire-pulse or pulseaudio (optional) | pipewire-pulse or pulseaudio | pipewire-pulseaudio or pulseaudio |
@@ -285,9 +286,9 @@ docker run --rm --platform linux/amd64 \
 
 Immediately after package installation, before installing any test tools, each
 install check requires `ldconfig -p` to resolve `libXcursor.so.1`, `libXext.so.6`,
-`libXi.so.6` and `libXrandr.so.2`. This prevents later tooling from masking an
-undeclared X11 dependency. In Ubuntu, the test first removes the minimized
-image's `/etc/dpkg/dpkg.cfg.d/excludes` so dpkg installs documentation as on a
+`libXi.so.6`, `libXrandr.so.2` and `libturbojpeg.so.0`. This prevents later
+tooling from masking an undeclared X11 or JPEG encoder dependency. In Ubuntu,
+the test first removes the minimized image's `/etc/dpkg/dpkg.cfg.d/excludes` so dpkg installs documentation as on a
 desktop, including the checked licence files.
 
 Each install command must print `PASS` after `/usr/bin/infopanel --dump-sensors`

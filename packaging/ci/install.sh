@@ -29,9 +29,9 @@ case "$target" in
         ;;
 esac
 # Check before installing any test tools: their dependencies could otherwise
-# hide a missing Avalonia X11 runtime dependency in the package metadata.
+# hide a missing Avalonia X11 or libturbojpeg dependency in the package metadata.
 library_cache="$(ldconfig -p)"
-for soname in libXcursor.so.1 libXext.so.6 libXi.so.6 libXrandr.so.2; do
+for soname in libXcursor.so.1 libXext.so.6 libXi.so.6 libXrandr.so.2 libturbojpeg.so.0; do
     if ! awk -v soname="$soname" '$1 == soname { found = 1 } END { exit !found }' <<< "$library_cache"; then
         echo "Missing declared runtime library: $soname" >&2
         exit 1

@@ -17,7 +17,7 @@ Priority: optional
 Architecture: amd64
 Maintainer: Emanuele Sparvoli <sparvoli@gmail.com>
 Installed-Size: $installed_size
-Depends: libc6, libgcc-s1, libstdc++6, zlib1g, libicu78, libfontconfig1, libx11-6, libice6, libsm6, libxcursor1, libxext6, libxi6, libxrandr2
+Depends: libc6, libgcc-s1, libstdc++6, zlib1g, libicu78, libfontconfig1, libx11-6, libice6, libsm6, libxcursor1, libxext6, libxi6, libxrandr2, libturbojpeg0
 Suggests: ffmpeg, smartmontools, pipewire-pulse | pulseaudio, pulseaudio-utils
 Homepage: https://github.com/emaspa/InfoPanel-linux
 Description: Hardware monitoring dashboards for Linux

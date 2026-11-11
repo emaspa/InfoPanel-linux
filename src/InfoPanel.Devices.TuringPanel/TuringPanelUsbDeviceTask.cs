@@ -1,4 +1,5 @@
 using InfoPanel.Extensions;
+using InfoPanel.Imaging;
 using InfoPanel.Models;
 using InfoPanel.TuringPanel;
 using InfoPanel.Utils;
@@ -88,16 +89,15 @@ namespace InfoPanel.Services
                     var resizedBitmap = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, rotation);
                     try
                     {
-                        using var pixmap = resizedBitmap.PeekPixels();
-                        using var data = pixmap.Encode(SKEncodedImageFormat.Jpeg, quality);
+                        var data = JpegEncoder.TryEncode(resizedBitmap, quality);
 
-                        if (data == null || data.IsEmpty)
+                        if (data == null || data.Length == 0)
                         {
                             Logger.Error("TuringPanelDevice {Device}: Failed to encode bitmap to JPEG", _device);
                             return null!;
                         }
 
-                        return data.ToArray();
+                        return data;
                     }
                     finally
                     {

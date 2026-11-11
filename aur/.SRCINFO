@@ -18,6 +18,7 @@ pkgbase = infopanel-bin
 	depends = libxext
 	depends = libxi
 	depends = libxrandr
+	depends = libjpeg-turbo
 	optdepends = ffmpeg: video and RTSP display items
 	optdepends = smartmontools: SMART drive health sensors
 	optdepends = pipewire-pulse: audio spectrum plugin (or pulseaudio)

@@ -1,4 +1,5 @@
 using InfoPanel.Extensions;
+using InfoPanel.Imaging;
 using System.Buffers;
 using System.Linq;
 using InfoPanel.Models;
@@ -191,8 +192,9 @@ namespace InfoPanel.Services
             var result = SKBitmapExtensions.EnsureBitmapSize(bitmap, _panelWidth, _panelHeight, _device.Rotation);
             if (ReferenceEquals(result, bitmap))
             {
-                // Same size, no rotation: copy so the shared frame never escapes the lock
-                result = bitmap.Copy();
+                // Same size, no rotation: copy so the shared frame never escapes the lock.
+                // Raw span copy: SKBitmap.Copy() is ~15x slower (1.6 ms vs 0.1 ms at 1920x480).
+                result = CopyPixels(bitmap);
             }
 
             if (_device.Brightness < 100)
@@ -236,7 +238,7 @@ namespace InfoPanel.Services
             {
                 int quality = _device.JpegQuality;
 
-                byte[] result = EncodeJpegSkia(prepared, quality);
+                byte[] result = JpegEncoder.Encode(prepared, quality);
 
                 // Adaptive quality: if JPEG exceeds device buffer limit, re-encode smaller
                 // (TRCC drops frames >= 450KB and reduces quality by 5; we re-encode in-place)
@@ -244,7 +246,7 @@ namespace InfoPanel.Services
                 {
                     for (quality -= 5; quality >= 50 && result.Length > _maxJpegSize; quality -= 5)
                     {
-                        result = EncodeJpegSkia(prepared, quality);
+                        result = JpegEncoder.Encode(prepared, quality);
                     }
                 }
 
@@ -254,6 +256,15 @@ namespace InfoPanel.Services
             {
                 prepared.Dispose();
             }
+        }
+
+        private static unsafe SKBitmap CopyPixels(SKBitmap source)
+        {
+            // Same row stride as the source, so the pixel buffers are byte-for-byte identical in layout
+            var copy = new SKBitmap(source.Info, source.RowBytes);
+            new ReadOnlySpan<byte>((void*)source.GetPixels(), source.ByteCount)
+                .CopyTo(new Span<byte>((void*)copy.GetPixels(), copy.ByteCount));
+            return copy;
         }
 
         private byte[]? GenerateRgb565Buffer()
@@ -429,10 +440,7 @@ namespace InfoPanel.Services
         {
             using var bitmap = new SKBitmap(_panelWidth, _panelHeight, SKColorType.Rgba8888, SKAlphaType.Opaque);
             bitmap.Erase(SKColors.Black);
-            using var image = SKImage.FromBitmap(bitmap);
-            int quality = _device.JpegQuality;
-            using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
-            return data.ToArray();
+            return JpegEncoder.Encode(bitmap, _device.JpegQuality);
         }
 
         protected override async Task DoWorkAsync(CancellationToken token)
@@ -2172,16 +2180,6 @@ namespace InfoPanel.Services
 
             _frameAvailable.Dispose();
             renderCts.Dispose();
-        }
-
-        /// <summary>
-        /// Encodes an SKBitmap (RGBA8888) to JPEG via SkiaSharp (libjpeg-turbo, 4:2:0 chroma).
-        /// </summary>
-        private static byte[] EncodeJpegSkia(SKBitmap skBitmap, int quality)
-        {
-            using var image = SKImage.FromBitmap(skBitmap);
-            using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
-            return data.ToArray();
         }
     }
 }
