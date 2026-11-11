@@ -794,34 +794,53 @@ namespace InfoPanel.Models
 
                 if (Type == ImageType.FFMPEG)
                 {
-                    // Resize once per decoded frame and cache the result keyed by
-                    // the decoder's frame version and target size: every consumer
-                    // (multiple panels, preview) then draws the same cached image
-                    // instead of each paying a full-resolution resample per draw.
+                    // Cache one image per decoded frame and target size: every consumer
+                    // (multiple panels, preview) then draws the same cached image.
+                    // The decoder scales inside ffmpeg to the largest size being drawn,
+                    // so the main consumer gets a plain copy; only smaller consumers
+                    // (or frames from before a size change) pay an in-app resample.
                     // Bilinear is plenty for moving video and is several times
                     // cheaper than the Mitchell cubic used for static images.
                     var decoder = _videoDecoder;
                     if (decoder == null)
                         return;
 
+                    decoder.RequestOutputSize(targetWidth, targetHeight);
+
                     var version = decoder.FrameVersion;
                     var sizeKey = (targetWidth, targetHeight);
                     if (!_frameResizeCache.TryGetValue(sizeKey, out var entry)
                         || entry.Version != version)
                     {
-                        SKBitmap? resized = null;
+                        SKImage? produced = null;
                         decoder.TryAccessFrame(frameBitmap =>
                         {
-                            resized = frameBitmap.Resize(
-                                new SKImageInfo(targetWidth, targetHeight),
-                                new SKSamplingOptions(SKFilterMode.Linear));
+                            if (frameBitmap.Width == targetWidth && frameBitmap.Height == targetHeight)
+                            {
+                                // Copies: the decoder reuses this bitmap for later frames.
+                                produced = SKImage.FromBitmap(frameBitmap);
+                            }
+                            else
+                            {
+                                // RGBA/opaque like the frame and the panel surfaces: the
+                                // default BGRA premul info costs a swizzle here and a
+                                // channel swap plus blend on every draw.
+                                using var resized = frameBitmap.Resize(
+                                    new SKImageInfo(targetWidth, targetHeight, SKColorType.Rgba8888, SKAlphaType.Opaque),
+                                    new SKSamplingOptions(SKFilterMode.Linear));
+                                if (resized != null)
+                                {
+                                    // Immutable: the image adopts the pixels instead of copying.
+                                    resized.SetImmutable();
+                                    produced = SKImage.FromBitmap(resized);
+                                }
+                            }
                         });
-                        if (resized == null)
+                        if (produced == null)
                             return;
 
                         entry.Image?.Dispose();
-                        entry = (version, SKImage.FromBitmap(resized));
-                        resized.Dispose();
+                        entry = (version, produced);
                         _frameResizeCache[sizeKey] = entry;
 
                         // Drop sizes no longer being drawn (e.g. after a preview
