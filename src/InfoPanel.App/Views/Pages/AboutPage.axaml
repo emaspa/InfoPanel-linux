@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.4.2 beta: BeadaPanel after a cold boot, startup delay on KDE" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.4.3 beta: no USB reset on connect for every panel" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="The USB change in 0.4.2 that fixed BeadaPanels after a cold boot now covers Thermalright, Turing and Lian Li panels too: InfoPanel no longer sends a USB configuration reset each time it connects to a panel that is already configured, as the Windows app never does." />
+                        <TextBlock Text="v0.4.2 beta: BeadaPanel after a cold boot, startup delay on KDE" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="BeadaPanels could stay dark after a cold boot or a replug, with the log repeating StatusLink read timeouts until InfoPanel was restarted: every connection attempt sent the panel a USB configuration reset, so a panel that had just powered up never got the chance to answer. InfoPanel now leaves the configuration alone when it is already set, as the Windows app does. The startup delay in Settings now works on KDE Plasma and other desktops, not only GNOME. Thanks @Loreweaver75 (#14)." />
                         <TextBlock Text="v0.4.1 beta: lighter video playback, less memory" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
