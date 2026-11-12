@@ -126,11 +126,7 @@ namespace InfoPanel.Services
                     return;
                 }
 
-                if (usbDevice is IUsbDevice wholeUsbDevice)
-                {
-                    wholeUsbDevice.SetConfiguration(1);
-                    wholeUsbDevice.ClaimInterface(0);
-                }
+                BeadaPanelHelper.ClaimStatusInterface(usbDevice);
 
                 var infoMessage = new StatusLinkMessage
                 {

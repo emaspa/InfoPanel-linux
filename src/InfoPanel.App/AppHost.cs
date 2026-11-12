@@ -126,6 +126,13 @@ namespace InfoPanel
 
             // React to settings toggles like v1's ConfigModel did: restart the affected
             // service when a mode changes, keep render pacing and autostart in sync.
+            // Rewrite an existing autostart entry so it picks up the current executable path
+            // and the delay format of this version (pre-0.4.2 entries used a GNOME-only key).
+            if (Settings.AutoStart && Platform.PlatformServices.Autostart?.IsEnabled == true)
+            {
+                Platform.PlatformServices.Autostart.Apply(true, Settings.AutoStartDelay);
+            }
+
             Settings.PropertyChanged += async (_, e) =>
             {
                 try

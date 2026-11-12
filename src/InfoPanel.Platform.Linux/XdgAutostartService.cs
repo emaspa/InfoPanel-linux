@@ -36,9 +36,8 @@ namespace InfoPanel.Platform.Linux
                     Type=Application
                     Name=InfoPanel
                     Comment=Hardware monitoring dashboard
-                    Exec={exePath}
+                    Exec={BuildExec(exePath, delaySeconds)}
                     X-GNOME-Autostart-enabled=true
-                    X-GNOME-Autostart-Delay={delaySeconds}
                     """;
                 File.WriteAllText(DesktopFile, content);
                 Logger.Information("Autostart enabled ({Path}, delay {Delay}s)", DesktopFile, delaySeconds);
@@ -47,6 +46,26 @@ namespace InfoPanel.Platform.Linux
             {
                 Logger.Error(ex, "Failed to update autostart entry");
             }
+        }
+
+        /// <summary>
+        /// Builds the Exec line. The delay is a shell sleep rather than X-GNOME-Autostart-Delay,
+        /// which only GNOME honors: KDE Plasma and other desktops ignored it and started the
+        /// app at login with no delay at all (#14).
+        /// </summary>
+        public static string BuildExec(string exePath, int delaySeconds)
+        {
+            // Inside a double-quoted Exec argument, ", `, $ and \ need escaping that also
+            // interacts with desktop-file string escapes; a path with any of those (or a
+            // single quote, used below) gets no delay rather than a broken Exec line.
+            bool quotable = exePath.IndexOfAny(['"', '`', '$', '\\', '\'', '\n', '\r']) < 0;
+
+            if (delaySeconds <= 0 || !quotable)
+            {
+                return quotable && exePath.Contains(' ') ? $"\"{exePath}\"" : exePath;
+            }
+
+            return $"sh -c \"sleep {delaySeconds}; exec '{exePath}'\"";
         }
     }
 }

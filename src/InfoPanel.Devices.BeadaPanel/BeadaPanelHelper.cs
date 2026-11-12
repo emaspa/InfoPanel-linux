@@ -39,6 +39,33 @@ namespace InfoPanel.BeadaPanel
             return null;
         }
 
+        /// <summary>
+        /// Selects configuration 1 only when it is not already active, then claims interface 0.
+        /// On Linux, SET_CONFIGURATION for the configuration that is already active is not a
+        /// no-op: usbfs turns it into usb_reset_configuration(), which resets the panel's
+        /// endpoints. Sending it on every probe kept a freshly powered panel (cold boot or
+        /// replug) from ever answering StatusLink, so the probe timed out forever (#14).
+        /// The Windows app talks to the panel through WinUSB and never sends it at all.
+        /// </summary>
+        internal static void ClaimStatusInterface(UsbDevice usbDevice)
+        {
+            if (usbDevice is not IUsbDevice wholeUsbDevice)
+            {
+                return;
+            }
+
+            if (!usbDevice.GetConfiguration(out byte config) || config != 1)
+            {
+                Logger.Information("BeadaPanel: active configuration is {Config}, selecting configuration 1", config);
+                wholeUsbDevice.SetConfiguration(1);
+            }
+
+            if (!wholeUsbDevice.ClaimInterface(0))
+            {
+                Logger.Warning("BeadaPanel: claiming interface 0 failed: {Error}", UsbDevice.LastErrorString);
+            }
+        }
+
         private static BeadaPanelInfo? GetPanelInfo(UsbRegistry usbRegistry)
         {
             if (_panelInfoCache.TryGetValue(usbRegistry.DevicePath, out var result))
@@ -55,11 +82,7 @@ namespace InfoPanel.BeadaPanel
                 return null;
             }
 
-            if (usbDevice is IUsbDevice wholeUsbDevice)
-            {
-                wholeUsbDevice.SetConfiguration(1);
-                wholeUsbDevice.ClaimInterface(0);
-            }
+            ClaimStatusInterface(usbDevice);
 
             var infoMessage = new StatusLinkMessage
             {
@@ -82,7 +105,7 @@ namespace InfoPanel.BeadaPanel
 
             if (readResult != ErrorCode.None || bytesRead == 0)
             {
-                Log.Error("StatusLink Query: Read failed with error {ErrorCode}, bytes read: {BytesRead}", readResult, bytesRead);
+                Logger.Error("StatusLink Query: Read failed on {DevicePath} with error {ErrorCode}, bytes read: {BytesRead}", usbRegistry.DevicePath, readResult, bytesRead);
                 return null;
             }
 
