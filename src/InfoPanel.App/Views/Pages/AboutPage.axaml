@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.4.1 beta: lighter video playback, less memory" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.4.2 beta: BeadaPanel after a cold boot, startup delay on KDE" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="BeadaPanels could stay dark after a cold boot or a replug, with the log repeating StatusLink read timeouts until InfoPanel was restarted: every connection attempt sent the panel a USB configuration reset, so a panel that had just powered up never got the chance to answer. InfoPanel now leaves the configuration alone when it is already set, as the Windows app does. The startup delay in Settings now works on KDE Plasma and other desktops, not only GNOME. Thanks @Loreweaver75 (#14)." />
+                        <TextBlock Text="v0.4.1 beta: lighter video playback, less memory" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="ffmpeg runs with fewer threads and plays a large video from a copy re-encoded once at the size it is drawn, kept in ~/.cache/infopanel/video. For a 2400x1080 video on a 1600x720 panel that took ffmpeg from 0.27 to 0.10 of a CPU core and from 450 to about 180 MB. InfoPanel limits glibc's malloc to two arenas, which saved about 120 MB on a 32-thread CPU. Hardware video decoding now uses an integrated GPU through VA-API before an NVIDIA card, and scales on the GPU." />
                         <TextBlock Text="v0.4.0 beta: much lower CPU use, optional GPU rendering" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
