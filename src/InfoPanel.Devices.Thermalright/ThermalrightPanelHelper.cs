@@ -312,7 +312,7 @@ namespace InfoPanel.ThermalrightPanel
 
             if (usbDevice is IUsbDevice wholeUsbDevice)
             {
-                wholeUsbDevice.SetConfiguration(1);
+                UsbConfiguration.EnsureConfiguration(usbDevice);
                 wholeUsbDevice.ClaimInterface(0);
             }
 
@@ -522,7 +522,7 @@ namespace InfoPanel.ThermalrightPanel
 
             if (usbDevice is IUsbDevice wholeUsbDevice)
             {
-                wholeUsbDevice.SetConfiguration(1);
+                UsbConfiguration.EnsureConfiguration(usbDevice);
                 wholeUsbDevice.ClaimInterface(0);
             }
 

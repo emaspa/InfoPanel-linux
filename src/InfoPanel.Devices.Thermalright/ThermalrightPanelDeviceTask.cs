@@ -731,7 +731,7 @@ namespace InfoPanel.Services
                 // Claim the interface (required for WinUSB devices)
                 if (usbDevice is IUsbDevice wholeUsbDevice)
                 {
-                    wholeUsbDevice.SetConfiguration(1);
+                    UsbConfiguration.EnsureConfiguration(usbDevice);
                     wholeUsbDevice.ClaimInterface(0);
                 }
                 else
@@ -1939,7 +1939,7 @@ namespace InfoPanel.Services
                                     catch (Exception ex) { Logger.Warning(ex, "SetAutoDetachKernelDriver failed, continuing"); }
                                 }
 
-                                wholeBulkDevice.SetConfiguration(1);
+                                UsbConfiguration.EnsureConfiguration(bulkDevice);
                                 if (!wholeBulkDevice.ClaimInterface(bulkInterface))
                                 {
                                     throw new Exception($"Failed to claim bulk interface {bulkInterface}");

@@ -47,7 +47,7 @@ namespace InfoPanel.LianLiPanel
 
             if (_usbDevice is IUsbDevice wholeUsbDevice)
             {
-                wholeUsbDevice.SetConfiguration(1);
+                UsbConfiguration.EnsureConfiguration(_usbDevice);
                 wholeUsbDevice.ClaimInterface(0);
             }
 

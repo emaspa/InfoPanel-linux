@@ -54,11 +54,7 @@ namespace InfoPanel.BeadaPanel
                 return;
             }
 
-            if (!usbDevice.GetConfiguration(out byte config) || config != 1)
-            {
-                Logger.Information("BeadaPanel: active configuration is {Config}, selecting configuration 1", config);
-                wholeUsbDevice.SetConfiguration(1);
-            }
+            UsbConfiguration.EnsureConfiguration(usbDevice);
 
             if (!wholeUsbDevice.ClaimInterface(0))
             {

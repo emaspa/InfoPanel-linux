@@ -160,7 +160,7 @@ namespace InfoPanel.TuringPanel
                         try { wholeUsbDevice.SetAutoDetachKernelDriver(true); }
                         catch (Exception ex) { Logger.Warning(ex, "SetAutoDetachKernelDriver failed, continuing"); }
                     }
-                    wholeUsbDevice.SetConfiguration(1);
+                    UsbConfiguration.EnsureConfiguration(_device);
                     wholeUsbDevice.ClaimInterface(0);
                 }
 
