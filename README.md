@@ -67,7 +67,9 @@ bad editing session is never fatal.
 Native Linux providers, no kernel modules or vendor daemons required:
 
 - **hwmon/sysfs**: CPU temperatures, voltages, fans, power, NVMe and SATA
-  drive temperatures, and everything else the kernel exposes.
+  drive temperatures, and everything else the kernel exposes. A chip that
+  counts energy but reports no power, such as an Arc card on the xe driver,
+  gets power in watts averaged over 5 seconds.
 - **Intel GPU**: on i915, frequency from sysfs and engine utilization from PMU
   perf events. On xe, the driver for Arc B-series cards and Lunar Lake or
   newer, frequency plus GPU and media utilization from sysfs, which needs no

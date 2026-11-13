@@ -30,6 +30,10 @@ public class HwmonMonitor
     private long _nextScan;
     private HwmonPollPlan _plan = new([]);
     private const int RescanIntervalMs = 10_000;
+    // Energy counters are reported as the average power over this window. Some update in bursts:
+    // the Arc B580's pkg counter read 20 W and then 112 W over two one-second samples (#16).
+    internal const long EnergyWindowMs = 5_000;
+    private readonly Dictionary<string, List<(long Ms, double Joules)>> _energy = new(StringComparer.Ordinal);
     public SensorIdResolver Resolver { get; }
     public SensorCatalogSnapshot? Catalog => Resolver.Snapshot;
     public event EventHandler<SensorCatalogSnapshot>? CatalogChanged;
@@ -139,7 +143,10 @@ public class HwmonMonitor
                             if (!scan.Snapshot.StableIdIndex.TryGetValue(old.StableId, out var replacement)
                                 || old.RealPath != replacement.RealPath || old.ValuePath != replacement.ValuePath
                                 || old.Unit != replacement.Unit || old.Divisor != replacement.Divisor)
+                            {
                                 SENSORHASH.TryRemove(old.StableId, out _);
+                                _energy.Remove(old.StableId);
+                            }
                         }
                         _plan = scan.PollPlan;
                         Resolver.Publish(scan.Snapshot);
@@ -178,9 +185,15 @@ public class HwmonMonitor
             if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) || !double.IsFinite(number))
             {
                 SENSORHASH.TryRemove(entry.StableId, out _);
+                _energy.Remove(entry.StableId);
                 continue;
             }
             var value = number / entry.Divisor;
+            if (entry.IsEnergy)
+            {
+                if (EnergyToPower(entry.StableId, _clock(), value) is not { } watts) continue;
+                value = watts;
+            }
             if (SENSORHASH.TryGetValue(entry.StableId, out var existing))
             {
                 var min = Math.Min(existing.ValueMin, value);
@@ -194,6 +207,24 @@ public class HwmonMonitor
         try { _systemPoll(); }
         catch (Exception ex) { Log.Debug(ex, "LinuxSystemSensors poll error"); }
         finally { if (forcePollAll) SensorDemand.ForcePollAll = forced; }
+    }
+
+    /// <summary>Average power since the newest sample at least a window old; null until two samples exist.</summary>
+    private double? EnergyToPower(string id, long nowMs, double joules)
+    {
+        if (!_energy.TryGetValue(id, out var samples)) _energy[id] = samples = [];
+        if (samples.Count > 0)
+        {
+            if (nowMs <= samples[^1].Ms) return null;
+            if (joules < samples[^1].Joules) samples.Clear(); // the counter restarted, e.g. on a driver reload
+        }
+        samples.Add((nowMs, joules));
+        while (samples.Count > 2 && nowMs - samples[1].Ms >= EnergyWindowMs) samples.RemoveAt(0);
+        // A start sample from long ago (the sensor was not on any panel) says nothing about the current draw.
+        while (samples.Count > 1 && nowMs - samples[0].Ms > 2 * EnergyWindowMs) samples.RemoveAt(0);
+        if (samples.Count < 2) return null;
+        var (startMs, startJoules) = samples[0];
+        return (joules - startJoules) * 1000 / (nowMs - startMs);
     }
 
     public static List<HwmonSensorInfo> GetOrderedList() => GetOrderedList(Instance);

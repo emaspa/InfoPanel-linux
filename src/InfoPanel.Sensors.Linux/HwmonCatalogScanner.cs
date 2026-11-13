@@ -4,7 +4,8 @@ using InfoPanel.Sensors;
 
 namespace InfoPanel.Services;
 
-public sealed record HwmonPollEntry(string StableId, string ValuePath, string RealPath, string Unit, double Divisor);
+/// <summary>An energy entry holds a cumulative counter (joules after Divisor); the monitor reports its rate in watts.</summary>
+public sealed record HwmonPollEntry(string StableId, string ValuePath, string RealPath, string Unit, double Divisor, bool IsEnergy = false);
 public sealed record HwmonPollPlan(ImmutableArray<HwmonPollEntry> Entries);
 public sealed record HwmonScanResult(SensorCatalogSnapshot Snapshot, HwmonPollPlan PollPlan, bool IsIdentical);
 
@@ -16,7 +17,9 @@ public sealed class HwmonCatalogScanner(SysfsAccess sysfs, Func<IEnumerable<Sens
     {
         ["temp"] = ("Temperature", "°C", 1000), ["fan"] = ("Fan", "RPM", 1), ["in"] = ("Voltage", "V", 1000),
         ["curr"] = ("Current", "A", 1000), ["power"] = ("Power", "W", 1000000),
-        ["freq"] = ("Frequency", "MHz", 1000000), ["humidity"] = ("Humidity", "%", 1000)
+        ["freq"] = ("Frequency", "MHz", 1000000), ["humidity"] = ("Humidity", "%", 1000),
+        // energyN_input is a cumulative counter in microjoules; HwmonMonitor turns it into watts.
+        ["energy"] = ("Power", "W", 1000000)
     };
 
     public HwmonScanResult Scan(SensorCatalogSnapshot? previous = null)
@@ -55,8 +58,14 @@ public sealed class HwmonCatalogScanner(SysfsAccess sysfs, Func<IEnumerable<Sens
                 var label = sysfs.ReadMetadata(Path.Combine(path, channel + "_label"));
                 channels.Add((channel, string.IsNullOrWhiteSpace(label) ? null : label));
             }
+            // Power from an energy counter only where the chip reports no power itself (xe on Arc B580: #16);
+            // a WireView's energy1 would just repeat its power1 'Total'.
+            if (channels.Any(c => c.Channel.StartsWith("power", StringComparison.Ordinal)))
+                channels.RemoveAll(c => IsEnergy(c.Channel));
             var chipLabel = sysfs.ReadMetadata(Path.Combine(path, "label"));
-            var identity = _identity.Derive(real, rawChip, channels, zones, string.IsNullOrWhiteSpace(chipLabel) ? null : chipLabel);
+            // Energy channels were added after IDs shipped; leave them out of the identity so existing IDs keep their values.
+            var identity = _identity.Derive(real, rawChip, channels.Where(c => !IsEnergy(c.Channel)).ToList(), zones,
+                string.IsNullOrWhiteSpace(chipLabel) ? null : chipLabel);
             foreach (var (channel, label) in channels)
             {
                 var prefix = Regex.Match(channel, @"\A[a-z]+").Value;
@@ -75,7 +84,9 @@ public sealed class HwmonCatalogScanner(SysfsAccess sysfs, Func<IEnumerable<Sens
         var identical = previous?.HasSameDescriptors(descriptors) == true;
         var snapshot = identical ? previous! : new SensorCatalogSnapshot((previous?.Generation ?? 0) + 1, descriptors);
         var plan = new HwmonPollPlan(snapshot.Descriptors.Where(d => !d.IsAmbiguous && d.Id.Source != "system")
-            .Select(d => new HwmonPollEntry(d.StableId, d.ValuePath, d.RealPath, d.Unit, d.Divisor)).ToImmutableArray());
+            .Select(d => new HwmonPollEntry(d.StableId, d.ValuePath, d.RealPath, d.Unit, d.Divisor, IsEnergy(d.Channel))).ToImmutableArray());
         return new(snapshot, plan, identical);
     }
+
+    private static bool IsEnergy(string channel) => channel.StartsWith("energy", StringComparison.Ordinal);
 }

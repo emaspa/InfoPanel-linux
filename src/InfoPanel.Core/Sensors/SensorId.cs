@@ -8,7 +8,7 @@ namespace InfoPanel.Sensors;
 public sealed record SensorId
 {
     private static readonly UTF8Encoding Utf8 = new(false, true);
-    private static readonly Regex ChannelPattern = new(@"\A(temp|fan|in|curr|power|freq|humidity)(0|[1-9][0-9]*)\z", RegexOptions.CultureInvariant);
+    private static readonly Regex ChannelPattern = new(@"\A(temp|fan|in|curr|power|energy|freq|humidity)(0|[1-9][0-9]*)\z", RegexOptions.CultureInvariant);
     private static readonly Regex LegacyPattern = new(@"\A(?:hwmon[0-9]+/(?:temp|fan|in|curr|power|freq|humidity)[0-9]+|thermal/thermal_zone[0-9]+)\z", RegexOptions.CultureInvariant);
     private static readonly HashSet<string> AnchorKinds = new(StringComparer.Ordinal)
         { "nvme-serial", "block-wwid", "block-serial", "gpu-uuid", "usb-serial", "usb-port", "pci", "platform", "type", "i2c", "name" };
