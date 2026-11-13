@@ -30,6 +30,7 @@ namespace InfoPanel
                     return HeadlessRunner.RunAsync(args).GetAwaiter().GetResult();
                 }
 
+                Utils.SessionManager.Detach();
                 return BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
             }
             catch (Exception ex)
