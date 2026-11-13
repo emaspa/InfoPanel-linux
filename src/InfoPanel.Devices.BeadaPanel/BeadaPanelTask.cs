@@ -30,6 +30,19 @@ namespace InfoPanel
 
         private BeadaPanelTask() { }
 
+        /// <summary>
+        /// Waits for every panel to finish its exit sequence (backlight 0, blank frame,
+        /// Panel-Link end tag). Cancelling this task only cancels the device tasks through
+        /// the linked token, so without this override app shutdown and system sleep went
+        /// straight on to UsbDevice.Exit() and Environment.Exit() while the device tasks
+        /// were still writing, leaving the panel mid-stream (#14).
+        /// </summary>
+        public override async Task StopAsync(bool shutdown = false)
+        {
+            await base.StopAsync(shutdown);
+            await StopAllDevices();
+        }
+
         public async Task StartDevice(BeadaPanelDevice device)
         {
             if(_deviceTasks.TryGetValue(device.Id, out var task))

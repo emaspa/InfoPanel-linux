@@ -21,6 +21,13 @@ namespace InfoPanel.Services
 
         private TuringPanelTask() { }
 
+        /// <summary>Waits for every panel to finish its exit sequence before shutdown or sleep goes on (#14).</summary>
+        public override async Task StopAsync(bool shutdown = false)
+        {
+            await base.StopAsync(shutdown);
+            await StopAllDevices();
+        }
+
         public async Task StartDevice(TuringPanelDevice device)
         {
             if (_deviceTasks.TryGetValue(device.Id, out var task))
