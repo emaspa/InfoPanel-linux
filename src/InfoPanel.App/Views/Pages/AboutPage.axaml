@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.4.4 beta: KDE logout, Intel GPUs on the xe driver" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.4.5 beta: power for Intel Arc cards on the xe driver" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="Hardware that counts energy but reports no power now gets a power sensor in watts, averaged over 5 seconds. On an Arc card on the xe driver that adds card and pkg power. Thanks @Vinnydev93 for testing 0.4.4 on a B580 and for the energy counters (#16)." />
+                        <TextBlock Text="v0.4.4 beta: KDE logout, Intel GPUs on the xe driver" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Since 0.4.0, the first logout or reboot on KDE Plasma failed with 'Logout canceled by &quot;&quot;' while InfoPanel was running. InfoPanel no longer registers with the X11 session manager; the session ends it with SIGTERM as before, and panels are still stopped cleanly on the way out. Thanks @Chris123NT (#15). Intel GPUs on the xe driver (Arc B-series, Lunar Lake and later) now show GPU frequency, GPU utilization and media utilization; before, they had no Intel GPU sensors at all. Thanks @Vinnydev93 (#16)." />
                         <TextBlock Text="v0.4.3 beta: no USB reset on connect for every panel" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
