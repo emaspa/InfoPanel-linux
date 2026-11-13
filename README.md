@@ -68,8 +68,10 @@ Native Linux providers, no kernel modules or vendor daemons required:
 
 - **hwmon/sysfs**: CPU temperatures, voltages, fans, power, NVMe and SATA
   drive temperatures, and everything else the kernel exposes.
-- **Intel GPU**: frequency via sysfs plus engine utilization via PMU perf
-  events.
+- **Intel GPU**: on i915, frequency from sysfs and engine utilization from PMU
+  perf events. On xe, the driver for Arc B-series cards and Lunar Lake or
+  newer, frequency plus GPU and media utilization from sysfs, which needs no
+  extra permissions.
 - **AMD GPU**: ROCm SMI (usage, clocks, VRAM, power, temperature).
 - **NVIDIA GPU**: NVML + NvAPI (usage, clocks, VRAM, power draw and
   limit, GPU/hotspot/VRAM temperatures, core voltage, performance state,
@@ -512,7 +514,7 @@ Requirements and optional dependencies:
   group membership needed. udev 261+ silently rejects rules that assign
   device nodes to non-system groups like the old `plugdev`, which is why the
   rules no longer use it).
-- **Intel GPU engine utilization**: `sysctl kernel.perf_event_paranoid=-1`
+- **Intel GPU engine utilization (i915)**: `sysctl kernel.perf_event_paranoid=-1`
   (see comments in `packaging/infopanel-udev.rules`).
 - **Video/RTSP display items**: a system `ffmpeg` binary.
 - **Fast JPEG encoding for panels**: `libturbojpeg.so.0` (`libjpeg-turbo` on

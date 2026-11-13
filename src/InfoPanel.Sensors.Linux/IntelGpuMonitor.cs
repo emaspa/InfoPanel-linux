@@ -9,18 +9,32 @@ using System.Runtime.InteropServices;
 namespace InfoPanel.Services;
 
 /// <summary>
-/// Intel GPU monitor using i915/xe PMU (Performance Monitoring Unit) via perf_event_open.
-/// Reads GPU utilization, frequency, and RC6 residency from kernel perf counters.
-/// Also reads sysfs for frequency limits and xe driver discrete GPU support.
+/// Intel GPU monitor.
+/// i915: PMU (Performance Monitoring Unit) counters via perf_event_open for frequency,
+/// RC6 residency and per-engine busy time, plus sysfs frequency files.
+/// xe: sysfs only, per GT under device/tile*/gt*: freq0/ for frequencies and
+/// gtidle/idle_residency_ms for utilization. The xe PMU is not used: every open xe
+/// event holds a runtime-PM reference, and engine and frequency events also hold GT
+/// forcewake, so keeping them open would stop the GPU from ever idling (and pin the
+/// utilization read from idle residency at 100%).
 /// </summary>
 public class IntelGpuMonitor
 {
-    private static readonly Lazy<IntelGpuMonitor> _instance = new(() => new IntelGpuMonitor());
+    private static readonly Lazy<IntelGpuMonitor> _instance = new(() => new IntelGpuMonitor(new SysfsAccess()));
     public static IntelGpuMonitor Instance => _instance.Value;
 
+    private readonly SysfsAccess _sysfs;
     private bool _available;
     private string _gpuName = "Intel GPU";
     private string _cardPath = "";
+    private string _pciSlot = "";   // e.g. 0000:03:00.0
+    private bool _isXe;
+
+    // xe: GT sysfs directories (device/tileN/gtN) and idle residency baselines
+    private string? _xeMainGt;
+    private string? _xeMediaGt;
+    private long _prevXeMainIdleMs = -1;
+    private long _prevXeMediaIdleMs = -1;
 
     // PMU file descriptors
     private int _fdActualFreq = -1;
@@ -38,7 +52,7 @@ public class IntelGpuMonitor
     // PMU type from sysfs
     private uint _pmuType;
 
-    private IntelGpuMonitor() { }
+    internal IntelGpuMonitor(SysfsAccess sysfs) => _sysfs = sysfs;
 
     public void Initialize()
     {
@@ -46,6 +60,12 @@ public class IntelGpuMonitor
         {
             // Find Intel GPU card in DRM
             if (!FindIntelGpu()) return;
+
+            if (_isXe)
+            {
+                InitializeXe();
+                return;
+            }
 
             // Try PMU-based monitoring (requires permissions)
             if (ReadPmuType())
@@ -79,18 +99,10 @@ public class IntelGpuMonitor
 
     private bool FindIntelGpu()
     {
-        const string drmPath = "/sys/class/drm";
-        if (!Directory.Exists(drmPath)) return false;
-
-        foreach (var (cardDir, _) in DrmDevices.Scan(new SysfsAccess(), "0x8086"))
+        foreach (var (cardDir, _) in DrmDevices.Scan(_sysfs, "0x8086"))
         {
-            if (Path.GetFileName(cardDir).Contains('-')) continue; // skip connectors
-
-            var vendorFile = Path.Combine(cardDir, "device", "vendor");
-            var vendor = ReadFile(vendorFile);
-            if (vendor != "0x8086") continue; // Intel
-
             _cardPath = cardDir;
+            _pciSlot = Path.GetFileName(_sysfs.ResolvePath(Path.Combine(cardDir, "device")) ?? "");
 
             // Try to get device name
             var deviceId = ReadFile(Path.Combine(cardDir, "device", "device")) ?? "";
@@ -100,6 +112,7 @@ public class IntelGpuMonitor
             var uevent = ReadFile(Path.Combine(cardDir, "device", "uevent"));
             if (uevent != null && uevent.Contains("DRIVER=xe"))
             {
+                _isXe = true;
                 _gpuName = $"Intel GPU [{deviceId}] (xe)";
             }
 
@@ -109,45 +122,55 @@ public class IntelGpuMonitor
         return false;
     }
 
+    private void InitializeXe()
+    {
+        // GTs by number across tiles. gtidle/name ends in -rc for the render/compute GT
+        // and -mc for the standalone media GT (Meteor Lake and later, Battlemage).
+        var device = Path.Combine(_cardPath, "device");
+        var gts = _sysfs.GetDirectories(device, "tile*")
+            .SelectMany(tile => _sysfs.GetDirectories(tile, "gt*"))
+            .Select(dir => (dir, id: int.TryParse(Path.GetFileName(dir).AsSpan(2), out var id) ? id : int.MaxValue))
+            .OrderBy(gt => gt.id)
+            .Select(gt => gt.dir)
+            .ToList();
+
+        foreach (var gt in gts)
+        {
+            var name = ReadFile(Path.Combine(gt, "gtidle", "name")) ?? "";
+            if (name.EndsWith("-mc", StringComparison.Ordinal)) _xeMediaGt ??= gt;
+            else _xeMainGt ??= gt;
+        }
+
+        _available = _xeMainGt != null
+            && (_sysfs.FileExists(Path.Combine(_xeMainGt, "freq0", "act_freq"))
+                || _sysfs.FileExists(Path.Combine(_xeMainGt, "gtidle", "idle_residency_ms")));
+
+        if (_available)
+            Log.Information("Intel GPU monitor initialized (xe sysfs): {Name}, {GtCount} GT(s)", _gpuName, gts.Count);
+        else
+            Log.Debug("Intel GPU: xe device without tile/gt sysfs at {Path}", device);
+    }
+
     private bool ReadPmuType()
     {
-        // Try i915 PMU first, then xe
-        foreach (var pmuName in new[] { "i915", "xe" })
+        // i915 names the integrated GPU's PMU "i915" and a discrete card's after its
+        // PCI address, i915_0000_03_00.0.
+        var names = new List<string>();
+        if (_pciSlot.Length > 0) names.Add("i915_" + _pciSlot.Replace(':', '_'));
+        names.Add("i915");
+
+        foreach (var pmuName in names)
         {
-            var typePath = $"/sys/bus/event_source/devices/{pmuName}/type";
-            var typeStr = ReadFile(typePath);
+            var typeStr = ReadFile(_sysfs.PathUnderRoot("bus", "event_source", "devices", pmuName, "type"));
             if (typeStr != null && uint.TryParse(typeStr, out var type))
             {
                 _pmuType = type;
                 Log.Debug("Intel GPU PMU type: {Type} ({Name})", type, pmuName);
-
-                // For xe driver, check for xe_0000:xx:xx.x format
                 return true;
             }
         }
 
-        // xe driver may use PCI-specific names like xe_0000:03:00.0
-        try
-        {
-            var eventSourcePath = "/sys/bus/event_source/devices";
-            if (Directory.Exists(eventSourcePath))
-            {
-                foreach (var dir in Directory.GetDirectories(eventSourcePath, "xe_*"))
-                {
-                    var typePath = Path.Combine(dir, "type");
-                    var typeStr = ReadFile(typePath);
-                    if (typeStr != null && uint.TryParse(typeStr, out var type))
-                    {
-                        _pmuType = type;
-                        Log.Debug("Intel GPU PMU type: {Type} ({Name})", type, Path.GetFileName(dir));
-                        return true;
-                    }
-                }
-            }
-        }
-        catch { }
-
-        Log.Debug("Intel GPU: no i915/xe PMU found");
+        Log.Debug("Intel GPU: no i915 PMU found");
         return false;
     }
 
@@ -235,13 +258,22 @@ public class IntelGpuMonitor
         _available = false;
     }
 
-    public void Poll()
+    public void Poll() => Poll(GetTimestampNs());
+
+    internal void Poll(long nowNs)
     {
         if (!_available) return;
 
-        var nowNs = GetTimestampNs();
         var deltaNs = nowNs - _prevTimestampNs;
         if (deltaNs <= 0) deltaNs = 1;
+
+        if (_isXe)
+        {
+            try { PollXe(nowNs); }
+            catch (Exception ex) { Log.Debug(ex, "Intel GPU (xe) poll error"); }
+            _prevTimestampNs = nowNs;
+            return;
+        }
 
         try
         {
@@ -320,42 +352,42 @@ public class IntelGpuMonitor
             UpdateSensor("system/igpu/max_frequency", max, "MHz");
         if (boostFreq != null && double.TryParse(boostFreq, NumberStyles.Any, CultureInfo.InvariantCulture, out var boost))
             UpdateSensor("system/igpu/boost_frequency", boost, "MHz");
-
-        // xe driver: tile/gt layout
-        try
-        {
-            var deviceDir = Path.Combine(_cardPath, "device");
-            if (Directory.Exists(deviceDir))
-            {
-                foreach (var tileDir in Directory.GetDirectories(deviceDir, "tile*"))
-                {
-                    foreach (var gtDir in Directory.GetDirectories(tileDir, "gt*"))
-                    {
-                        foreach (var freqDir in Directory.GetDirectories(gtDir, "freq*"))
-                        {
-                            var xeActFreq = ReadFile(Path.Combine(freqDir, "act_freq"));
-                            var xeCurFreq = ReadFile(Path.Combine(freqDir, "cur_freq"));
-                            var xeMinFreq = ReadFile(Path.Combine(freqDir, "min_freq"));
-                            var xeMaxFreq = ReadFile(Path.Combine(freqDir, "max_freq"));
-
-                            if (xeActFreq != null && double.TryParse(xeActFreq, NumberStyles.Any, CultureInfo.InvariantCulture, out var xeAct))
-                                UpdateSensor("system/igpu/frequency", xeAct, "MHz");
-                            else if (xeCurFreq != null && double.TryParse(xeCurFreq, NumberStyles.Any, CultureInfo.InvariantCulture, out var xeCur))
-                                UpdateSensor("system/igpu/frequency", xeCur, "MHz");
-
-                            if (xeMinFreq != null && double.TryParse(xeMinFreq, NumberStyles.Any, CultureInfo.InvariantCulture, out var xeMin))
-                                UpdateSensor("system/igpu/min_frequency", xeMin, "MHz");
-                            if (xeMaxFreq != null && double.TryParse(xeMaxFreq, NumberStyles.Any, CultureInfo.InvariantCulture, out var xeMax))
-                                UpdateSensor("system/igpu/max_frequency", xeMax, "MHz");
-
-                            return; // only first freq node
-                        }
-                    }
-                }
-            }
-        }
-        catch { }
     }
+
+    private void PollXe(long nowNs)
+    {
+        var main = _xeMainGt!;
+        var freq = Path.Combine(main, "freq0");
+        if (ReadDouble(Path.Combine(freq, "act_freq")) is { } act) UpdateSensor("system/igpu/frequency", act, "MHz");
+        if (ReadDouble(Path.Combine(freq, "cur_freq")) is { } cur) UpdateSensor("system/igpu/req_frequency", cur, "MHz");
+        if (ReadDouble(Path.Combine(freq, "min_freq")) is { } min) UpdateSensor("system/igpu/min_frequency", min, "MHz");
+        if (ReadDouble(Path.Combine(freq, "max_freq")) is { } max) UpdateSensor("system/igpu/max_frequency", max, "MHz");
+
+        // Utilization = share of the interval the GT was out of its C6 idle state.
+        var elapsedMs = (nowNs - _prevTimestampNs) / 1_000_000.0;
+        if (XeIdlePercent(main, ref _prevXeMainIdleMs, elapsedMs) is { } idle)
+        {
+            UpdateSensor("system/igpu/rc6_percent", idle, "%");
+            UpdateSensor("system/igpu/utilization", Math.Round(100 - idle, 1), "%");
+        }
+        if (_xeMediaGt != null && XeIdlePercent(_xeMediaGt, ref _prevXeMediaIdleMs, elapsedMs) is { } mediaIdle)
+        {
+            UpdateSensor("system/igpu/media_utilization", Math.Round(100 - mediaIdle, 1), "%");
+        }
+    }
+
+    private double? XeIdlePercent(string gt, ref long prevIdleMs, double elapsedMs)
+    {
+        if (ReadDouble(Path.Combine(gt, "gtidle", "idle_residency_ms")) is not { } value) return null;
+        var idleMs = (long)value;
+        var prev = prevIdleMs;
+        prevIdleMs = idleMs;
+        if (prev < 0 || idleMs < prev || elapsedMs <= 0) return null;   // first sample or counter reset
+        return Math.Clamp(Math.Round((idleMs - prev) * 100.0 / elapsedMs, 1), 0, 100);
+    }
+
+    private double? ReadDouble(string path) =>
+        ReadFile(path) is { } text && double.TryParse(text, NumberStyles.Any, CultureInfo.InvariantCulture, out var value) ? value : null;
 
     private static bool ReadPerfCounter(int fd, out long value)
     {
@@ -390,6 +422,7 @@ public class IntelGpuMonitor
             ("max_frequency", "Max Frequency", "Frequency", "MHz"),
             ("boost_frequency", "Boost Frequency", "Frequency", "MHz"),
             ("utilization", "GPU Utilization", "Utilization", "%"),
+            ("media_utilization", "Media Utilization", "Utilization", "%"),
             ("rc6_percent", "RC6 Residency (Idle)", "Power", "%"),
         })
         {
@@ -440,16 +473,7 @@ public class IntelGpuMonitor
         }
     }
 
-    private static string? ReadFile(string path)
-    {
-        try
-        {
-            if (File.Exists(path))
-                return File.ReadAllText(path).Trim();
-        }
-        catch { }
-        return null;
-    }
+    private string? ReadFile(string path) => _sysfs.ReadValue(path);
 
     // --- P/Invoke ---
 
