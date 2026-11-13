@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.4.6 beta: BeadaPanel stuck after a reboot" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.4.7 beta: BeadaPanel and Turing panels stopped cleanly on exit" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="When InfoPanel quit, logged out, shut down or went to sleep, it exited without waiting for BeadaPanel and Turing panels to finish disconnecting. A BeadaPanel got the backlight-off command but not the blank frame or the end of the stream, so it was left mid-stream through the reboot. InfoPanel now waits for both kinds of panel, as it already did for the others. Thanks @Loreweaver75 (#14)." />
+                        <TextBlock Text="v0.4.6 beta: BeadaPanel stuck after a reboot" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="A BeadaPanel could stay dark after a reboot, with the log showing one StatusLink read timeout and then write timeouts on every retry. The panel takes no new commands while it holds data InfoPanel has not read, such as a late answer to the first panel info request or the status packet newer firmware sends by itself. InfoPanel now reads that data before it asks again. Thanks @Loreweaver75 (#14)." />
                         <TextBlock Text="v0.4.5 beta: power for Intel Arc cards on the xe driver" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
