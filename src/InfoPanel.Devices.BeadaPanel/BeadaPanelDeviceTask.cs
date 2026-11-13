@@ -128,22 +128,7 @@ namespace InfoPanel.Services
 
                 BeadaPanelHelper.ClaimStatusInterface(usbDevice);
 
-                var infoMessage = new StatusLinkMessage
-                {
-                    Type = StatusLinkMessageType.GetPanelInfo
-                };
-
-                using UsbEndpointWriter writer = usbDevice.OpenEndpointWriter(WriteEndpointID.Ep02);
-                writer.Write(infoMessage.ToBuffer(), 2000, out int _);
-
-                // Protocol message sent
-
-                byte[] responseBuffer = new byte[100];
-
-                using UsbEndpointReader reader = usbDevice.OpenEndpointReader(ReadEndpointID.Ep02);
-                reader.Read(responseBuffer, 2000, out int bytesRead);
-
-                var panelInfo = BeadaPanelParser.ParsePanelInfoResponse(responseBuffer);
+                var panelInfo = BeadaPanelHelper.QueryPanelInfo(usbDevice, usbRegistry.DevicePath);
 
                 if (panelInfo == null)
                 {
@@ -188,6 +173,7 @@ namespace InfoPanel.Services
                     Payload = [100]
                 };
 
+                using UsbEndpointWriter writer = usbDevice.OpenEndpointWriter(WriteEndpointID.Ep02);
                 writer.Write(resetTag.ToBuffer(), 2000, out int _);
 
                 await Task.Delay(1000, token);
