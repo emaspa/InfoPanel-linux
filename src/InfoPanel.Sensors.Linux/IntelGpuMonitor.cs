@@ -16,7 +16,8 @@ namespace InfoPanel.Services;
 /// gtidle/idle_residency_ms for utilization. The xe PMU is not used: every open xe
 /// event holds a runtime-PM reference, and engine and frequency events also hold GT
 /// forcewake, so keeping them open would stop the GPU from ever idling (and pin the
-/// utilization read from idle residency at 100%).
+/// utilization read from idle residency at 100%). VRAM comes from the xe memory region
+/// query on the card's render node (see <see cref="XeMemoryQuery"/>).
 /// </summary>
 public class IntelGpuMonitor
 {
@@ -36,6 +37,10 @@ public class IntelGpuMonitor
     private long _prevXeMainIdleMs = -1;
     private long _prevXeMediaIdleMs = -1;
 
+    // xe: VRAM used/total for discrete cards
+    private readonly Func<string, IXeMemoryQuery?> _openMemoryQuery;
+    private IXeMemoryQuery? _xeMemory;
+
     // PMU file descriptors
     private int _fdActualFreq = -1;
     private int _fdRequestedFreq = -1;
@@ -52,7 +57,11 @@ public class IntelGpuMonitor
     // PMU type from sysfs
     private uint _pmuType;
 
-    internal IntelGpuMonitor(SysfsAccess sysfs) => _sysfs = sysfs;
+    internal IntelGpuMonitor(SysfsAccess sysfs, Func<string, IXeMemoryQuery?>? openMemoryQuery = null)
+    {
+        _sysfs = sysfs;
+        _openMemoryQuery = openMemoryQuery ?? (node => XeMemoryQuery.Open(node));
+    }
 
     public void Initialize()
     {
@@ -149,6 +158,22 @@ public class IntelGpuMonitor
             Log.Information("Intel GPU monitor initialized (xe sysfs): {Name}, {GtCount} GT(s)", _gpuName, gts.Count);
         else
             Log.Debug("Intel GPU: xe device without tile/gt sysfs at {Path}", device);
+
+        // VRAM through the render node; integrated GPUs have no VRAM region and get no sensors.
+        var renderNode = _sysfs.GetDirectories(Path.Combine(device, "drm"), "renderD*").Select(Path.GetFileName).Order(StringComparer.Ordinal).FirstOrDefault();
+        if (renderNode != null && _openMemoryQuery("/dev/dri/" + renderNode) is { } query)
+        {
+            if (query.QueryVram() is { } vram)
+            {
+                _xeMemory = query;
+                _available = true;
+                Log.Information("Intel GPU: {Total} MB VRAM, used reported: {HasUsed}", vram.Total / (1024 * 1024), vram.Used != null);
+            }
+            else
+            {
+                query.Dispose();
+            }
+        }
     }
 
     private bool ReadPmuType()
@@ -255,6 +280,8 @@ public class IntelGpuMonitor
             close(fd);
         }
         _engineFds.Clear();
+        _xeMemory?.Dispose();
+        _xeMemory = null;
         _available = false;
     }
 
@@ -356,7 +383,18 @@ public class IntelGpuMonitor
 
     private void PollXe(long nowNs)
     {
-        var main = _xeMainGt!;
+        if (_xeMemory?.QueryVram() is { } vram)
+        {
+            const double Mb = 1024.0 * 1024;
+            UpdateSensor("system/igpu/vram_total", Math.Round(vram.Total / Mb, 0), "MB");
+            if (vram.Used is { } used)
+            {
+                UpdateSensor("system/igpu/vram_used", Math.Round(used / Mb, 0), "MB");
+                UpdateSensor("system/igpu/vram_percent", Math.Round(used * 100.0 / vram.Total, 1), "%");
+            }
+        }
+
+        if (_xeMainGt is not { } main) return;
         var freq = Path.Combine(main, "freq0");
         if (ReadDouble(Path.Combine(freq, "act_freq")) is { } act) UpdateSensor("system/igpu/frequency", act, "MHz");
         if (ReadDouble(Path.Combine(freq, "cur_freq")) is { } cur) UpdateSensor("system/igpu/req_frequency", cur, "MHz");
@@ -424,6 +462,9 @@ public class IntelGpuMonitor
             ("utilization", "GPU Utilization", "Utilization", "%"),
             ("media_utilization", "Media Utilization", "Utilization", "%"),
             ("rc6_percent", "RC6 Residency (Idle)", "Power", "%"),
+            ("vram_used", "VRAM Used", "Memory", "MB"),
+            ("vram_total", "VRAM Total", "Memory", "MB"),
+            ("vram_percent", "VRAM Usage", "Memory", "%"),
         })
         {
             var key = $"system/igpu/{suffix}";

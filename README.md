@@ -72,8 +72,9 @@ Native Linux providers, no kernel modules or vendor daemons required:
   gets power in watts averaged over 5 seconds.
 - **Intel GPU**: on i915, frequency from sysfs and engine utilization from PMU
   perf events. On xe, the driver for Arc B-series cards and Lunar Lake or
-  newer, frequency plus GPU and media utilization from sysfs, which needs no
-  extra permissions.
+  newer, frequency plus GPU and media utilization from sysfs, and VRAM used
+  and total on discrete cards from the driver's memory query. None of it
+  needs extra permissions.
 - **AMD GPU**: ROCm SMI (usage, clocks, VRAM, power, temperature).
 - **NVIDIA GPU**: NVML + NvAPI (usage, clocks, VRAM, power draw and
   limit, GPU/hotspot/VRAM temperatures, core voltage, performance state,

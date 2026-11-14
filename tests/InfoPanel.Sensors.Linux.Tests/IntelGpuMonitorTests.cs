@@ -32,7 +32,93 @@ public sealed class IntelGpuMonitorTests : IDisposable
         }
         // The xe PMU is present but must not be needed (or used).
         fs.Write("bus/event_source/devices/xe_0000_03_00.0/type", "32");
+        fs.Dir(device + "/drm/card1");
+        fs.Dir(device + "/drm/renderD128");
         return device;
+    }
+
+    private sealed class FakeMemoryQuery(params XeVram?[] replies) : IXeMemoryQuery
+    {
+        private int _next;
+        public bool Disposed;
+        public XeVram? QueryVram() => replies[Math.Min(_next++, replies.Length - 1)];
+        public void Dispose() => Disposed = true;
+    }
+
+    private const ulong MiB = 1024 * 1024;
+
+    [Fact]
+    public void XeCardReportsVramFromTheRenderNodeQuery()
+    {
+        using var fs = new FakeSysfs();
+        XeCard(fs);
+        string? opened = null;
+        var query = new FakeMemoryQuery(new XeVram(12 * 1024 * MiB, 1536 * MiB), new XeVram(12 * 1024 * MiB, 3072 * MiB));
+        var monitor = new IntelGpuMonitor(fs, node => { opened = node; return query; });
+        monitor.Initialize();
+        Assert.Equal("/dev/dri/renderD128", opened);
+
+        monitor.Poll(1 * Second);
+        Assert.Equal(12288, HwmonMonitor.SENSORHASH["system/igpu/vram_total"].ValueNow);
+        Assert.Equal(3072, HwmonMonitor.SENSORHASH["system/igpu/vram_used"].ValueNow);
+        Assert.Equal(25, HwmonMonitor.SENSORHASH["system/igpu/vram_percent"].ValueNow);
+        Assert.Contains(monitor.GetSensorInfoList(), s => s.SensorId == "system/igpu/vram_used" && s.Unit == "MB");
+
+        monitor.Shutdown();
+        Assert.True(query.Disposed);
+    }
+
+    [Fact]
+    public void XeVramUsedIsLeftOutWhenTheKernelDoesNotReportIt()
+    {
+        using var fs = new FakeSysfs();
+        XeCard(fs);
+        var monitor = new IntelGpuMonitor(fs, _ => new FakeMemoryQuery(new XeVram(12 * 1024 * MiB, null)));
+        monitor.Initialize();
+        monitor.Poll(1 * Second);
+        Assert.Equal(12288, HwmonMonitor.SENSORHASH["system/igpu/vram_total"].ValueNow);
+        Assert.False(HwmonMonitor.SENSORHASH.ContainsKey("system/igpu/vram_used"));
+        Assert.False(HwmonMonitor.SENSORHASH.ContainsKey("system/igpu/vram_percent"));
+    }
+
+    [Fact]
+    public void XeIntegratedGpuWithoutVramClosesTheQuery()
+    {
+        using var fs = new FakeSysfs();
+        XeCard(fs);
+        var query = new FakeMemoryQuery((XeVram?)null);
+        var monitor = new IntelGpuMonitor(fs, _ => query);
+        monitor.Initialize();
+        monitor.Poll(1 * Second);
+        Assert.True(query.Disposed);
+        Assert.False(HwmonMonitor.SENSORHASH.ContainsKey("system/igpu/vram_total"));
+        Assert.True(HwmonMonitor.SENSORHASH.ContainsKey("system/igpu/frequency"));
+    }
+
+    [Fact]
+    public void XeMemoryRegionReplyIsParsedPerUapiLayout()
+    {
+        // struct drm_xe_query_mem_regions: sysmem region, then one VRAM region (88 bytes each).
+        var reply = new byte[8 + 2 * 88];
+        BitConverter.TryWriteBytes(reply.AsSpan(0), 2u);
+        BitConverter.TryWriteBytes(reply.AsSpan(8 + 0), (ushort)0);
+        BitConverter.TryWriteBytes(reply.AsSpan(8 + 8), 64UL * 1024 * MiB);
+        BitConverter.TryWriteBytes(reply.AsSpan(8 + 16), 900 * MiB);
+        var vram = 8 + 88;
+        BitConverter.TryWriteBytes(reply.AsSpan(vram + 0), (ushort)1);
+        BitConverter.TryWriteBytes(reply.AsSpan(vram + 2), (ushort)1);
+        BitConverter.TryWriteBytes(reply.AsSpan(vram + 8), 12UL * 1024 * MiB);
+        BitConverter.TryWriteBytes(reply.AsSpan(vram + 16), 512 * MiB);
+        var handle = System.Runtime.InteropServices.GCHandle.Alloc(reply, System.Runtime.InteropServices.GCHandleType.Pinned);
+        try
+        {
+            Assert.Equal(new XeVram(12UL * 1024 * MiB, 512 * MiB), XeMemoryQuery.Parse(handle.AddrOfPinnedObject(), reply.Length));
+            BitConverter.TryWriteBytes(reply.AsSpan(vram + 16), 0UL);
+            Assert.Equal(new XeVram(12UL * 1024 * MiB, null), XeMemoryQuery.Parse(handle.AddrOfPinnedObject(), reply.Length));
+            BitConverter.TryWriteBytes(reply.AsSpan(0), 3u); // claims more regions than the reply holds
+            Assert.Null(XeMemoryQuery.Parse(handle.AddrOfPinnedObject(), reply.Length));
+        }
+        finally { handle.Free(); }
     }
 
     [Fact]
@@ -40,7 +126,7 @@ public sealed class IntelGpuMonitorTests : IDisposable
     {
         using var fs = new FakeSysfs { ReverseListings = true };
         var device = XeCard(fs);
-        var monitor = new IntelGpuMonitor(fs);
+        var monitor = new IntelGpuMonitor(fs, _ => null);
         monitor.Initialize();
 
         monitor.Poll(10 * Second);
@@ -69,7 +155,7 @@ public sealed class IntelGpuMonitorTests : IDisposable
     {
         using var fs = new FakeSysfs();
         var device = XeCard(fs);
-        var monitor = new IntelGpuMonitor(fs);
+        var monitor = new IntelGpuMonitor(fs, _ => null);
         monitor.Initialize();
         fs.Write(device + "/tile0/gt0/gtidle/idle_residency_ms", "5000");
         monitor.Poll(1 * Second);
@@ -87,7 +173,7 @@ public sealed class IntelGpuMonitorTests : IDisposable
         using var fs = new FakeSysfs();
         var device = XeCard(fs);
         Directory.Delete(fs.PathUnderRoot(device + "/tile0/gt1"), recursive: true);
-        var monitor = new IntelGpuMonitor(fs);
+        var monitor = new IntelGpuMonitor(fs, _ => null);
         monitor.Initialize();
         monitor.Poll(1 * Second);
         monitor.Poll(2 * Second);
