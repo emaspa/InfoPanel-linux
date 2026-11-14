@@ -542,7 +542,7 @@ To produce the same self-contained tarball as the published releases (also
 requires Python 3 for the version guard):
 
 ```bash
-packaging/publish.sh 0.4.7     # builds artifacts/infopanel-0.4.7-linux-x64.tar.gz
+packaging/publish.sh 0.4.8     # builds artifacts/infopanel-0.4.8-linux-x64.tar.gz
 ```
 
 The argument must match `<Version>` in `src/InfoPanel.App/InfoPanel.App.csproj`;
