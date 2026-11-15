@@ -42,7 +42,10 @@
                 </WrapPanel>
                 <Expander Header="Release notes" FontSize="12">
                     <StackPanel Spacing="4" Margin="0,8,0,0">
-                        <TextBlock Text="v0.4.8 beta: VRAM for Intel Arc cards on the xe driver" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock Text="v0.4.9 beta: optional engine utilization for Intel Arc on xe" FontWeight="SemiBold" FontSize="12" />
+                        <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
+                                   Text="On the xe driver, GPU Utilization is the time the GPU is awake, which reads near 100% in games that don't load it fully. A new option in Settings, Sensors adds render, copy, video and compute busy from each program's GPU usage. It is off by default because every reading briefly wakes the GPU. Thanks @Vinnydev93 (#16)." />
+                        <TextBlock Text="v0.4.8 beta: VRAM for Intel Arc cards on the xe driver" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
                         <TextBlock FontSize="11" Opacity="0.75" TextWrapping="Wrap"
                                    Text="Discrete Arc cards on the xe driver now report VRAM Used, VRAM Total and VRAM Usage. InfoPanel asks the driver directly, which needs no permissions and does not wake the GPU. Thanks @Vinnydev93 (#16)." />
                         <TextBlock Text="v0.4.7 beta: BeadaPanel and Turing panels stopped cleanly on exit" FontWeight="SemiBold" FontSize="12" Margin="0,8,0,0" />
