@@ -189,6 +189,9 @@ namespace InfoPanel
                         case nameof(Settings.RenderDevice):
                             Gpu.GpuRendering.Select(Settings.RenderDevice);
                             break;
+                        case nameof(Settings.IntelGpuFdinfoEngines):
+                            IntelGpuMonitor.FdinfoEngineUtilization = Settings.IntelGpuFdinfoEngines;
+                            break;
                         case nameof(Settings.HardwareVideoDecode):
                             // Restarts running video decoders so the change shows at once.
                             Video.FfmpegVideoDecoder.HardwareDecode = Settings.HardwareVideoDecode;
@@ -222,6 +225,7 @@ namespace InfoPanel
             RenderContext.GridLinesColor = Settings.GridLinesColor;
             RenderContext.SelectedItemColor = Settings.SelectedItemColor;
             Video.FfmpegVideoDecoder.HardwareDecode = Settings.HardwareVideoDecode;
+            IntelGpuMonitor.FdinfoEngineUtilization = Settings.IntelGpuFdinfoEngines;
 
             // Live display items: renderers see designer edits immediately
             RenderContext.GetDisplayItems = Stores.DisplayItemStore.Instance.GetSnapshot;

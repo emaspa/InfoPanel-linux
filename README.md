@@ -74,7 +74,9 @@ Native Linux providers, no kernel modules or vendor daemons required:
   perf events. On xe, the driver for Arc B-series cards and Lunar Lake or
   newer, frequency plus GPU and media utilization from sysfs, and VRAM used
   and total on discrete cards from the driver's memory query. None of it
-  needs extra permissions.
+  needs extra permissions. Per-engine utilization on xe (render, copy,
+  video, compute) comes from each program's DRM fdinfo and is off by
+  default (Settings, Sensors), because every reading briefly wakes the GPU.
 - **AMD GPU**: ROCm SMI (usage, clocks, VRAM, power, temperature).
 - **NVIDIA GPU**: NVML + NvAPI (usage, clocks, VRAM, power draw and
   limit, GPU/hotspot/VRAM temperatures, core voltage, performance state,

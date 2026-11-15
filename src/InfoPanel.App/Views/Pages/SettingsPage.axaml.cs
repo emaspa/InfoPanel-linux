@@ -38,6 +38,7 @@ namespace InfoPanel.Views.Pages
             FrameRate.ValueChanged += (_, _) => Apply(s => s.TargetFrameRate = (int)(FrameRate.Value ?? 15));
             GraphRate.ValueChanged += (_, _) => Apply(s => s.TargetGraphUpdateRate = (int)(GraphRate.Value ?? 1000));
             HardwareVideoDecodeToggle.IsCheckedChanged += (_, _) => Apply(s => s.HardwareVideoDecode = HardwareVideoDecodeToggle.IsChecked == true);
+            IntelFdinfoToggle.IsCheckedChanged += (_, _) => Apply(s => s.IntelGpuFdinfoEngines = IntelFdinfoToggle.IsChecked == true);
             WebServerToggle.IsCheckedChanged += (_, _) => Apply(s => s.WebServer = WebServerToggle.IsChecked == true);
             WebServerIp.LostFocus += (_, _) => Apply(s => s.WebServerListenIp = WebServerIp.Text ?? "127.0.0.1");
             WebServerPort.ValueChanged += (_, _) => Apply(s => s.WebServerListenPort = (int)(WebServerPort.Value ?? 80));
@@ -72,6 +73,7 @@ namespace InfoPanel.Views.Pages
                 GraphRate.Value = settings.TargetGraphUpdateRate;
                 LoadRenderDevices(settings.RenderDevice);
                 HardwareVideoDecodeToggle.IsChecked = settings.HardwareVideoDecode;
+                IntelFdinfoToggle.IsChecked = settings.IntelGpuFdinfoEngines;
                 WebServerToggle.IsChecked = settings.WebServer;
                 WebServerIp.Text = settings.WebServerListenIp;
                 WebServerPort.Value = settings.WebServerListenPort;

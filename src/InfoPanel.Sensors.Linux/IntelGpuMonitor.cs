@@ -17,7 +17,9 @@ namespace InfoPanel.Services;
 /// event holds a runtime-PM reference, and engine and frequency events also hold GT
 /// forcewake, so keeping them open would stop the GPU from ever idling (and pin the
 /// utilization read from idle residency at 100%). VRAM comes from the xe memory region
-/// query on the card's render node (see <see cref="XeMemoryQuery"/>).
+/// query on the card's render node (see <see cref="XeMemoryQuery"/>). Per-engine busy on xe
+/// comes from DRM fdinfo, opt-in through <see cref="FdinfoEngineUtilization"/> because every
+/// fdinfo read briefly wakes the GPU (see <see cref="XeFdinfoEngines"/>).
 /// </summary>
 public class IntelGpuMonitor
 {
@@ -41,6 +43,17 @@ public class IntelGpuMonitor
     private readonly Func<string, IXeMemoryQuery?> _openMemoryQuery;
     private IXeMemoryQuery? _xeMemory;
 
+    // xe: per-engine busy from fdinfo (opt-in)
+    private static readonly (string Class, string Name)[] XeEngineClasses =
+        [("rcs", "render"), ("bcs", "copy"), ("vcs", "video"), ("vecs", "video-enhance"), ("ccs", "compute"), ("other", "other")];
+    private readonly string _procRoot;
+    private List<string> _xeNodes = [];
+    private XeFdinfoEngines? _xeEngines;
+    private bool _xeEngineSensors;
+
+    /// <summary>Settings.IntelGpuFdinfoEngines, pushed by the host. Off by default: each read wakes the GPU.</summary>
+    public static volatile bool FdinfoEngineUtilization;
+
     // PMU file descriptors
     private int _fdActualFreq = -1;
     private int _fdRequestedFreq = -1;
@@ -57,9 +70,10 @@ public class IntelGpuMonitor
     // PMU type from sysfs
     private uint _pmuType;
 
-    internal IntelGpuMonitor(SysfsAccess sysfs, Func<string, IXeMemoryQuery?>? openMemoryQuery = null)
+    internal IntelGpuMonitor(SysfsAccess sysfs, Func<string, IXeMemoryQuery?>? openMemoryQuery = null, string procRoot = "/proc")
     {
         _sysfs = sysfs;
+        _procRoot = procRoot;
         _openMemoryQuery = openMemoryQuery ?? (node => XeMemoryQuery.Open(node));
     }
 
@@ -159,8 +173,14 @@ public class IntelGpuMonitor
         else
             Log.Debug("Intel GPU: xe device without tile/gt sysfs at {Path}", device);
 
+        _xeNodes = _sysfs.GetDirectories(Path.Combine(device, "drm"))
+            .Select(d => Path.GetFileName(d)!)
+            .Where(n => n.StartsWith("card", StringComparison.Ordinal) || n.StartsWith("renderD", StringComparison.Ordinal))
+            .ToList();
+        if (_xeNodes.Count > 0) _available = true;
+
         // VRAM through the render node; integrated GPUs have no VRAM region and get no sensors.
-        var renderNode = _sysfs.GetDirectories(Path.Combine(device, "drm"), "renderD*").Select(Path.GetFileName).Order(StringComparer.Ordinal).FirstOrDefault();
+        var renderNode = _xeNodes.Where(n => n.StartsWith("renderD", StringComparison.Ordinal)).Order(StringComparer.Ordinal).FirstOrDefault();
         if (renderNode != null && _openMemoryQuery("/dev/dri/" + renderNode) is { } query)
         {
             if (query.QueryVram() is { } vram)
@@ -394,6 +414,8 @@ public class IntelGpuMonitor
             }
         }
 
+        PollXeEngines(nowNs);
+
         if (_xeMainGt is not { } main) return;
         var freq = Path.Combine(main, "freq0");
         if (ReadDouble(Path.Combine(freq, "act_freq")) is { } act) UpdateSensor("system/igpu/frequency", act, "MHz");
@@ -411,6 +433,33 @@ public class IntelGpuMonitor
         if (_xeMediaGt != null && XeIdlePercent(_xeMediaGt, ref _prevXeMediaIdleMs, elapsedMs) is { } mediaIdle)
         {
             UpdateSensor("system/igpu/media_utilization", Math.Round(100 - mediaIdle, 1), "%");
+        }
+    }
+
+    private void PollXeEngines(long nowNs)
+    {
+        if (!FdinfoEngineUtilization || _xeNodes.Count == 0 || _pciSlot.Length == 0)
+        {
+            _xeEngines = null;   // turned off: drop the sensors, and start fresh when it is turned on again
+            if (!_xeEngineSensors) return;
+            _xeEngineSensors = false;
+            foreach (var (_, name) in XeEngineClasses) HwmonMonitor.SENSORHASH.TryRemove($"system/igpu/engine/{name}", out _);
+            return;
+        }
+        // Each sample wakes the GPU, so skip it unless an engine sensor is on a panel or a sensor page is open.
+        if (!SensorDemand.PollAll && !XeEngineClasses.Any(e => SensorDemand.IsHwmonUsed($"system/igpu/engine/{e.Name}")))
+        {
+            _xeEngines = null;   // the next sample after a gap must not average over it
+            return;
+        }
+
+        _xeEngines ??= new XeFdinfoEngines(_procRoot, _pciSlot,
+            new HashSet<string>(_xeNodes.Select(n => "/dev/dri/" + n), StringComparer.Ordinal), Environment.ProcessId);
+        foreach (var (cls, busy) in _xeEngines.Sample(nowNs / 1_000_000))
+        {
+            var name = XeEngineClasses.FirstOrDefault(e => e.Class == cls).Name ?? cls;
+            UpdateSensor($"system/igpu/engine/{name}", busy, "%");
+            _xeEngineSensors = true;
         }
     }
 

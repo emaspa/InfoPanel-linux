@@ -198,6 +198,11 @@ namespace InfoPanel.Models
         [ObservableProperty]
         private bool _hardwareVideoDecode = false;
 
+        /// <summary>Per-engine busy for Intel GPUs on the xe driver from DRM fdinfo. Off by
+        /// default: every fdinfo read briefly wakes the GPU out of RC6.</summary>
+        [ObservableProperty]
+        private bool _intelGpuFdinfoEngines = false;
+
         [ObservableProperty]
         private int _version = 114;
 

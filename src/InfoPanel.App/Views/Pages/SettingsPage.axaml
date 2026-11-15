@@ -39,6 +39,13 @@
             </StackPanel>
 
             <StackPanel Spacing="8">
+                <TextBlock Text="Sensors" FontSize="18" FontWeight="SemiBold" />
+                <ToggleSwitch x:Name="IntelFdinfoToggle" OnContent="Intel GPU engine utilization (xe)" OffContent="Intel GPU engine utilization (xe)" />
+                <TextBlock Text="Adds render, copy, video and compute busy sensors for Intel GPUs on the xe driver, read from each program's GPU usage. Every reading briefly wakes the GPU, which lowers its idle residency, so it only runs while one of these sensors is on a panel or a sensor page is open."
+                           FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <StackPanel Spacing="8">
                 <TextBlock Text="Program-specific profiles" FontSize="18" FontWeight="SemiBold" />
                 <TextBlock Text="Shows an overlay only while its trigger program is in the foreground. Set trigger programs per profile in the Designer."
                            FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
